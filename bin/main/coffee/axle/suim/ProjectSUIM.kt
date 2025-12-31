@@ -41,7 +41,7 @@ class ProjectSUIM {
             val lineHeight = fr.FONT_HEIGHT + 1
             val yPos = event.gui.height - 10 - brandingHeight - (2 * lineHeight)
 
-            fr.drawStringWithShadow("$MOD_NAME (" + featureManager?.features?.count()+ ") Modules", 2F, yPos.toFloat(), 0xFFFFFF)
+            fr.drawStringWithShadow("$MOD_NAME Modules: " + featureManager?.features?.count(), 2F, yPos.toFloat(), 0xFFFFFF)
             
             val myauModuleCount = featureManager?.manager?.moduleCount ?: 0
             fr.drawStringWithShadow("Myau Modules: $myauModuleCount", 2F, (yPos + lineHeight).toFloat(), 0xFFFFFF)
