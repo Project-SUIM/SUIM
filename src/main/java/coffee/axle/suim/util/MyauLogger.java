@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class MyauLogger {
-    private static String PREFIX = "[MyauInjectionTemplate]";
+    private static String PREFIX = "[d'Myau]";
     private static final Map<String, String> ERROR_TO_MSG = new HashMap<>();
 
     static {

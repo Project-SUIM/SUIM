@@ -14,8 +14,9 @@ import net.minecraftforge.fml.common.gameevent.TickEvent
 @Mod(modid = "suim", useMetadata = true)
 class ProjectSUIM {
     companion object {
-        const val MOD_NAME = "MyauInjectionTemplate"
-        const val LOG_PREFIX = "[MyauInjectionTemplate]"
+        const val MOD_NAME = "d'Myau"
+        const val MOD_NAME_LONG = "Société des Utilitaires et Injections d'Myau" // when will we need this?
+        const val LOG_PREFIX = "[d'Myau]"
     }
 
     private var featureManager: FeatureManager? = null
@@ -25,12 +26,10 @@ class ProjectSUIM {
 
     @Mod.EventHandler
     fun init(event: FMLInitializationEvent) {
-        // Set the logger prefix early
         MyauLogger.setPrefix(LOG_PREFIX)
         MyauLogger.log("INIT_START")
         MinecraftForge.EVENT_BUS.register(this)
     }
-    // This draws some info on the main menu about how many modules the template includes + the total myau is reporting from myau + all injected modules
     @SubscribeEvent
     fun onGuiDraw(event: GuiScreenEvent.DrawScreenEvent.Post) {
         if (event.gui is GuiMainMenu) {
