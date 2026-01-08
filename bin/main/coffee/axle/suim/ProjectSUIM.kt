@@ -1,5 +1,6 @@
 package coffee.axle.suim
 
+import coffee.axle.suim.handlers.PlayerMotionHandler
 import coffee.axle.suim.util.MyauLogger
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiMainMenu
@@ -28,6 +29,7 @@ class ProjectSUIM {
     fun init(event: FMLInitializationEvent) {
         MyauLogger.setPrefix(LOG_PREFIX)
         MyauLogger.log("INIT_START")
+        MinecraftForge.EVENT_BUS.register(PlayerMotionHandler())
         MinecraftForge.EVENT_BUS.register(this)
     }
     @SubscribeEvent

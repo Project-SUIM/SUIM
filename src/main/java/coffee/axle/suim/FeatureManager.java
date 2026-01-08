@@ -1,8 +1,6 @@
 package coffee.axle.suim;
 
-import coffee.axle.suim.features.Feature;
-import coffee.axle.suim.features.TestCommand;
-import coffee.axle.suim.features.TestModule;
+import coffee.axle.suim.features.*;
 import coffee.axle.suim.hooks.MyauHook;
 import coffee.axle.suim.hooks.MyauModuleCreator;
 import coffee.axle.suim.hooks.MyauModuleManager;
@@ -23,8 +21,32 @@ public class FeatureManager {
         this.creator = new MyauModuleCreator(hook);
         this.manager = new MyauModuleManager(hook);
 
+        // Test features
         registerFeature(new TestCommand(creator, manager));
         registerFeature(new TestModule(hook, creator, manager));
+
+        // Commands
+        registerFeature(new DMyauCommand());
+        registerFeature(new FindCommand());
+        registerFeature(new StatusCommand());
+        registerFeature(new ClientInfoCommand());
+
+        // Module extensions
+        registerFeature(new AimAssistShowTarget());
+        registerFeature(new ArmorExceptions());
+        registerFeature(new AutoClickerExtras());
+        registerFeature(new BedESPTeamColor());
+        registerFeature(new Bedplates());
+        registerFeature(new EagleAutoSwap());
+        registerFeature(new FastPlaceExtras());
+        registerFeature(new Freelook());
+        registerFeature(new HitSelect());
+        registerFeature(new InvManagerExtras());
+        registerFeature(new KillAuraDisableOnDeath());
+        registerFeature(new SkullESP());
+        registerFeature(new TimerFeature());
+        registerFeature(new VelocityBuffer());
+        registerFeature(new XraySpawnerNameTags());
     }
 
     private void registerFeature(Feature feature) {
