@@ -32,6 +32,7 @@ public class FeatureManager {
         registerFeature(new ClientInfoCommand());
 
         // Module extensions
+        registerFeature(new MultiPointAiming());
         registerFeature(new AimAssistShowTarget());
         registerFeature(new ArmorExceptions());
         registerFeature(new AutoClickerExtras());
@@ -43,6 +44,9 @@ public class FeatureManager {
         registerFeature(new HitSelect());
         registerFeature(new InvManagerExtras());
         registerFeature(new KillAuraDisableOnDeath());
+        registerFeature(new MoreKB());
+        registerFeature(new AutoBlockIn());
+        registerFeature(new AutoClutch());
         registerFeature(new SkullESP());
         registerFeature(new TimerFeature());
         registerFeature(new VelocityBuffer());

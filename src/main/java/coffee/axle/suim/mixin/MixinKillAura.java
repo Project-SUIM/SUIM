@@ -14,7 +14,7 @@ import java.util.Random;
 /**
  * NoSlow fix via slot switch
  * 
- * @author maybsomeday (meow) - ported 1:1 to d'Myau
+ * @author maybsomeday (meow)
  */
 @Pseudo
 @Mixin(targets = "myau.Kf", remap = false)

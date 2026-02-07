@@ -639,6 +639,13 @@ public class MyauHook {
         this.clientNamePrefix = rawPrefix;
     }
 
+    public void setClientName(String name) throws Exception {
+        Class<?> myauClass = getCachedClass(CLASS_MAIN);
+        Field clientNameField = getCachedField(myauClass, FIELD_CLIENT_NAME);
+        clientNameField.set(null, name);
+        this.clientNamePrefix = name;
+    }
+
     public String getClientVersion() {
         try {
             Class<?> myauClass = getCachedClass(CLASS_MAIN);

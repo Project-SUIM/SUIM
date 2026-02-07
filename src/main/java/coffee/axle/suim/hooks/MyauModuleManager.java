@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static coffee.axle.suim.hooks.MyauMappings.*;
 
 /**
- * Manages existing Myau modules rather than creating new ones
+ * Manages existing Myau modules
  */
 public class MyauModuleManager {
     private static final Minecraft mc = Minecraft.getMinecraft();

@@ -1,6 +1,7 @@
 package coffee.axle.suim.features;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiInventory;
@@ -72,7 +73,7 @@ public class InvManagerExtras implements Feature {
                 return false;
             }
 
-            hook.registerEventHandler("myau.q", this::onWindowClick, (byte) 0);
+            hook.registerEventHandler(MyauMappings.CLASS_WINDOW_CLICK_EVENT, this::onWindowClick, (byte) 0);
 
             net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
 
@@ -108,21 +109,21 @@ public class InvManagerExtras implements Feature {
             updateExceptionList();
 
             Class<?> eventClass = eventObj.getClass();
-            Field modeField = eventClass.getDeclaredField("E");
+            Field modeField = eventClass.getDeclaredField(MyauMappings.FIELD_WINDOW_CLICK_MODE);
             modeField.setAccessible(true);
             int mode = modeField.getInt(eventObj);
 
             if (mode != 4)
                 return;
 
-            Field mouseField = eventClass.getDeclaredField("z");
+            Field mouseField = eventClass.getDeclaredField(MyauMappings.FIELD_WINDOW_CLICK_BUTTON);
             mouseField.setAccessible(true);
             int mouseButton = mouseField.getInt(eventObj);
 
             if (mouseButton != 1)
                 return;
 
-            Field slotField = eventClass.getDeclaredField("n");
+            Field slotField = eventClass.getDeclaredField(MyauMappings.FIELD_WINDOW_CLICK_SLOT);
             slotField.setAccessible(true);
             int slotId = slotField.getInt(eventObj);
 
@@ -132,7 +133,8 @@ public class InvManagerExtras implements Feature {
                 ItemStack stack = mc.thePlayer.inventory.getStackInSlot(inventorySlot);
 
                 if (stack != null && isException(stack)) {
-                    Field cancelledField = eventClass.getSuperclass().getDeclaredField("H");
+                    Field cancelledField = eventClass.getSuperclass()
+                            .getDeclaredField(MyauMappings.FIELD_EVENT_CANCELLED);
                     cancelledField.setAccessible(true);
                     cancelledField.setBoolean(eventObj, true);
                 }

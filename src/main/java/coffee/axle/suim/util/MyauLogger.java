@@ -49,7 +49,7 @@ public class MyauLogger {
     public static void log(String code, Object... args) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " ???");
+            System.out.println(PREFIX + " " + code);
         } else {
             if (args.length > 0) {
                 msg = String.format(msg, args);
@@ -61,7 +61,7 @@ public class MyauLogger {
     public static void log(String component, String code, Object... args) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " [" + component + "] ???");
+            System.out.println(PREFIX + " [" + component + "] " + code);
         } else {
             if (args.length > 0) {
                 msg = String.format(msg, args);
@@ -73,7 +73,7 @@ public class MyauLogger {
     public static void logMore(String code, String details) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " ???");
+            System.out.println(PREFIX + " " + code);
         } else {
             System.out.println(PREFIX + " " + msg + " (" + details + ")");
         }

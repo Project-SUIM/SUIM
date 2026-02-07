@@ -1,6 +1,7 @@
 package coffee.axle.suim.features;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
@@ -66,8 +67,8 @@ public class HitSelect implements Feature {
 
             hook.reloadModuleCommand();
 
-            hook.registerEventHandler("myau.m6", this::onUpdate, (byte) 3);
-            hook.registerEventHandler("myau.R", this::onPacket, (byte) 0);
+            hook.registerEventHandler(MyauMappings.CLASS_UPDATE_EVENT, this::onUpdate, (byte) 3);
+            hook.registerEventHandler(MyauMappings.CLASS_PACKET_EVENT, this::onPacket, (byte) 0);
 
             MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
@@ -82,11 +83,11 @@ public class HitSelect implements Feature {
         try {
             Class<?> ec = eventObj.getClass();
 
-            Field typeField = ec.getDeclaredField("C");
+            Field typeField = ec.getDeclaredField(MyauMappings.FIELD_UPDATE_EVENT_TYPE);
             typeField.setAccessible(true);
             Object eventType = typeField.get(eventObj);
 
-            if (eventType != null && eventType.toString().equals("POST")) {
+            if (eventType != null && eventType.toString().equals(MyauMappings.FIELD_EVENT_TYPED_POST)) {
                 resetMotion();
             }
 
@@ -102,7 +103,7 @@ public class HitSelect implements Feature {
 
             Class<?> eventClass = eventObj.getClass();
 
-            Field packetField = eventClass.getDeclaredField("z");
+            Field packetField = eventClass.getDeclaredField(MyauMappings.FIELD_PACKET_EVENT_PACKET);
             packetField.setAccessible(true);
             Packet<?> packet = (Packet<?>) packetField.get(eventObj);
 
@@ -157,7 +158,8 @@ public class HitSelect implements Feature {
                 }
 
                 if (!allow) {
-                    Field cancelledField = eventClass.getSuperclass().getDeclaredField("H");
+                    Field cancelledField = eventClass.getSuperclass()
+                            .getDeclaredField(MyauMappings.FIELD_EVENT_CANCELLED);
                     cancelledField.setAccessible(true);
                     cancelledField.setBoolean(eventObj, true);
 
@@ -230,13 +232,15 @@ public class HitSelect implements Feature {
             if (raw instanceof Number)
                 val = ((Number) raw).doubleValue();
 
-            Field enabledField = hook.findFieldInHierarchy(keepSprintModule.getClass(), "p");
+            Field enabledField = hook.findFieldInHierarchy(keepSprintModule.getClass(),
+                    MyauMappings.FIELD_MODULE_ENABLED);
             if (enabledField != null) {
                 enabledField.setAccessible(true);
                 enabledField.setBoolean(keepSprintModule, true);
             }
 
-            Field valueField = keepSprintSlowProperty.getClass().getSuperclass().getDeclaredField("J");
+            Field valueField = keepSprintSlowProperty.getClass().getSuperclass()
+                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
             valueField.setAccessible(true);
             valueField.set(keepSprintSlowProperty, 0);
 
@@ -253,11 +257,13 @@ public class HitSelect implements Feature {
             return;
 
         try {
-            Field valueField = keepSprintSlowProperty.getClass().getSuperclass().getDeclaredField("J");
+            Field valueField = keepSprintSlowProperty.getClass().getSuperclass()
+                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
             valueField.setAccessible(true);
             valueField.set(keepSprintSlowProperty, (int) val);
 
-            Field enabledField = hook.findFieldInHierarchy(keepSprintModule.getClass(), "p");
+            Field enabledField = hook.findFieldInHierarchy(keepSprintModule.getClass(),
+                    MyauMappings.FIELD_MODULE_ENABLED);
             if (enabledField != null) {
                 enabledField.setAccessible(true);
                 enabledField.setBoolean(keepSprintModule, false);

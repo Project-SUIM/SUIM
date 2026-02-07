@@ -147,12 +147,7 @@ public class ClientInfoCommand implements Feature {
                 formattedName = formattedName + "§r ";
             }
 
-            Class<?> myauClass = Class.forName("myau.X");
-            java.lang.reflect.Field clientNameField = myauClass.getDeclaredField("R");
-            clientNameField.setAccessible(true);
-            clientNameField.set(null, formattedName);
-
-            hook.setClientNamePrefix(formattedName);
+            hook.setClientName(formattedName);
 
             saveClientName(formattedName);
             String echo = formattedName.replace("§", "&");
@@ -184,10 +179,7 @@ public class ClientInfoCommand implements Feature {
                 return;
             }
 
-            Class<?> myauClass = Class.forName("myau.X");
-            java.lang.reflect.Field clientNameField = myauClass.getDeclaredField("R");
-            clientNameField.setAccessible(true);
-            clientNameField.set(null, savedName);
+            hook.setClientName(savedName);
         } catch (Exception e) {
             MyauLogger.error("Failed to load client name", e);
         }

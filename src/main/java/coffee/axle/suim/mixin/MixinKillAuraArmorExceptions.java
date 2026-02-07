@@ -25,14 +25,12 @@ public class MixinKillAuraArmorExceptions {
 
             if (armorExceptions == null) {
                 if (!loggedOnce) {
-                    MyauLogger.log("ArmorExceptions not initialized!");
                     loggedOnce = true;
                 }
                 return;
             }
 
             if (!loggedOnce) {
-                MyauLogger.log("ArmorExceptions mixin active and initialized!");
                 loggedOnce = true;
             }
 
@@ -42,7 +40,7 @@ public class MixinKillAuraArmorExceptions {
             }
 
         } catch (Exception e) {
-            // Silent fail
+
         }
     }
 }

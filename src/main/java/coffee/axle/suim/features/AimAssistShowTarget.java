@@ -1,25 +1,30 @@
 package coffee.axle.suim.features;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemSword;
+import net.minecraft.item.ItemTool;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
-import java.awt.*;
+import java.awt.Color;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
  * AimAssist Show Target
- * 
+ *
  * @maybsomeday
  */
 public class AimAssistShowTarget implements Feature {
@@ -30,22 +35,21 @@ public class AimAssistShowTarget implements Feature {
     private Object aimAssistModule;
     private Object showTargetProperty;
 
-    private Method isValidTargetMethod;
-    private Method isInReachMethod;
-    private Method isEnabledMethod;
-    private Object hudColorProperty;
-    private Object hudColorHurtProperty;
-    private Field hurtTimeField;
-
-    private static final int NONE = 0;
-    private static final int DEFAULT = 1;
-    private static final int HUD = 2;
-
-    private EntityLivingBase cachedTarget = null;
-    private int lastTargetCheck = 0;
-    private static final int TARGET_CHECK_INTERVAL = 2;
+    private Object weaponsOnlyProperty;
+    private Object allowToolsProperty;
 
     private Object boxOutlineWidth;
+
+    private Method isValidTargetMethod;
+    private Method isInReachMethod;
+    private Field hurtTimeField;
+
+    private EntityPlayer cachedTarget;
+    private int targetUpdateCounter = 0;
+    private static final int TARGET_UPDATE_INTERVAL = 10;
+
+    private final Color defaultColorHurt = new Color(16733525);
+    private final Color defaultColorNormal = new Color(5635925);
 
     @Override
     public String getName() {
@@ -63,22 +67,34 @@ public class AimAssistShowTarget implements Feature {
                 return false;
             }
 
+            HudUtils.getInstance().initialize();
+
+            weaponsOnlyProperty = hook.findProperty(
+                    aimAssistModule, "weapons-only");
+            allowToolsProperty = hook.findProperty(
+                    aimAssistModule, "allow-tools");
+
             showTargetProperty = hook.createEnumProperty(
                     "show-target",
                     0,
-                    new String[] { "NONE", "DEFAULT", "HUD" });
+                    new String[] { "NONE", "DEFAULT", "HUD", "BOX" });
 
-            boxOutlineWidth = hook.createFloatProperty("target-box-width", 2.0f, 1.0f, 5.0f);
+            boxOutlineWidth = hook.createFloatProperty(
+                    "target-box-width", 2.0f, 1.0f, 5.0f);
 
-            if (!hook.injectPropertyAfter(aimAssistModule, showTargetProperty, "aim-bone")) {
-                if (!hook.registerPropertiesToModule(aimAssistModule, showTargetProperty)) {
+            if (!hook.injectPropertyAfter(
+                    aimAssistModule, showTargetProperty, "aim-bone")) {
+                if (!hook.registerPropertiesToModule(
+                        aimAssistModule, showTargetProperty)) {
                     MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
                     return false;
                 }
             }
 
             hook.registerPropertiesToModule(aimAssistModule, boxOutlineWidth);
-            cacheReflectionData();
+
+            cacheAimAssistMethods();
+            cacheHurtTimeField();
 
             MinecraftForge.EVENT_BUS.register(this);
 
@@ -91,193 +107,227 @@ public class AimAssistShowTarget implements Feature {
         }
     }
 
-    private void cacheReflectionData() {
+    private void cacheAimAssistMethods() {
+        for (Method m : aimAssistModule.getClass().getDeclaredMethods()) {
+            if (m.getParameterCount() == 1
+                    && m.getParameterTypes()[0].equals(Entity.class)
+                    && m.getReturnType().equals(boolean.class)) {
+                m.setAccessible(true);
+                if (isValidTargetMethod == null) {
+                    isValidTargetMethod = m;
+                } else if (isInReachMethod == null) {
+                    isInReachMethod = m;
+                }
+            }
+        }
+
+    }
+
+    private void cacheHurtTimeField() {
         try {
-            Class<?> moduleClass = aimAssistModule.getClass();
-
-            for (Method method : moduleClass.getDeclaredMethods()) {
-                method.setAccessible(true);
-                Class<?>[] params = method.getParameterTypes();
-
-                if (params.length == 1 && params[0] == Entity.class) {
-                    if (method.getReturnType() == boolean.class) {
-                        String methodName = method.getName();
-                        if (methodName.length() <= 2) {
-                            if (isValidTargetMethod == null) {
-                                isValidTargetMethod = method;
-                            } else if (isInReachMethod == null) {
-                                isInReachMethod = method;
-                            }
-                        }
-                    }
-                }
-            }
-
-            for (Method method : moduleClass.getDeclaredMethods()) {
-                method.setAccessible(true);
-                if (method.getParameterCount() == 0 && method.getReturnType() == boolean.class) {
-                    String methodName = method.getName();
-                    if (methodName.equals("p") || methodName.length() == 1) {
-                        isEnabledMethod = method;
-                        break;
-                    }
-                }
-            }
-
+            hurtTimeField = EntityLivingBase.class.getDeclaredField("hurtTime");
+        } catch (NoSuchFieldException e) {
             try {
-                Class<?> hudClass = Class.forName("myau.L3");
-
-                Object hudInstance = null;
-                for (Field f : hudClass.getDeclaredFields()) {
-                    f.setAccessible(true);
-                    if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
-                        Object val = f.get(null);
-                        if (val != null && hudClass.isInstance(val)) {
-                            hudInstance = val;
-                            break;
-                        }
-                    }
-                }
-
-                if (hudInstance != null) {
-                    hudColorProperty = hook.findProperty(hudInstance, "color");
-                    hudColorHurtProperty = hook.findProperty(hudInstance, "hurt-color");
-                }
-            } catch (Exception ignored) {
+                hurtTimeField = EntityLivingBase.class.getDeclaredField(
+                        "field_70737_aN");
+            } catch (NoSuchFieldException ignored) {
             }
+        }
 
-            try {
-                hurtTimeField = EntityLivingBase.class.getDeclaredField("hurtTime");
-                hurtTimeField.setAccessible(true);
-            } catch (NoSuchFieldException e) {
-                try {
-                    for (Field f : EntityLivingBase.class.getDeclaredFields()) {
-                        if (f.getType() == int.class) {
-                            f.setAccessible(true);
-                            hurtTimeField = f;
-                            break;
-                        }
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-
-        } catch (Exception e) {
-            MyauLogger.error("Failed to cache reflection data", e);
+        if (hurtTimeField != null) {
+            hurtTimeField.setAccessible(true);
         }
     }
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
-        if (!hook.isModuleEnabled(aimAssistModule))
-            return;
-        if (mc.thePlayer == null || mc.theWorld == null)
-            return;
-
-        int mode = getShowTargetMode();
-        if (mode == NONE)
-            return;
-
-        EntityLivingBase target = findTargetOptimized();
-        if (target == null)
-            return;
-
-        drawEntityBox(target, mode, event.partialTicks);
-    }
-
-    private EntityLivingBase findTargetOptimized() {
-        int currentTick = mc.thePlayer.ticksExisted;
-        if (currentTick - lastTargetCheck < TARGET_CHECK_INTERVAL && cachedTarget != null) {
-            if (cachedTarget.isEntityAlive() && isValidTarget(cachedTarget)) {
-                return cachedTarget;
-            }
-        }
-
-        lastTargetCheck = currentTick;
-        cachedTarget = null;
-
-        double closestDistance = Double.MAX_VALUE;
-        for (Entity entity : mc.theWorld.loadedEntityList) {
-            if (!(entity instanceof EntityLivingBase))
-                continue;
-            if (entity == mc.thePlayer)
-                continue;
-
-            EntityLivingBase living = (EntityLivingBase) entity;
-            if (!living.isEntityAlive())
-                continue;
-
-            if (!isValidTarget(living))
-                continue;
-            if (!isInReach(living))
-                continue;
-
-            double distance = mc.thePlayer.getDistanceToEntity(living);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                cachedTarget = living;
-            }
-        }
-
-        return cachedTarget;
-    }
-
-    private boolean isValidTarget(Entity entity) {
-        if (isValidTargetMethod == null)
-            return true;
         try {
-            return (Boolean) isValidTargetMethod.invoke(aimAssistModule, entity);
+            if (!hook.isModuleEnabled(aimAssistModule)) {
+                cachedTarget = null;
+                return;
+            }
+
+            if (mc.thePlayer == null || mc.theWorld == null) {
+                cachedTarget = null;
+                return;
+            }
+
+            if (!checkWeaponRequirement()) {
+                cachedTarget = null;
+                return;
+            }
+
+            Integer mode = (Integer) hook.getPropertyValue(showTargetProperty);
+            if (mode == null || mode == 0)
+                return;
+
+            targetUpdateCounter++;
+            if (targetUpdateCounter >= TARGET_UPDATE_INTERVAL) {
+                cachedTarget = findTargetOptimized();
+                targetUpdateCounter = 0;
+            }
+
+            if (cachedTarget == null
+                    || cachedTarget.isDead
+                    || cachedTarget.getHealth() <= 0) {
+                cachedTarget = null;
+                return;
+            }
+
+            Color color;
+            if (mode == 1 || mode == 3) {
+                color = getDefaultColorFast(cachedTarget);
+            } else {
+                color = HudUtils.getInstance()
+                        .getHudColor(defaultColorNormal);
+            }
+
+            if (mode == 3) {
+                drawEntityOutlineBox(cachedTarget, color, event.partialTicks);
+            } else {
+                drawEntityBox(cachedTarget, color, event.partialTicks);
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
+    private boolean checkWeaponRequirement() {
+        try {
+            Boolean weaponsOnly = false;
+            if (weaponsOnlyProperty != null) {
+                weaponsOnly = (Boolean) hook.getPropertyValue(weaponsOnlyProperty);
+            }
+
+            if (weaponsOnly == null || !weaponsOnly) {
+                return true;
+            }
+
+            ItemStack heldItem = mc.thePlayer.getHeldItem();
+            if (heldItem == null) {
+                return false;
+            }
+
+            if (heldItem.getItem() instanceof ItemSword) {
+                return true;
+            }
+
+            Boolean allowTools = false;
+            if (allowToolsProperty != null) {
+                allowTools = (Boolean) hook.getPropertyValue(allowToolsProperty);
+            }
+
+            if (allowTools != null
+                    && allowTools
+                    && heldItem.getItem() instanceof ItemTool) {
+                return true;
+            }
+
+            return false;
+
         } catch (Exception e) {
             return true;
         }
     }
 
-    private boolean isInReach(Entity entity) {
-        if (isInReachMethod == null)
-            return true;
+    private EntityPlayer findTargetOptimized() {
         try {
-            return (Boolean) isInReachMethod.invoke(aimAssistModule, entity);
+            EntityPlayer closest = null;
+            double closestDist = Double.MAX_VALUE;
+
+            for (Object entity : mc.theWorld.loadedEntityList) {
+                if (!(entity instanceof EntityPlayer))
+                    continue;
+
+                EntityPlayer player = (EntityPlayer) entity;
+                if (player == mc.thePlayer)
+                    continue;
+
+                if (!invokeQuietly(
+                        isValidTargetMethod, aimAssistModule, player)) {
+                    continue;
+                }
+
+                double dist = mc.thePlayer.getDistanceToEntity(player);
+                if (dist < closestDist) {
+                    closest = player;
+                    closestDist = dist;
+                }
+            }
+
+            if (closest != null && isInReachMethod != null) {
+                if (!invokeQuietly(
+                        isInReachMethod, aimAssistModule, closest)) {
+                    return null;
+                }
+            }
+
+            return closest;
         } catch (Exception e) {
-            return true;
+            return null;
         }
     }
 
-    private void drawEntityBox(EntityLivingBase entity, int mode, float partialTicks) {
-        double x = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * partialTicks
-                - mc.getRenderManager().viewerPosX;
-        double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks
-                - mc.getRenderManager().viewerPosY;
-        double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks
-                - mc.getRenderManager().viewerPosZ;
+    private boolean invokeQuietly(
+            Method method, Object instance, Object... args) {
+        try {
+            return (Boolean) method.invoke(instance, args);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
-        float halfWidth = entity.width / 2.0F;
-        AxisAlignedBB box = new AxisAlignedBB(
-                x - halfWidth, y, z - halfWidth,
-                x + halfWidth, y + entity.height, z + halfWidth);
+    private Color getDefaultColorFast(EntityPlayer target) {
+        try {
+            int hurtTime = hurtTimeField.getInt(target);
+            return hurtTime > 0 ? defaultColorHurt : defaultColorNormal;
+        } catch (Exception e) {
+            return defaultColorNormal;
+        }
+    }
 
-        Color color = calculateHUDColor(entity, mode);
+    private void drawEntityOutlineBox(
+            EntityPlayer entity, Color color, float partialTicks) {
+        double x = entity.lastTickPosX
+                + (entity.posX - entity.lastTickPosX) * partialTicks;
+        double y = entity.lastTickPosY
+                + (entity.posY - entity.lastTickPosY) * partialTicks;
+        double z = entity.lastTickPosZ
+                + (entity.posZ - entity.lastTickPosZ) * partialTicks;
 
-        GlStateManager.pushMatrix();
-        GlStateManager.enableBlend();
-        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-        GlStateManager.disableTexture2D();
-        GlStateManager.disableDepth();
-        GlStateManager.disableLighting();
+        AxisAlignedBB box = entity.getEntityBoundingBox()
+                .expand(0.1f, 0.1f, 0.1f)
+                .offset(x - entity.posX, y - entity.posY, z - entity.posZ)
+                .offset(
+                        -mc.getRenderManager().viewerPosX,
+                        -mc.getRenderManager().viewerPosY,
+                        -mc.getRenderManager().viewerPosZ);
 
         float lineWidth = 2.0f;
         try {
             lineWidth = (Float) hook.getPropertyValue(boxOutlineWidth);
         } catch (Exception ignored) {
         }
+
+        GlStateManager.pushMatrix();
+        GlStateManager.enableBlend();
+        GlStateManager.blendFunc(
+                GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager.disableTexture2D();
+        GlStateManager.disableDepth();
+        GlStateManager.disableLighting();
+
         GL11.glLineWidth(lineWidth);
+        GL11.glEnable(GL11.GL_LINE_SMOOTH);
+        GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
 
-        float r = color.getRed() / 255.0F;
-        float g = color.getGreen() / 255.0F;
-        float b = color.getBlue() / 255.0F;
-        float a = color.getAlpha() / 255.0F;
+        RenderGlobal.drawOutlinedBoundingBox(
+                box,
+                color.getRed(), color.getGreen(),
+                color.getBlue(), color.getAlpha());
 
-        GlStateManager.color(r, g, b, a);
-        RenderGlobal.drawSelectionBoundingBox(box);
+        GL11.glDisable(GL11.GL_LINE_SMOOTH);
+        GL11.glLineWidth(2.0f);
 
         GlStateManager.enableDepth();
         GlStateManager.enableTexture2D();
@@ -285,60 +335,81 @@ public class AimAssistShowTarget implements Feature {
         GlStateManager.popMatrix();
     }
 
-    private Color calculateHUDColor(EntityLivingBase entity, int mode) {
-        if (mode == DEFAULT) {
-            return new Color(255, 0, 0, 255);
-        }
+    private void drawEntityBox(
+            EntityPlayer entity, Color color, float partialTicks) {
+        double x = entity.lastTickPosX
+                + (entity.posX - entity.lastTickPosX) * partialTicks;
+        double y = entity.lastTickPosY
+                + (entity.posY - entity.lastTickPosY) * partialTicks;
+        double z = entity.lastTickPosZ
+                + (entity.posZ - entity.lastTickPosZ) * partialTicks;
 
-        boolean isHurt = false;
-        try {
-            if (hurtTimeField != null) {
-                int hurtTime = hurtTimeField.getInt(entity);
-                isHurt = hurtTime > 0;
-            } else {
-                isHurt = entity.hurtTime > 0;
-            }
-        } catch (Exception e) {
-            isHurt = entity.hurtTime > 0;
-        }
+        AxisAlignedBB box = entity.getEntityBoundingBox()
+                .expand(0.1f, 0.1f, 0.1f)
+                .offset(x - entity.posX, y - entity.posY, z - entity.posZ)
+                .offset(
+                        -mc.getRenderManager().viewerPosX,
+                        -mc.getRenderManager().viewerPosY,
+                        -mc.getRenderManager().viewerPosZ);
 
-        if (isHurt && hudColorHurtProperty != null) {
-            try {
-                Object colorValue = hook.getPropertyValue(hudColorHurtProperty);
-                if (colorValue instanceof Integer) {
-                    return new Color((Integer) colorValue, true);
-                } else if (colorValue instanceof Color) {
-                    return (Color) colorValue;
-                }
-            } catch (Exception ignored) {
-            }
-            return new Color(255, 0, 0, 255);
-        }
+        GlStateManager.enableBlend();
+        GlStateManager.blendFunc(
+                GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager.disableTexture2D();
+        GlStateManager.disableCull();
+        GlStateManager.disableAlpha();
+        GlStateManager.disableDepth();
 
-        if (hudColorProperty != null) {
-            try {
-                Object colorValue = hook.getPropertyValue(hudColorProperty);
-                if (colorValue instanceof Integer) {
-                    return new Color((Integer) colorValue, true);
-                } else if (colorValue instanceof Color) {
-                    return (Color) colorValue;
-                }
-            } catch (Exception ignored) {
-            }
-        }
+        GL11.glBegin(GL11.GL_QUADS);
+        GL11.glColor4f(
+                color.getRed() / 255.0f,
+                color.getGreen() / 255.0f,
+                color.getBlue() / 255.0f,
+                0.15f);
 
-        return new Color(0, 255, 0, 255);
-    }
+        // Bottom
+        GL11.glVertex3d(box.minX, box.minY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.minY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.minY, box.maxZ);
+        GL11.glVertex3d(box.minX, box.minY, box.maxZ);
 
-    private int getShowTargetMode() {
-        try {
-            Object value = hook.getPropertyValue(showTargetProperty);
-            if (value instanceof Integer) {
-                return (Integer) value;
-            }
-        } catch (Exception ignored) {
-        }
-        return NONE;
+        // Top
+        GL11.glVertex3d(box.minX, box.maxY, box.minZ);
+        GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
+
+        // Front
+        GL11.glVertex3d(box.minX, box.minY, box.minZ);
+        GL11.glVertex3d(box.minX, box.maxY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.minY, box.minZ);
+
+        // Back
+        GL11.glVertex3d(box.minX, box.minY, box.maxZ);
+        GL11.glVertex3d(box.maxX, box.minY, box.maxZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
+        GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
+
+        // Left
+        GL11.glVertex3d(box.minX, box.minY, box.minZ);
+        GL11.glVertex3d(box.minX, box.minY, box.maxZ);
+        GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
+        GL11.glVertex3d(box.minX, box.maxY, box.minZ);
+
+        // Right
+        GL11.glVertex3d(box.maxX, box.minY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
+        GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
+        GL11.glVertex3d(box.maxX, box.minY, box.maxZ);
+
+        GL11.glEnd();
+
+        GlStateManager.enableDepth();
+        GlStateManager.enableAlpha();
+        GlStateManager.enableCull();
+        GlStateManager.enableTexture2D();
+        GlStateManager.disableBlend();
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.BedLocationAPI;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
@@ -14,7 +15,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.awt.*;
 import java.lang.reflect.Field;
-import java.util.*;
 
 /**
  * BedESP Color mode: team
@@ -26,7 +26,6 @@ public class BedESPTeamColor implements Feature {
     private static BedESPTeamColor instance;
     private Object bedESPModule;
     private Object colorProperty;
-    private Field valuesField;
     private Field currentValueField;
     private Field bedsField;
     private String currentMap = null;
@@ -49,78 +48,32 @@ public class BedESPTeamColor implements Feature {
             instance = this;
             BedLocationAPI.fetchData();
 
-            Class<?> moduleManagerClass = Class.forName("myau.mJ");
-            Field mmField = hook.getClass().getDeclaredField("moduleManager");
-            mmField.setAccessible(true);
-            Object moduleManager = mmField.get(hook);
-
-            Field modulesField = moduleManagerClass.getDeclaredField("E");
-            modulesField.setAccessible(true);
-            LinkedHashMap<Class<?>, Object> modulesMap = (LinkedHashMap<Class<?>, Object>) modulesField
-                    .get(moduleManager);
-
-            for (Object module : modulesMap.values()) {
-                try {
-                    java.lang.reflect.Method getNameMethod = module.getClass().getSuperclass().getDeclaredMethod("J");
-                    getNameMethod.setAccessible(true);
-                    if ("BedESP".equals(getNameMethod.invoke(module))) {
-                        bedESPModule = module;
-                        break;
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-
+            bedESPModule = hook.findModule("BedESP");
             if (bedESPModule == null) {
                 MyauLogger.error("FEATURE_FAIL", new RuntimeException("BedESP module not found"));
                 return false;
             }
 
-            for (Field f : bedESPModule.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                if (f.getType() == java.util.concurrent.CopyOnWriteArraySet.class) {
-                    bedsField = f;
-                    break;
-                }
-            }
+            bedsField = hook.getCachedField(bedESPModule.getClass(), MyauMappings.FIELD_BED_ESP_BEDS);
 
-            if (bedsField == null) {
-                MyauLogger.error("FEATURE_FAIL", new RuntimeException("Could not find 'beds' field"));
+            colorProperty = hook.findProperty(bedESPModule, "color");
+            if (colorProperty == null) {
+                MyauLogger.error("FEATURE_FAIL", new RuntimeException("Could not find BedESP color property"));
                 return false;
             }
 
-            boolean modified = false;
-            for (Field field : bedESPModule.getClass().getDeclaredFields()) {
-                field.setAccessible(true);
-                Object value = field.get(bedESPModule);
+            Field uField = colorProperty.getClass().getDeclaredField(MyauMappings.FIELD_ENUM_VALUES_ARRAY);
+            uField.setAccessible(true);
+            String[] modes = (String[]) uField.get(colorProperty);
 
-                if (value != null && value.getClass().getName().equals("myau.n")) {
-                    Field uField = value.getClass().getDeclaredField("u");
-                    uField.setAccessible(true);
-                    String[] modes = (String[]) uField.get(value);
+            String[] newModes = new String[modes.length + 1];
+            System.arraycopy(modes, 0, newModes, 0, modes.length);
+            newModes[modes.length] = "TEAM";
+            uField.set(colorProperty, newModes);
 
-                    if (modes.length >= 2 && modes[0].equals("CUSTOM") && modes[1].equals("HUD")) {
-                        colorProperty = value;
-                        valuesField = uField;
-
-                        String[] newModes = new String[modes.length + 1];
-                        System.arraycopy(modes, 0, newModes, 0, modes.length);
-                        newModes[modes.length] = "TEAM";
-
-                        valuesField.set(colorProperty, newModes);
-                        currentValueField = colorProperty.getClass().getSuperclass().getDeclaredField("J");
-                        currentValueField.setAccessible(true);
-
-                        modified = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!modified) {
-                MyauLogger.error("FEATURE_FAIL", new RuntimeException("Could not inject TEAM mode"));
-                return false;
-            }
+            Class<?> valueBase = hook.getCachedClass(MyauMappings.CLASS_VALUE_BASE);
+            currentValueField = valueBase.getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
+            currentValueField.setAccessible(true);
 
             MinecraftForge.EVENT_BUS.register(this);
 

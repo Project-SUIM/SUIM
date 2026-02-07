@@ -1,6 +1,7 @@
 package coffee.axle.suim.features;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiChest;
@@ -55,8 +56,8 @@ public class AutoClickerExtras implements Feature {
 
             hook.registerPropertiesToModule(autoClickerModule, inventoryFillProperty, requirePressProperty);
 
-            leftCpsMinProperty = hook.findProperty(autoClickerModule, "left-cps-min");
-            leftCpsMaxProperty = hook.findProperty(autoClickerModule, "left-cps-max");
+            leftCpsMinProperty = hook.findProperty(autoClickerModule, "min-cps");
+            leftCpsMaxProperty = hook.findProperty(autoClickerModule, "max-cps");
 
             initializeEventHook();
 
@@ -70,20 +71,18 @@ public class AutoClickerExtras implements Feature {
 
     private void initializeEventHook() {
         try {
-            tickEventClass = Class.forName("myau.KP");
+            tickEventClass = Class.forName(MyauMappings.CLASS_TICK_EVENT);
 
-            eventTypeField = tickEventClass.getDeclaredField("p");
+            eventTypeField = tickEventClass.getDeclaredField(MyauMappings.FIELD_TICK_EVENT_TYPE);
             eventTypeField.setAccessible(true);
 
-            Class<?> eventTypeEnum = Class.forName("myau.U");
-            for (Object constant : eventTypeEnum.getEnumConstants()) {
-                if (constant.toString().equals("PRE")) {
-                    preEventType = constant;
-                    break;
-                }
+            Class<?> eventTypeEnum = eventTypeField.getType();
+            Object[] enumConstants = eventTypeEnum.getEnumConstants();
+            if (enumConstants != null && enumConstants.length > 0) {
+                preEventType = enumConstants[0];
             }
 
-            hook.registerEventHandler("myau.KP", this::onMyauTickPre, (byte) 3);
+            hook.registerEventHandler(MyauMappings.CLASS_TICK_EVENT, this::onMyauTickPre, (byte) 1);
         } catch (Exception e) {
             MyauLogger.error("Failed to init event hook", e);
         }

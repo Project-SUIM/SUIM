@@ -32,7 +32,6 @@ public class PacketUtils {
     public static void receivePacketNoEvent(Packet packet) {
         try {
             skipReceiveEvent.add(packet);
-            // Get the network manager and process packet directly
             NetworkManager networkManager = mc.getNetHandler().getNetworkManager();
             packet.processPacket(mc.getNetHandler());
         } catch (Exception e) {

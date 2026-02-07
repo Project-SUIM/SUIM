@@ -1,6 +1,7 @@
 package coffee.axle.suim.features;
 
 import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.PropertyUtils;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
@@ -127,9 +128,9 @@ public class SkullESP implements Feature {
         if (skullList.isEmpty())
             return;
 
-        boolean renderOutline = getBooleanSafe(outlineProperty, true);
-        boolean renderTracers = getBooleanSafe(tracersProperty, true);
-        float lineWidth = getFloatSafe(lineWidthProperty, 2.0f);
+        boolean renderOutline = PropertyUtils.getBoolean(outlineProperty, true);
+        boolean renderTracers = PropertyUtils.getBoolean(tracersProperty, true);
+        float lineWidth = PropertyUtils.getFloat(lineWidthProperty, 2.0f);
 
         Entity viewEntity = mc.getRenderViewEntity();
         if (viewEntity == null)
@@ -269,7 +270,7 @@ public class SkullESP implements Feature {
 
         skullList.clear();
 
-        int targetSkullType = getIntSafe(skullTypeProperty, PLAYER);
+        int targetSkullType = PropertyUtils.getInt(skullTypeProperty, PLAYER);
 
         for (TileEntity tileEntity : new ArrayList<>(mc.theWorld.loadedTileEntityList)) {
             if (!(tileEntity instanceof TileEntitySkull))
@@ -296,30 +297,6 @@ public class SkullESP implements Feature {
 
     private float lerpFloat(float current, float previous, float partialTicks) {
         return previous + (current - previous) * partialTicks;
-    }
-
-    private boolean getBooleanSafe(Object property, boolean defaultValue) {
-        try {
-            return (Boolean) hook.getPropertyValue(property);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private float getFloatSafe(Object property, float defaultValue) {
-        try {
-            return (Float) hook.getPropertyValue(property);
-        } catch (Exception e) {
-            return defaultValue;
-        }
-    }
-
-    private int getIntSafe(Object property, int defaultValue) {
-        try {
-            return (Integer) hook.getPropertyValue(property);
-        } catch (Exception e) {
-            return defaultValue;
-        }
     }
 
     @Override

@@ -93,7 +93,6 @@ public class KillAuraDisableOnDeath implements Feature {
             }
 
         } catch (Exception e) {
-            // Silent fail
         }
     }
 }

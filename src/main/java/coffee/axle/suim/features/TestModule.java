@@ -3,11 +3,13 @@ package coffee.axle.suim.features;
 import coffee.axle.suim.hooks.MyauHook;
 import coffee.axle.suim.hooks.MyauModuleCreator;
 import coffee.axle.suim.hooks.MyauModuleManager;
+import coffee.axle.suim.util.AimDotTracker;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.TestModuleRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -22,6 +24,7 @@ public class TestModule implements Feature {
 
     private Object moduleInstance;
     private Object useMixinProperty;
+    private Object aimDotsProperty;
 
     public TestModule(MyauHook hook, MyauModuleCreator creator, MyauModuleManager manager) {
         this.hook = hook;
@@ -43,7 +46,8 @@ public class TestModule implements Feature {
 
             // Create properties
             this.useMixinProperty = creator.createBooleanProperty("use-mixin", false);
-            creator.registerProperties(this.moduleInstance, this.useMixinProperty);
+            this.aimDotsProperty = creator.createBooleanProperty("debug-aim-dots", false);
+            creator.registerProperties(this.moduleInstance, this.useMixinProperty, this.aimDotsProperty);
 
             // Reload module command so it appears in .myau list
             manager.reloadModuleCommand();
@@ -65,6 +69,7 @@ public class TestModule implements Feature {
                     },
                     () -> {
                         TestModuleRenderer.setModuleEnabled(false);
+                        AimDotTracker.clear();
                         MyauLogger.info("TestModule disabled!");
                     });
 
@@ -112,15 +117,39 @@ public class TestModule implements Feature {
     }
 
     @SubscribeEvent
+    public void onAttackEntity(AttackEntityEvent event) {
+        if (!manager.isModuleEnabled(this.getName()))
+            return;
+        if (!getAimDots())
+            return;
+        if (event.target == null)
+            return;
+
+        AimDotTracker.recordHit(event.target);
+    }
+
+    @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         // Only render if NOT using mixin path (purple = direct, green = mixin)
         // The mixin handles green rendering via TestModuleRenderer.renderMixinBox()
         TestModuleRenderer.renderDirectBox(event.partialTicks);
+
+        if (manager.isModuleEnabled(this.getName()) && getAimDots()) {
+            AimDotTracker.renderDots(event.partialTicks);
+        }
     }
 
     private boolean getUseMixin() {
         try {
             return (Boolean) manager.getPropertyValue(this.useMixinProperty);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean getAimDots() {
+        try {
+            return (Boolean) manager.getPropertyValue(this.aimDotsProperty);
         } catch (Exception e) {
             return false;
         }
@@ -142,6 +171,7 @@ public class TestModule implements Feature {
         try {
             MinecraftForge.EVENT_BUS.unregister(this);
             TestModuleRenderer.setModuleEnabled(false);
+            AimDotTracker.clear();
             if (this.moduleInstance != null) {
                 manager.setModuleEnabled(this.moduleInstance, false);
             }
