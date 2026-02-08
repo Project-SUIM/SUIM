@@ -222,7 +222,7 @@ public class MixinAimAssist {
             float border = target.getCollisionBorderSize();
             AxisAlignedBB expandedBox = box.expand(border, border, border);
 
-            float verticalMultipoint = RotationUtil.computeVerticalMultipoint(target);
+            float verticalMultipoint = RotationUtil.computeVerticalMultipoint(target.posY);
             if (verticalMultipoint == 0.5f)
                 return;
 

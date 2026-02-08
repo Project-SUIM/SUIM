@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * Fetches off Polyfrost data to get bed locations for BedESP teams color mode
  * 
- * @author maybsomeday (meow) - ported to d'Myau
+ * @author maybsomeday (meow)
  */
 public class BedLocationAPI {
     private static final String API_URL = "https://data.polyfrost.org/bed_locations.json";

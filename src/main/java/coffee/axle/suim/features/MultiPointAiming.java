@@ -62,7 +62,6 @@ public class MultiPointAiming implements Feature {
         }
     }
 
-    /** Whether dynamic multi-point is enabled for AimAssist. */
     public static boolean isAimAssistDynamic() {
         if (!featureActive)
             return false;
