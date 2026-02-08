@@ -1,6 +1,7 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.features.MultiPointAiming;
+import coffee.axle.suim.feature.combat.MultiPointAiming;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.RotationUtil;
 import net.minecraft.client.Minecraft;
@@ -61,21 +62,21 @@ public class MixinAimAssist {
     private static void suim$ensureRotationManagerReflection()
             throws Exception {
         if (suim$rotationManagerField == null) {
-            Class<?> clientClass = Class.forName("myau.X");
-            suim$rotationManagerField = clientClass.getDeclaredField("N");
+            Class<?> clientClass = Class.forName(MyauMappings.CLASS_MAIN);
+            suim$rotationManagerField = clientClass.getDeclaredField(MyauMappings.FIELD_ROTATION_MANAGER);
             suim$rotationManagerField.setAccessible(true);
         }
-        Class<?> rmClass = Class.forName("myau.mO");
+        Class<?> rmClass = Class.forName(MyauMappings.CLASS_ROTATION_MANAGER);
         if (suim$yawDeltaField == null) {
-            suim$yawDeltaField = rmClass.getDeclaredField("b");
+            suim$yawDeltaField = rmClass.getDeclaredField(MyauMappings.FIELD_ROT_MGR_YAW_DELTA);
             suim$yawDeltaField.setAccessible(true);
         }
         if (suim$pitchDeltaField == null) {
-            suim$pitchDeltaField = rmClass.getDeclaredField("v");
+            suim$pitchDeltaField = rmClass.getDeclaredField(MyauMappings.FIELD_ROT_MGR_PITCH_DELTA);
             suim$pitchDeltaField.setAccessible(true);
         }
         if (suim$lastUpdateField == null) {
-            suim$lastUpdateField = rmClass.getDeclaredField("V");
+            suim$lastUpdateField = rmClass.getDeclaredField(MyauMappings.FIELD_ROT_MGR_LAST_UPDATE);
             suim$lastUpdateField.setAccessible(true);
         }
     }
@@ -96,8 +97,8 @@ public class MixinAimAssist {
         float range;
         int fov;
         try {
-            range = suim$getFloatProp(aimAssistInstance, "s", 4.5f);
-            fov = suim$getIntProp(aimAssistInstance, "S", 90);
+            range = suim$getFloatProp(aimAssistInstance, MyauMappings.FIELD_AIM_ASSIST_RANGE, 4.5f);
+            fov = suim$getIntProp(aimAssistInstance, MyauMappings.FIELD_AIM_ASSIST_FOV, 90);
         } catch (Exception e) {
             range = 4.5f;
             fov = 90;
@@ -142,7 +143,7 @@ public class MixinAimAssist {
             Object prop = f.get(instance);
             if (prop == null)
                 return fallback;
-            Method getValue = prop.getClass().getMethod("J");
+            Method getValue = prop.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE);
             Object val = getValue.invoke(prop);
             if (val instanceof Number)
                 return ((Number) val).floatValue();
@@ -160,7 +161,7 @@ public class MixinAimAssist {
             Object prop = f.get(instance);
             if (prop == null)
                 return fallback;
-            Method getValue = prop.getClass().getMethod("J");
+            Method getValue = prop.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE);
             Object val = getValue.invoke(prop);
             if (val instanceof Number)
                 return ((Number) val).intValue();
@@ -226,11 +227,11 @@ public class MixinAimAssist {
             if (verticalMultipoint == 0.5f)
                 return;
 
-            float smoothing = suim$getFloatProp(this, "x", 50.0f) / 100.0f;
+            float smoothing = suim$getFloatProp(this, MyauMappings.FIELD_AIM_ASSIST_SMOOTHING, 50.0f) / 100.0f;
             float hSpeed = Math.min(
-                    Math.abs(suim$getFloatProp(this, "J", 3.0f)), 10.0f);
+                    Math.abs(suim$getFloatProp(this, MyauMappings.FIELD_AIM_ASSIST_HSPEED, 3.0f)), 10.0f);
             float vSpeed = Math.min(
-                    Math.abs(suim$getFloatProp(this, "c", 0.0f)), 10.0f);
+                    Math.abs(suim$getFloatProp(this, MyauMappings.FIELD_AIM_ASSIST_VSPEED, 0.0f)), 10.0f);
 
             float[] mpRotations = RotationUtil.getRotationsToBoxDynamic(
                     expandedBox,

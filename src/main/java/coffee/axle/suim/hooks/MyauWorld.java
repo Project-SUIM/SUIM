@@ -64,9 +64,10 @@ public class MyauWorld {
         if (hook == null || hook.getModulesMap() == null)
             return result;
 
+        java.lang.reflect.Method getNameMethod = hook.getModuleGetNameMethod();
         for (Map.Entry<Class<?>, Object> entry : hook.getModulesMap().entrySet()) {
             try {
-                String name = hook.getModuleName(entry.getValue());
+                String name = (String) getNameMethod.invoke(entry.getValue());
                 result.put(name, getOrigin(entry.getValue()));
             } catch (Exception e) {
                 MyauLogger.info("Origin lookup failed: " + e.getMessage());
@@ -79,9 +80,10 @@ public class MyauWorld {
         if (hook == null || moduleName == null)
             return UNKNOWN;
 
+        java.lang.reflect.Method getNameMethod = hook.getModuleGetNameMethod();
         for (Map.Entry<Class<?>, Object> entry : hook.getModulesMap().entrySet()) {
             try {
-                String name = hook.getModuleName(entry.getValue());
+                String name = (String) getNameMethod.invoke(entry.getValue());
                 if (moduleName.equalsIgnoreCase(name)) {
                     return getOrigin(entry.getValue());
                 }

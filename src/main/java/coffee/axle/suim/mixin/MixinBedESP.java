@@ -1,6 +1,6 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.features.BedESPTeamColor;
+import coffee.axle.suim.feature.render.BedESPTeamColor;
 import net.minecraft.util.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;

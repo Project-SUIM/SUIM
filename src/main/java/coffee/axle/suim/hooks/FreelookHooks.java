@@ -1,6 +1,6 @@
 package coffee.axle.suim.hooks;
 
-import coffee.axle.suim.features.Freelook;
+import coffee.axle.suim.feature.render.Freelook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.client.settings.GameSettings;
@@ -14,7 +14,6 @@ import net.minecraft.entity.player.EntityPlayer;
 public class FreelookHooks {
 
     public static Freelook instance;
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     public static boolean overrideMouse(Minecraft minecraft) {
         if (minecraft.inGameHasFocus) {

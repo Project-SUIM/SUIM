@@ -1,6 +1,6 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.features.ArmorExceptions;
+import coffee.axle.suim.feature.combat.ArmorExceptions;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.entity.EntityLivingBase;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,6 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Mixin to inject armor-exceptions check into KillAura's isValidTarget method
  */
+@SuppressWarnings("unused")
+
 @Pseudo
 @Mixin(targets = "myau.Kf", remap = false)
 public class MixinKillAuraArmorExceptions {

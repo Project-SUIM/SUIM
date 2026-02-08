@@ -1,7 +1,7 @@
 package coffee.axle.suim.mixin;
 
 import coffee.axle.suim.hooks.FreelookHooks;
-import coffee.axle.suim.util.TestModuleRenderer;
+import coffee.axle.suim.render.TestModuleRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.entity.Entity;

@@ -149,7 +149,7 @@ public class MyauModuleManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("Manager:findProperty", e);
         }
         return null;
     }
@@ -248,7 +248,7 @@ public class MyauModuleManager {
                 mc.thePlayer.addChatMessage(new ChatComponentText(formatted));
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("Manager:sendMessage", e);
         }
     }
 
@@ -314,6 +314,44 @@ public class MyauModuleManager {
             }
         }
         return null;
+    }
+
+    public void setClientName(String name) throws Exception {
+        Class<?> mainClass = hook.getCachedClass(CLASS_MAIN);
+        Field nameField = hook.getCachedField(mainClass, FIELD_CLIENT_NAME);
+        nameField.set(null, name);
+    }
+
+    public void registerModuleCallbacks(Object moduleInstance, Runnable onEnable, Runnable onDisable) {
+        hook.registerModuleCallbacks(moduleInstance, onEnable, onDisable);
+    }
+
+    public Field findFieldInHierarchy(Class<?> clazz, String fieldName) {
+        return hook.findFieldInHierarchy(clazz, fieldName);
+    }
+
+    public Class<?> getCachedClass(String className) throws ClassNotFoundException {
+        return hook.getCachedClass(className);
+    }
+
+    public Field getCachedField(Class<?> clazz, String fieldName) throws NoSuchFieldException {
+        return hook.getCachedField(clazz, fieldName);
+    }
+
+    public Method getModuleGetNameMethod() {
+        return hook.getModuleGetNameMethod();
+    }
+
+    public Method getPropertyGetValueMethod() {
+        return hook.getPropertyGetValueMethod();
+    }
+
+    public Method getPropertyGetNameMethod() {
+        return hook.getPropertyGetNameMethod();
+    }
+
+    public LinkedHashMap<Class<?>, Object> getModulesMap() {
+        return hook.getModulesMap();
     }
 
     public void clearCaches() {

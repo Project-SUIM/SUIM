@@ -1,5 +1,7 @@
 package coffee.axle.suim.mixin;
 
+import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.util.MyauLogger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -10,6 +12,7 @@ import java.io.File;
 /**
  * Mixin to override TargetCommand (myau.KA) to support multiple usernames
  */
+@SuppressWarnings("unchecked")
 @Pseudo
 @Mixin(targets = "myau.KA", remap = false)
 public class MixinTargetCommand {
@@ -17,24 +20,28 @@ public class MixinTargetCommand {
     @Overwrite
     public void J(ArrayList<String> args, long unused) {
         try {
-            Class<?> myauClass = Class.forName("myau.X");
-            java.lang.reflect.Field targetManagerField = myauClass.getDeclaredField("O");
+            Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
+            java.lang.reflect.Field targetManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_TARGET_MANAGER);
             targetManagerField.setAccessible(true);
             Object targetManager = targetManagerField.get(null);
 
-            java.lang.reflect.Field clientNameField = myauClass.getDeclaredField("R");
+            java.lang.reflect.Field clientNameField = myauClass.getDeclaredField(MyauMappings.FIELD_CLIENT_NAME);
             clientNameField.setAccessible(true);
             String clientName = (String) clientNameField.get(null);
 
-            Class<?> chatUtilClass = Class.forName("myau.Q");
-            java.lang.reflect.Method sendFormattedMethod = chatUtilClass.getMethod("d", String.class, long.class);
-            java.lang.reflect.Method sendRawMethod = chatUtilClass.getMethod("l", String.class, long.class);
+            Class<?> chatUtilClass = Class.forName(MyauMappings.CLASS_CHAT_UTIL);
+            java.lang.reflect.Method sendFormattedMethod = chatUtilClass
+                    .getMethod(MyauMappings.METHOD_CHAT_SEND_FORMATTED, String.class, long.class);
+            java.lang.reflect.Method sendRawMethod = chatUtilClass.getMethod(MyauMappings.METHOD_CHAT_SEND_RAW,
+                    String.class, long.class);
 
-            java.lang.reflect.Field playersField = targetManager.getClass().getSuperclass().getDeclaredField("b");
+            java.lang.reflect.Field playersField = targetManager.getClass().getSuperclass()
+                    .getDeclaredField(MyauMappings.FIELD_PLAYER_LIST);
             playersField.setAccessible(true);
             ArrayList<String> playersList = (ArrayList<String>) playersField.get(targetManager);
 
-            java.lang.reflect.Field fileField = targetManager.getClass().getSuperclass().getDeclaredField("a");
+            java.lang.reflect.Field fileField = targetManager.getClass().getSuperclass()
+                    .getDeclaredField(MyauMappings.FIELD_PLAYER_FILE);
             fileField.setAccessible(true);
             File file = (File) fileField.get(targetManager);
 
@@ -113,7 +120,7 @@ public class MixinTargetCommand {
                     0L);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("MixinTargetCommand", e);
         }
     }
 
@@ -125,7 +132,7 @@ public class MixinTargetCommand {
             }
             writer.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("MixinTargetCommand:save", e);
         }
     }
 }

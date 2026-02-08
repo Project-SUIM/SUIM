@@ -52,9 +52,7 @@ public class BedLocationAPI {
                 reader.close();
                 loaded = true;
             } catch (Exception e) {
-                System.out
-                        .println("[d'Myau.util.BedLocationAPI] Failed to fetch data from Polyfost: " + e.getMessage());
-                e.printStackTrace();
+                MyauLogger.error("BedLocationAPI:init", e);
             }
         }).start();
     }
@@ -90,7 +88,7 @@ public class BedLocationAPI {
                 }
             }
         } catch (Exception e) {
-            System.out.println("[d'Myau.util.BedLocationAPI] Error parsing overrides: " + e.getMessage());
+            MyauLogger.error("BedLocationAPI:overrides", e);
         }
 
         // Return default order

@@ -1,6 +1,6 @@
 package coffee.axle.suim.util;
 
-import coffee.axle.suim.hooks.MyauHook;
+import coffee.axle.suim.hooks.MyauModuleManager;
 
 import java.awt.Color;
 
@@ -13,7 +13,7 @@ public class HudUtils {
 
     private static HudUtils instance;
 
-    private final MyauHook hook = MyauHook.getInstance();
+    private MyauModuleManager manager;
 
     private Object hudModule;
     private boolean initialized = false;
@@ -46,6 +46,10 @@ public class HudUtils {
         return instance;
     }
 
+    public void setManager(MyauModuleManager manager) {
+        this.manager = manager;
+    }
+
     /**
      * Caches HUD module and its color-related properties.
      * Safe to call multiple times; subsequent calls are no-ops.
@@ -57,19 +61,23 @@ public class HudUtils {
             return true;
         }
 
+        if (manager == null) {
+            return false;
+        }
+
         try {
-            hudModule = hook.findModule("HUD");
+            hudModule = manager.findModule("HUD");
             if (hudModule == null) {
                 return false;
             }
 
-            colorModeProperty = hook.findProperty(hudModule, "color");
-            custom1Property = hook.findProperty(hudModule, "custom-color-1");
-            custom2Property = hook.findProperty(hudModule, "custom-color-2");
-            custom3Property = hook.findProperty(hudModule, "custom-color-3");
-            colorSpeedProperty = hook.findProperty(hudModule, "color-speed");
-            colorSaturationProperty = hook.findProperty(hudModule, "color-saturation");
-            colorBrightnessProperty = hook.findProperty(hudModule, "color-brightness");
+            colorModeProperty = manager.findProperty(hudModule, "color");
+            custom1Property = manager.findProperty(hudModule, "custom-color-1");
+            custom2Property = manager.findProperty(hudModule, "custom-color-2");
+            custom3Property = manager.findProperty(hudModule, "custom-color-3");
+            colorSpeedProperty = manager.findProperty(hudModule, "color-speed");
+            colorSaturationProperty = manager.findProperty(hudModule, "color-saturation");
+            colorBrightnessProperty = manager.findProperty(hudModule, "color-brightness");
 
             initialized = true;
             return true;
@@ -103,7 +111,7 @@ public class HudUtils {
         colorUpdateCounter = 0;
 
         try {
-            Integer colorMode = (Integer) hook.getPropertyValue(
+            Integer colorMode = (Integer) manager.getPropertyValue(
                     colorModeProperty);
             if (colorMode == null) {
                 return fallback;
@@ -115,7 +123,7 @@ public class HudUtils {
             switch (colorMode) {
                 case 3:
                     color = new Color(
-                            (Integer) hook.getPropertyValue(
+                            (Integer) manager.getPropertyValue(
                                     custom1Property));
                     break;
                 case 4:
@@ -140,11 +148,11 @@ public class HudUtils {
     }
 
     private Color gradient2Color(long time) throws Exception {
-        Integer c1 = (Integer) hook.getPropertyValue(
+        Integer c1 = (Integer) manager.getPropertyValue(
                 custom1Property);
-        Integer c2 = (Integer) hook.getPropertyValue(
+        Integer c2 = (Integer) manager.getPropertyValue(
                 custom2Property);
-        Float speed = (Float) hook.getPropertyValue(
+        Float speed = (Float) manager.getPropertyValue(
                 colorSpeedProperty);
 
         double cycle = getColorCycle(time, 0L, speed);
@@ -155,13 +163,13 @@ public class HudUtils {
     }
 
     private Color gradient3Color(long time) throws Exception {
-        Integer c1 = (Integer) hook.getPropertyValue(
+        Integer c1 = (Integer) manager.getPropertyValue(
                 custom1Property);
-        Integer c2 = (Integer) hook.getPropertyValue(
+        Integer c2 = (Integer) manager.getPropertyValue(
                 custom2Property);
-        Integer c3 = (Integer) hook.getPropertyValue(
+        Integer c3 = (Integer) manager.getPropertyValue(
                 custom3Property);
-        Float speed = (Float) hook.getPropertyValue(
+        Float speed = (Float) manager.getPropertyValue(
                 colorSpeedProperty);
 
         double cycle = getColorCycle(time, 0L, speed);
@@ -177,9 +185,9 @@ public class HudUtils {
 
     private Color applySaturationBrightness(Color color)
             throws Exception {
-        Integer sat = (Integer) hook.getPropertyValue(
+        Integer sat = (Integer) manager.getPropertyValue(
                 colorSaturationProperty);
-        Integer bri = (Integer) hook.getPropertyValue(
+        Integer bri = (Integer) manager.getPropertyValue(
                 colorBrightnessProperty);
         float[] hsb = Color.RGBtoHSB(
                 color.getRed(), color.getGreen(),

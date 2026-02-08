@@ -1,6 +1,6 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.features.FastPlaceExtras;
+import coffee.axle.suim.feature.world.FastPlaceExtras;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;

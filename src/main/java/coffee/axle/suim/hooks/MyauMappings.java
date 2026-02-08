@@ -18,6 +18,11 @@ public class MyauMappings {
     public static final String CLASS_BED_ESP = "myau.mb";
     public static final String CLASS_BED_TRACKER = "myau.mt";
     public static final String CLASS_KILL_AURA = "myau.Kf";
+    public static final String CLASS_NO_SLOW = "myau.Kq";
+
+    // Utility classes
+    public static final String CLASS_CHAT_UTIL = "myau.Q";
+    public static final String CLASS_PACKET_UTIL = "myau.k";
 
     // Manager classes
     public static final String CLASS_MODULE_MANAGER = "myau.mJ";
@@ -30,6 +35,7 @@ public class MyauMappings {
     public static final String FIELD_ROT_MGR_YAW_DELTA = "b";
     public static final String FIELD_ROT_MGR_PITCH_DELTA = "v";
     public static final String FIELD_ROT_MGR_ROTATED = "G";
+    public static final String FIELD_ROT_MGR_LAST_UPDATE = "V";
     public static final String FIELD_ROT_MGR_PRIORITY = "B";
     public static final String METHOD_ROT_MGR_SET_ROTATION = "w";
     public static final String SIG_ROT_MGR_SET_ROTATION = "(FFJIZ)V";
@@ -63,6 +69,30 @@ public class MyauMappings {
     public static final String FIELD_COMMAND_MANAGER = "i";
     public static final String FIELD_PROPERTY_MANAGER = "e";
     public static final String FIELD_CLIENT_NAME = "R";
+    public static final String FIELD_FRIEND_MANAGER = "z";
+    public static final String FIELD_TARGET_MANAGER = "O";
+
+    // ChatUtil (myau.Q)
+    public static final String METHOD_CHAT_SEND_FORMATTED = "d";
+    public static final String METHOD_CHAT_SEND_RAW = "l";
+
+    // PlayerListManager superclass fields
+    public static final String FIELD_PLAYER_LIST = "b";
+    public static final String FIELD_PLAYER_FILE = "a";
+    public static final String METHOD_PLAYER_LIST_CONTAINS = "W";
+
+    // PacketUtil (myau.k)
+    public static final String METHOD_SEND_PACKET = "E";
+
+    // Module methods
+    public static final String METHOD_GET_MODULE = "h";
+    public static final String METHOD_IS_ENABLED = "P";
+
+    // KillAura (myau.Kf) — mixin-specific fields
+    public static final String FIELD_KILL_AURA_AUTOBLOCK = "j";
+    public static final String FIELD_KILL_AURA_IS_BLOCKING = "B";
+    public static final String FIELD_KILL_AURA_TICK_STATE = "y";
+    public static final String METHOD_KILL_AURA_IS_PLAYER_BLOCKING = "Q";
 
     // Module
     public static final String FIELD_MODULES_MAP = "E";

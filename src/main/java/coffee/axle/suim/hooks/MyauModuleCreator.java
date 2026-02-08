@@ -1,5 +1,6 @@
 package coffee.axle.suim.hooks;
 
+import coffee.axle.suim.util.MyauLogger;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -228,7 +229,7 @@ public class MyauModuleCreator {
                 return true;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("Creator:injectProperty", e);
         }
         return false;
     }

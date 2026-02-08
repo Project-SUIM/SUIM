@@ -1,5 +1,6 @@
 package coffee.axle.suim.util;
 
+import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
@@ -13,6 +14,7 @@ import java.util.List;
  * 
  * @author maybsomeday (meow) - ported to d'Myau
  */
+@SuppressWarnings({ "unused", "rawtypes", "unchecked" })
 public class PacketUtils {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -35,7 +37,7 @@ public class PacketUtils {
             NetworkManager networkManager = mc.getNetHandler().getNetworkManager();
             packet.processPacket(mc.getNetHandler());
         } catch (Exception e) {
-            e.printStackTrace();
+            MyauLogger.error("PacketUtils", e);
         }
     }
 }

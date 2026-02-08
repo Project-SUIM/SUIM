@@ -1,5 +1,6 @@
 package coffee.axle.suim
 
+import coffee.axle.suim.feature.FeatureManager
 import coffee.axle.suim.handlers.PlayerMotionHandler
 import coffee.axle.suim.util.MyauLogger
 import net.minecraft.client.Minecraft
@@ -13,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.TickEvent
 
 @Mod(modid = "suim", useMetadata = true)
+
 class ProjectSUIM {
     companion object {
         const val MOD_NAME = "d'Myau"
@@ -26,7 +28,7 @@ class ProjectSUIM {
     private var tickCount = 0
 
     @Mod.EventHandler
-    fun init(event: FMLInitializationEvent) {
+    fun init(event: FMLInitializationEvent?) {
         MyauLogger.setPrefix(LOG_PREFIX)
         MyauLogger.log("INIT_START")
         MinecraftForge.EVENT_BUS.register(PlayerMotionHandler())
