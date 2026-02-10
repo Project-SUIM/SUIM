@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.hooks.FreelookHooks;
 import coffee.axle.suim.util.MyauLogger;
@@ -40,6 +41,11 @@ public class Freelook extends Feature {
     @Override
     public String getName() {
         return "Freelook";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.RENDER;
     }
 
     @Override
@@ -222,3 +228,8 @@ public class Freelook extends Feature {
         safeReset();
     }
 }
+
+
+
+
+

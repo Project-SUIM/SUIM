@@ -106,3 +106,8 @@ public final class BlockBedTable {
         return INVALID.contains(block);
     }
 }
+
+
+
+
+

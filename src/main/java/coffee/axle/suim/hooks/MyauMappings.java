@@ -12,6 +12,9 @@ public class MyauMappings {
     public static final String CLASS_EVENT_ANNOTATION = "myau.mB";
     public static final String CLASS_MODULE_COMMAND = "myau.KU";
 
+    public static final String CLASS_EVIL_AUTUMN = "myau.a"; // please dm foxgirlfrot for information regarding this
+                                                             // class
+
     // Module classes
     public static final String CLASS_HUD = "myau.mr";
     public static final String CLASS_AIM_ASSIST = "myau.mT";
@@ -47,6 +50,7 @@ public class MyauMappings {
     public static final String CLASS_VALUE_BASE = "myau.V";
     public static final String CLASS_BOOLEAN_PROPERTY = "myau.l";
     public static final String CLASS_INTEGER_PROPERTY = "myau.c";
+    public static final String CLASS_INT_VALUE = "myau.A";
     public static final String CLASS_FLOAT_PROPERTY = "myau.P";
     public static final String CLASS_STRING_PROPERTY = "myau.d";
     public static final String CLASS_ENUM_PROPERTY = "myau.n";
@@ -195,6 +199,20 @@ public class MyauMappings {
     public static final String FIELD_VALUE_CURRENT = "J";
     public static final String FIELD_VALUE_NAME = "m";
     public static final String FIELD_VALUE_OWNER = "v";
+    public static final String FIELD_VALUE_DEFAULT = "d";
+    public static final String FIELD_VALUE_VISIBILITY = "D";
+
+    // RangedValue (myau.c) — extends V<Integer>
+    public static final String FIELD_RANGED_MIN = "e";
+    public static final String FIELD_RANGED_MAX = "z";
+
+    // FloatValue (myau.P) — extends V<Float>
+    public static final String FIELD_FLOAT_MIN = "x";
+    public static final String FIELD_FLOAT_MAX = "R";
+
+    // IntValue (myau.A) — extends V<Integer>
+    public static final String FIELD_INT_MIN = "N";
+    public static final String FIELD_INT_MAX = "w";
 
     // EventTyped (myau.U)
     public static final String FIELD_EVENT_TYPED_PRE = "PRE";

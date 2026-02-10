@@ -1,6 +1,7 @@
 package coffee.axle.suim.hooks;
 
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.feature.clickgui.ClickGui;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -14,6 +15,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -93,6 +95,26 @@ public class MyauModuleManager {
         setModuleEnabled(module, !isModuleEnabled(module));
     }
 
+    /**
+     * Toggles a module through Myau's command handler so the
+     * standard "[Myau] Module (ON/OFF)" notification is displayed.
+     * Falls back to direct toggle if the command path fails.
+     */
+    public void toggleModuleViaCommand(Object module) {
+        try {
+            String name = getModuleName(module);
+            ArrayList<String> args = new ArrayList<>();
+            args.add(name);
+            runCommandByName(name, args);
+        } catch (Exception e) {
+            try {
+                toggleModule(module);
+            } catch (Exception fallback) {
+                MyauLogger.error("toggleModuleViaCommand", fallback);
+            }
+        }
+    }
+
     public void toggleModule(String moduleName) throws Exception {
         Object module = findModule(moduleName);
         if (module != null) {
@@ -117,6 +139,7 @@ public class MyauModuleManager {
             Field keyField = hook.findFieldInHierarchy(module.getClass(), FIELD_MODULE_KEYBIND);
             if (keyField != null) {
                 keyField.setInt(module, keyCode);
+                notifyConfigChanged();
                 return true;
             }
         } catch (Exception e) {
@@ -156,6 +179,204 @@ public class MyauModuleManager {
 
     public Object getPropertyValue(Object property) throws Exception {
         return hook.getPropertyGetValueMethod().invoke(property);
+    }
+
+    /**
+     * Sets the value on a Myau property object.
+     * Finds the value field by matching against the field name constant from
+     * mappings.
+     */
+    public void setPropertyValue(Object property, Object newValue) throws Exception {
+        Field valueField = hook.findFieldInHierarchy(property.getClass(), FIELD_VALUE_CURRENT);
+        if (valueField != null) {
+            valueField.set(property, newValue);
+            notifyConfigChanged();
+            return;
+        }
+        // Fallback: find a non-static, non-final field matching the value type
+        Object currentValue = getPropertyValue(property);
+        if (currentValue == null) {
+            throw new Exception("Cannot set property value: current value is null");
+        }
+        Class<?> clazz = property.getClass();
+        while (clazz != null && clazz != Object.class) {
+            for (Field field : clazz.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()))
+                    continue;
+                if (java.lang.reflect.Modifier.isFinal(field.getModifiers()))
+                    continue;
+                field.setAccessible(true);
+                try {
+                    Object fieldValue = field.get(property);
+                    if (fieldValue != null && fieldValue.equals(currentValue)) {
+                        field.set(property, newValue);
+                        notifyConfigChanged();
+                        return;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        throw new Exception("Could not find value field for property type " + property.getClass().getName());
+    }
+
+    private void notifyConfigChanged() {
+        ClickGui clickGui = ClickGui.getInstance();
+        if (clickGui != null) {
+            clickGui.onSettingChanged();
+        }
+    }
+
+    /**
+     * Gets all Myau property objects from a module by scanning its declared fields.
+     */
+    public List<Object> getAllProperties(Object module) {
+        List<Object> props = new ArrayList<>();
+        Method getNameMethod = hook.getPropertyGetNameMethod();
+        try {
+            for (Field f : module.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object prop = f.get(module);
+                if (prop != null) {
+                    try {
+                        getNameMethod.invoke(prop);
+                        props.add(prop);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception e) {
+            MyauLogger.error("Manager:getAllProperties", e);
+        }
+        return props;
+    }
+
+    /**
+     * Gets the type of a Myau property (boolean, float, integer, string, enum,
+     * color).
+     */
+    public String getPropertyType(Object property) {
+        String className = property.getClass().getName();
+        if (className.equals(CLASS_BOOLEAN_PROPERTY))
+            return "boolean";
+        if (className.equals(CLASS_FLOAT_PROPERTY))
+            return "float";
+        if (className.equals(CLASS_INTEGER_PROPERTY) || className.equals(CLASS_INT_VALUE))
+            return "integer";
+        if (className.equals(CLASS_STRING_PROPERTY))
+            return "string";
+        if (className.equals(CLASS_ENUM_PROPERTY))
+            return "enum";
+        if (className.equals(CLASS_COLOR_PROPERTY))
+            return "color";
+        return "unknown";
+    }
+
+    /**
+     * Gets the enum values array from an enum property.
+     */
+    public String[] getEnumPropertyValues(Object enumProperty) {
+        try {
+            Field valuesField = hook.findFieldInHierarchy(enumProperty.getClass(), FIELD_ENUM_VALUES_ARRAY);
+            if (valuesField != null) {
+                Object arr = valuesField.get(enumProperty);
+                if (arr instanceof String[])
+                    return (String[]) arr;
+            }
+        } catch (Exception ignored) {
+        }
+        return new String[0];
+    }
+
+    /**
+     * Gets the minimum value from a ranged Myau property.
+     * Supports RangedValue (Integer), FloatValue (Float), and IntValue (Integer).
+     *
+     * @return the min value as Number, or null if not a ranged type
+     */
+    public Number getPropertyMin(Object property) {
+        String type = getPropertyType(property);
+        try {
+            switch (type) {
+                case "integer": {
+                    String className = property.getClass().getName();
+                    String fieldName;
+                    if (className.equals(CLASS_INTEGER_PROPERTY)) {
+                        fieldName = MyauMappings.FIELD_RANGED_MIN;
+                    } else if (className.equals(CLASS_INT_VALUE)) {
+                        fieldName = MyauMappings.FIELD_INT_MIN;
+                    } else {
+                        return null;
+                    }
+                    Field f = hook.findFieldInHierarchy(property.getClass(), fieldName);
+                    return f != null ? (Number) f.get(property) : null;
+                }
+                case "float": {
+                    Field f = hook.findFieldInHierarchy(property.getClass(), MyauMappings.FIELD_FLOAT_MIN);
+                    return f != null ? (Number) f.get(property) : null;
+                }
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            MyauLogger.error("getPropertyMin", e);
+            return null;
+        }
+    }
+
+    /**
+     * Gets the maximum value from a ranged Myau property.
+     * Supports RangedValue (Integer), FloatValue (Float), and IntValue (Integer).
+     *
+     * @return the max value as Number, or null if not a ranged type
+     */
+    public Number getPropertyMax(Object property) {
+        String type = getPropertyType(property);
+        try {
+            switch (type) {
+                case "integer": {
+                    String className = property.getClass().getName();
+                    String fieldName;
+                    if (className.equals(CLASS_INTEGER_PROPERTY)) {
+                        fieldName = MyauMappings.FIELD_RANGED_MAX;
+                    } else if (className.equals(CLASS_INT_VALUE)) {
+                        fieldName = MyauMappings.FIELD_INT_MAX;
+                    } else {
+                        return null;
+                    }
+                    Field f = hook.findFieldInHierarchy(property.getClass(), fieldName);
+                    return f != null ? (Number) f.get(property) : null;
+                }
+                case "float": {
+                    Field f = hook.findFieldInHierarchy(property.getClass(), MyauMappings.FIELD_FLOAT_MAX);
+                    return f != null ? (Number) f.get(property) : null;
+                }
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            MyauLogger.error("getPropertyMax", e);
+            return null;
+        }
+    }
+
+    /**
+     * Checks whether a Myau property is currently visible
+     * (its BooleanSupplier visibility condition returns true).
+     */
+    public boolean isPropertyVisible(Object property) {
+        try {
+            Field visField = hook.findFieldInHierarchy(property.getClass(), MyauMappings.FIELD_VALUE_VISIBILITY);
+            if (visField != null) {
+                Object supplier = visField.get(property);
+                if (supplier instanceof java.util.function.BooleanSupplier) {
+                    return ((java.util.function.BooleanSupplier) supplier).getAsBoolean();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return true;
     }
 
     public String getPropertyName(Object property) throws Exception {
@@ -286,6 +507,43 @@ public class MyauModuleManager {
         }
 
         MyauLogger.info("Reloaded ModuleCommand with " + names.size() + " modules");
+    }
+
+    public void saveCurrentConfig() throws Exception {
+        ArrayList<String> args = new ArrayList<>();
+        args.add("config");
+        args.add("save");
+        runCommandByName("config", args);
+    }
+
+    public void runCommandByName(String commandName, ArrayList<String> args)
+            throws Exception {
+        Object cm = hook.getCommandManager();
+        if (cm == null) {
+            throw new Exception("Command manager not available");
+        }
+        Field commandsField = hook.getCachedField(
+                cm.getClass(), FIELD_COMMANDS_LIST);
+        @SuppressWarnings("unchecked")
+        ArrayList<Object> commands = (ArrayList<Object>) commandsField.get(cm);
+        Method runMethod = hook.getCommandRunMethod();
+        if (runMethod == null) {
+            throw new Exception("Command run method not available");
+        }
+
+        for (Object cmd : commands) {
+            try {
+                Field namesField = cmd.getClass().getField(FIELD_COMMAND_NAMES);
+                @SuppressWarnings("unchecked")
+                ArrayList<String> names = (ArrayList<String>) namesField.get(cmd);
+                if (names != null && names.contains(commandName)) {
+                    runMethod.invoke(cmd, args, System.currentTimeMillis());
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        throw new Exception("Command not found: " + commandName);
     }
 
     private Object findModuleCommand(ArrayList<Object> commands) {

@@ -44,3 +44,8 @@ public class MixinEntityRenderer {
         return FreelookHooks.prevRotationPitchModifier(entity);
     }
 }
+
+
+
+
+

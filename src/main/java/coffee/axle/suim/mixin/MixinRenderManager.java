@@ -20,3 +20,8 @@ public class MixinRenderManager {
         FreelookHooks.playerViewYModifier(instance, value);
     }
 }
+
+
+
+
+

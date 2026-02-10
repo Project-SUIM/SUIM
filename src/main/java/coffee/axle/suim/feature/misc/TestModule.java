@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.misc;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.render.AimDotTracker;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.render.TestModuleRenderer;
@@ -21,6 +22,11 @@ public class TestModule extends Feature {
     @Override
     public String getName() {
         return "TestModule";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.MISC;
     }
 
     @Override
@@ -165,3 +171,8 @@ public class TestModule extends Feature {
         }
     }
 }
+
+
+
+
+

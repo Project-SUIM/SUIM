@@ -118,3 +118,8 @@ public class BedLocationAPI {
         return COLOR_TO_INDEX.getOrDefault(color.toLowerCase(), 5);
     }
 }
+
+
+
+
+

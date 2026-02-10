@@ -1,7 +1,8 @@
 package coffee.axle.suim.feature;
 
+import coffee.axle.suim.feature.clickgui.ClickGui;
+import coffee.axle.suim.feature.clickgui.EditHud;
 import coffee.axle.suim.feature.combat.*;
-import coffee.axle.suim.feature.command.*;
 import coffee.axle.suim.feature.exploit.*;
 import coffee.axle.suim.feature.misc.*;
 import coffee.axle.suim.feature.player.*;
@@ -32,15 +33,18 @@ public class FeatureManager {
         this.propertyManager = new ModulePropertyManager(manager);
         HudUtils.getInstance().setManager(manager);
 
+        // ClickGUI modules (feature/clickgui/)
+        registerFeature(new ClickGui());
+        registerFeature(new EditHud());
+        registerFeature(new TestGuiModule());
+
         // Misc
         registerFeature(new TestCommand());
         registerFeature(new TestModule());
 
         // Commands
-        registerFeature(new DMyauCommand());
-        registerFeature(new FindCommand());
-        registerFeature(new StatusCommand());
-        registerFeature(new ClientInfoCommand());
+        // Removed — SUIM no longer ships separate command features.
+        // Commands like .client, .dmyau, .find, .status are retired.
 
         // Combat
         registerFeature(new MultiPointAiming());

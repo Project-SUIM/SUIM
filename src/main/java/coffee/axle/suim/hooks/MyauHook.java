@@ -400,6 +400,10 @@ public class MyauHook {
         return this.moduleGetNameMethod;
     }
 
+    public Method getCommandRunMethod() {
+        return this.commandRunMethod;
+    }
+
     public Method getPropertyGetValueMethod() {
         return this.propertyGetValueMethod;
     }

@@ -98,3 +98,8 @@ public class FreelookHooks {
         rm.playerViewY = Freelook.perspectiveToggled ? Freelook.cameraYaw : val;
     }
 }
+
+
+
+
+

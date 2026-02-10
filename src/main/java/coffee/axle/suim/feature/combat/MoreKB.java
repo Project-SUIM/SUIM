@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
@@ -35,6 +36,11 @@ public class MoreKB extends Feature {
     @Override
     public String getName() {
         return "MoreKB";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.COMBAT;
     }
 
     @Override
@@ -220,3 +226,8 @@ public class MoreKB extends Feature {
         }
     }
 }
+
+
+
+
+

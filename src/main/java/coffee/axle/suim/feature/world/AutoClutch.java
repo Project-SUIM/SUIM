@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.world;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.block.Block;
@@ -55,6 +56,11 @@ public class AutoClutch extends Feature {
     @Override
     public String getName() {
         return "AutoClutch";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.WORLD;
     }
 
     @Override
@@ -375,3 +381,8 @@ public class AutoClutch extends Feature {
         }
     }
 }
+
+
+
+
+

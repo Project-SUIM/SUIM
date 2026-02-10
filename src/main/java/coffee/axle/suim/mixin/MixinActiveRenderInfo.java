@@ -20,3 +20,8 @@ public class MixinActiveRenderInfo {
         return FreelookHooks.modifyYaw(player);
     }
 }
+
+
+
+
+

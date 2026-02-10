@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.feature.render.bedplates.BlockBedScanner;
 import coffee.axle.suim.hooks.MyauMappings;
@@ -56,6 +57,11 @@ public class Bedplates extends Feature {
     @Override
     public String getName() {
         return "BedPlates";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.RENDER;
     }
 
     @Override
@@ -466,3 +472,8 @@ public class Bedplates extends Feature {
         clearBedData();
     }
 }
+
+
+
+
+

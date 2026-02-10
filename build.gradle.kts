@@ -86,6 +86,8 @@ dependencies {
     forge("net.minecraftforge:forge:1.8.9-11.15.1.2318-1.8.9")
 
     shadowImpl(kotlin("stdlib-jdk8"))
+    shadowImpl(kotlin("reflect"))
+    shadowImpl("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
     // If you don't want mixins, remove these lines
     shadowImpl("org.spongepowered:mixin:0.7.11-SNAPSHOT") {
@@ -98,7 +100,7 @@ dependencies {
 
 }
 
-// Tasks:
+// Tasks
 
 tasks.withType(JavaCompile::class) {
     options.encoding = "UTF-8"

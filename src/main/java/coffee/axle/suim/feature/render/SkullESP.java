@@ -1,6 +1,7 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
@@ -52,6 +53,11 @@ public class SkullESP extends Feature {
     @Override
     public String getName() {
         return "SkullESP";
+    }
+
+    @Override
+    public GuiCategory getGuiCategory() {
+        return GuiCategory.RENDER;
     }
 
     @Override
@@ -304,3 +310,8 @@ public class SkullESP extends Feature {
         skullList.clear();
     }
 }
+
+
+
+
+
