@@ -3,6 +3,7 @@ package coffee.axle.suim.feature;
 import coffee.axle.suim.feature.clickgui.ClickGui;
 import coffee.axle.suim.feature.clickgui.EditHud;
 import coffee.axle.suim.feature.combat.*;
+import coffee.axle.suim.feature.command.*;
 import coffee.axle.suim.feature.exploit.*;
 import coffee.axle.suim.feature.misc.*;
 import coffee.axle.suim.feature.player.*;
@@ -43,8 +44,10 @@ public class FeatureManager {
         registerFeature(new TestModule());
 
         // Commands
-        // Removed — SUIM no longer ships separate command features.
-        // Commands like .client, .dmyau, .find, .status are retired.
+        registerFeature(new DMyauCommand());
+        registerFeature(new FindCommand());
+        registerFeature(new StatusCommand());
+        registerFeature(new ClientInfoCommand());
 
         // Combat
         registerFeature(new MultiPointAiming());

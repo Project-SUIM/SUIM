@@ -533,10 +533,13 @@ public class MyauModuleManager {
 
         for (Object cmd : commands) {
             try {
-                Field namesField = cmd.getClass().getField(FIELD_COMMAND_NAMES);
+                Field namesField = hook.findFieldInHierarchy(cmd.getClass(), FIELD_COMMAND_NAMES);
+                if (namesField == null) {
+                    continue;
+                }
                 @SuppressWarnings("unchecked")
                 ArrayList<String> names = (ArrayList<String>) namesField.get(cmd);
-                if (names != null && names.contains(commandName)) {
+                if (commandNamesContain(names, commandName)) {
                     runMethod.invoke(cmd, args, System.currentTimeMillis());
                     return;
                 }
@@ -544,6 +547,20 @@ public class MyauModuleManager {
             }
         }
         throw new Exception("Command not found: " + commandName);
+    }
+
+    private boolean commandNamesContain(ArrayList<String> names, String commandName) {
+        if (names == null || commandName == null) {
+            return false;
+        }
+
+        for (String alias : names) {
+            if (alias != null && alias.equalsIgnoreCase(commandName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Object findModuleCommand(ArrayList<Object> commands) {

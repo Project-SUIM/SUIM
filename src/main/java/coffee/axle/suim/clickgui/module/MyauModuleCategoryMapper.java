@@ -22,24 +22,43 @@ public final class MyauModuleCategoryMapper {
         map("KillAura", GuiCategory.COMBAT);
         map("AimAssist", GuiCategory.COMBAT);
         map("AutoClicker", GuiCategory.COMBAT);
+        map("AutoClickerMINUS", GuiCategory.COMBAT);
         map("Reach", GuiCategory.COMBAT);
         map("Velocity", GuiCategory.COMBAT);
+        map("BufferVelocity", GuiCategory.COMBAT);
         map("AntiBot", GuiCategory.COMBAT);
         map("Criticals", GuiCategory.COMBAT);
+        map("AntiFireball", GuiCategory.COMBAT);
+        map("KeepSprint", GuiCategory.COMBAT);
+        map("LagRange", GuiCategory.COMBAT);
+        map("NoHitDelay", GuiCategory.COMBAT);
+        map("WTap", GuiCategory.COMBAT);
+        map("TargetHUD", GuiCategory.COMBAT);
+        map("TargetStrafe", GuiCategory.COMBAT);
 
         // Render
         map("ESP", GuiCategory.RENDER);
+        map("ItemESP", GuiCategory.RENDER);
         map("BedESP", GuiCategory.RENDER);
+        map("BedPlates", GuiCategory.RENDER);
         map("BedTracker", GuiCategory.RENDER);
         map("Chams", GuiCategory.RENDER);
+        map("ChestESP", GuiCategory.RENDER);
+        map("Indicators", GuiCategory.RENDER);
         map("NameTags", GuiCategory.RENDER);
+        map("NickHider", GuiCategory.RENDER);
+        map("NoHurtCam", GuiCategory.RENDER);
+        map("NoRotate", GuiCategory.RENDER);
+        map("Trajectories", GuiCategory.RENDER);
         map("Tracers", GuiCategory.RENDER);
         map("HUD", GuiCategory.RENDER);
         map("ClickGUI", GuiCategory.SETTINGS);
+        map("EditHUD", GuiCategory.SETTINGS);
         map("Fullbright", GuiCategory.RENDER);
         map("Animations", GuiCategory.RENDER);
         map("ItemPhysics", GuiCategory.RENDER);
         map("TimeChanger", GuiCategory.RENDER);
+        map("ViewClip", GuiCategory.RENDER);
         map("ViewModel", GuiCategory.RENDER);
         map("XRay", GuiCategory.RENDER);
         map("Xray", GuiCategory.RENDER);
@@ -53,27 +72,41 @@ public final class MyauModuleCategoryMapper {
         map("ChestStealer", GuiCategory.PLAYER);
         map("Scaffold", GuiCategory.PLAYER);
         map("NoSlow", GuiCategory.PLAYER);
+        map("InvWalk", GuiCategory.PLAYER);
+        map("Jesus", GuiCategory.PLAYER);
+        map("NoJumpDelay", GuiCategory.PLAYER);
+        map("SafeWalk", GuiCategory.PLAYER);
         map("AutoArmor", GuiCategory.PLAYER);
+        map("AutoHeal", GuiCategory.PLAYER);
         map("AutoTool", GuiCategory.PLAYER);
 
         // World
         map("Disabler", GuiCategory.WORLD);
         map("Timer", GuiCategory.WORLD);
         map("FastPlace", GuiCategory.WORLD);
+        map("BedNuker", GuiCategory.WORLD);
         map("Eagle", GuiCategory.WORLD);
+        map("LightningTracker", GuiCategory.WORLD);
+        map("SpeedMine", GuiCategory.WORLD);
         map("Teams", GuiCategory.WORLD);
 
         // Exploit
         map("Blink", GuiCategory.EXPLOIT);
         map("Freeze", GuiCategory.EXPLOIT);
+        map("GhostHand", GuiCategory.EXPLOIT);
         map("Phase", GuiCategory.EXPLOIT);
         map("Fly", GuiCategory.EXPLOIT);
         map("Speed", GuiCategory.EXPLOIT);
         map("LongJump", GuiCategory.EXPLOIT);
+        map("AntiVoid", GuiCategory.EXPLOIT);
 
         // Misc
         map("AutoGG", GuiCategory.MISC);
+        map("AntiDebuff", GuiCategory.MISC);
+        map("AntiObbyTrap", GuiCategory.MISC);
+        map("AntiObfuscate", GuiCategory.MISC);
         map("AutoText", GuiCategory.MISC);
+        map("MCF", GuiCategory.MISC);
         map("Spammer", GuiCategory.MISC);
         map("AntiStaff", GuiCategory.MISC);
     }
