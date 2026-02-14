@@ -6,6 +6,7 @@ import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockBed;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -31,6 +32,7 @@ import java.util.Queue;
  * Hybrid event model: myau UpdateEvent for rotation spoofing,
  * Forge events for tick placement and rendering.
  */
+@SuppressWarnings("unused")
 public class AutoBlockIn extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -44,6 +46,17 @@ public class AutoBlockIn extends Feature {
     private Object itemSpoofProperty;
     private Object showProgressProperty;
     private Object moveFixProperty;
+    private Object bedRangeProperty;
+    private Object centeringProperty;
+
+    private Object bedEspModule;
+    private Object killAuraModule;
+    private Object bedNukerModule;
+    private Field bedEspBedsField;
+    private Field killAuraTargetField;
+    private Field killAuraIsBlockingField;
+    private Field bedNukerTargetBedField;
+    private Field bedNukerBreakingField;
 
     // Cached reflection — only UpdateEvent (the sole myau hook)
     private Method setRotationMethod;
@@ -65,6 +78,9 @@ public class AutoBlockIn extends Feature {
     private BlockPos targetBlock;
     private EnumFacing targetFacing;
     private Vec3 targetHitVec;
+    private Vec3 queuedHitVec;
+    private boolean placeQueued;
+    private boolean operationActive;
     private int lastSlot = -1;
     private boolean updateEventWorking = false;
 
@@ -101,15 +117,20 @@ public class AutoBlockIn extends Feature {
             showProgressProperty = creator.createBooleanProperty("show-progress", true);
             moveFixProperty = creator.createEnumProperty("move-fix", 1,
                     new String[] { "NONE", "SILENT", "STRICT" });
+            bedRangeProperty = creator.createFloatProperty("bed-range", 0f, 0f, 10f);
+            centeringProperty = creator.createEnumProperty("centering", 0,
+                    new String[] { "OFF", "SOFT", "STRICT" });
 
             creator.registerProperties(moduleInstance,
                     rangeProperty, speedProperty, placeDelayProperty,
                     rotationToleranceProperty, itemSpoofProperty,
-                    showProgressProperty, moveFixProperty);
+                    showProgressProperty, moveFixProperty,
+                    bedRangeProperty, centeringProperty);
 
             manager.reloadModuleCommand();
             initBlockScores();
             cacheUpdateEventMethods();
+            hookContextModules();
 
             // Single myau hook: UpdateEvent for server-side rotation spoofing
             creator.registerEventHandler(
@@ -186,6 +207,49 @@ public class AutoBlockIn extends Feature {
         return null;
     }
 
+    private void hookContextModules() {
+        try {
+            bedEspModule = manager.findModule("BedESP");
+            killAuraModule = manager.findModule("KillAura");
+            bedNukerModule = manager.findModule("BedNuker");
+
+            if (bedEspModule != null) {
+                bedEspBedsField = manager.getCachedField(
+                        bedEspModule.getClass(), MyauMappings.FIELD_BED_ESP_BEDS);
+            }
+
+            if (killAuraModule != null) {
+                killAuraTargetField = findDeclaredField(
+                        killAuraModule.getClass(),
+                        MyauMappings.FIELD_KILL_AURA_TARGET);
+                if (killAuraTargetField != null) {
+                    killAuraTargetField.setAccessible(true);
+                }
+
+                killAuraIsBlockingField = findDeclaredField(
+                        killAuraModule.getClass(),
+                        MyauMappings.FIELD_KILL_AURA_IS_BLOCKING);
+                if (killAuraIsBlockingField != null) {
+                    killAuraIsBlockingField.setAccessible(true);
+                }
+            }
+
+            if (bedNukerModule != null) {
+                bedNukerTargetBedField = findDeclaredField(bedNukerModule.getClass(), "I");
+                if (bedNukerTargetBedField != null) {
+                    bedNukerTargetBedField.setAccessible(true);
+                }
+
+                bedNukerBreakingField = findDeclaredField(bedNukerModule.getClass(), "K");
+                if (bedNukerBreakingField != null) {
+                    bedNukerBreakingField.setAccessible(true);
+                }
+            }
+        } catch (Exception e) {
+            MyauLogger.error("AutoBlockIn hookContextModules", e);
+        }
+    }
+
     // ==================== Module Lifecycle ====================
 
     private void onModuleEnabled() {
@@ -199,6 +263,9 @@ public class AutoBlockIn extends Feature {
             targetBlock = null;
             targetFacing = null;
             targetHitVec = null;
+            queuedHitVec = null;
+            placeQueued = false;
+            operationActive = false;
             lastPlaceTime = 0;
             updateEventWorking = false;
         }
@@ -214,6 +281,9 @@ public class AutoBlockIn extends Feature {
         targetBlock = null;
         targetFacing = null;
         targetHitVec = null;
+        queuedHitVec = null;
+        placeQueued = false;
+        operationActive = false;
         updateEventWorking = false;
         MyauLogger.log(getName(), "MODULE_DISABLED");
     }
@@ -244,6 +314,15 @@ public class AutoBlockIn extends Feature {
 
             serverYaw = ((Number) getYawMethod.invoke(eventObj)).floatValue();
             serverPitch = ((Number) getPitchMethod.invoke(eventObj)).floatValue();
+
+            operationActive = !isSuppressedByOtherModules() && isBedTriggerSatisfied();
+            if (!operationActive) {
+                clearTargeting();
+                progress = 0f;
+                return;
+            }
+
+            applyCentering();
 
             updateProgress();
 
@@ -276,17 +355,15 @@ public class AutoBlockIn extends Feature {
                 float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
                 targetYaw = MathHelper.wrapAngleTo180_float(targetYaw);
 
-                float maxTurn = getSpeed();
-                float yawDiff = MathHelper.wrapAngleTo180_float(targetYaw - serverYaw);
-                float pitchDiff = targetPitch - serverPitch;
-
-                float yawStep = MathHelper.clamp_float(yawDiff, -maxTurn, maxTurn);
-                float pitchStep = MathHelper.clamp_float(pitchDiff, -maxTurn, maxTurn);
-
-                aimYaw = serverYaw + yawStep;
-                aimPitch = MathHelper.clamp_float(serverPitch + pitchStep, -90.0f, 90.0f);
+                float[] smoothed = getSmoothedRotations(targetYaw, targetPitch);
+                aimYaw = smoothed[0];
+                aimPitch = smoothed[1];
 
                 setRotationMethod.invoke(eventObj, aimYaw, aimPitch, 6);
+                updatePlacementQueue();
+            } else {
+                placeQueued = false;
+                queuedHitVec = null;
             }
 
         } catch (Exception e) {
@@ -308,9 +385,20 @@ public class AutoBlockIn extends Feature {
                 return;
             if (mc.currentScreen != null)
                 return;
+            operationActive = !isSuppressedByOtherModules() && isBedTriggerSatisfied();
+            if (!operationActive) {
+                clearTargeting();
+                progress = 0f;
+                return;
+            }
+
+            applyCentering();
+
+            applyLocalMoveFix();
+
             if (targetBlock == null || targetFacing == null || targetHitVec == null)
                 return;
-            if (!withinRotationTolerance(aimYaw, aimPitch))
+            if (!placeQueued || queuedHitVec == null)
                 return;
 
             long currentTime = System.currentTimeMillis();
@@ -319,23 +407,14 @@ public class AutoBlockIn extends Feature {
 
             lastPlaceTime = currentTime;
 
-            MovingObjectPosition mop = rayTraceBlock(aimYaw, aimPitch, getRange());
-            if (mop != null
-                    && mop.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
-                    && mop.getBlockPos().equals(targetBlock)
-                    && mop.sideHit == targetFacing) {
+            ItemStack heldStack = mc.thePlayer.inventory.getCurrentItem();
+            if (heldStack != null && heldStack.getItem() instanceof ItemBlock) {
+                mc.playerController.onPlayerRightClick(
+                        mc.thePlayer, mc.theWorld, heldStack,
+                        targetBlock, targetFacing, queuedHitVec);
+                mc.thePlayer.swingItem();
 
-                ItemStack heldStack = mc.thePlayer.inventory.getCurrentItem();
-                if (heldStack != null && heldStack.getItem() instanceof ItemBlock) {
-                    mc.playerController.onPlayerRightClick(
-                            mc.thePlayer, mc.theWorld, heldStack,
-                            targetBlock, targetFacing, mop.hitVec);
-                    mc.thePlayer.swingItem();
-
-                    targetBlock = null;
-                    targetFacing = null;
-                    targetHitVec = null;
-                }
+                clearTargeting();
             }
         } catch (Exception e) {
             MyauLogger.error("AutoBlockIn onClientTick", e);
@@ -355,6 +434,8 @@ public class AutoBlockIn extends Feature {
         if (!getShowProgress())
             return;
         if (mc.fontRendererObj == null)
+            return;
+        if (!operationActive)
             return;
 
         float scale = 1.0f;
@@ -594,7 +675,49 @@ public class AutoBlockIn extends Feature {
             if (isAir(feetGoal))
                 goals.add(feetGoal);
         }
+
+        Vec3 closestEnemy = getClosestOtherPlayerPos();
+        if (closestEnemy != null) {
+            goals.sort(Comparator.comparingDouble(pos -> {
+                double dx = (pos.getX() + 0.5) - closestEnemy.xCoord;
+                double dy = (pos.getY() + 0.5) - closestEnemy.yCoord;
+                double dz = (pos.getZ() + 0.5) - closestEnemy.zCoord;
+                return dx * dx + dy * dy + dz * dz;
+            }));
+        }
+
         findBestForGoals(goals, eye, reach);
+    }
+
+    private Vec3 getClosestOtherPlayerPos() {
+        if (mc.theWorld == null || mc.thePlayer == null)
+            return null;
+
+        Vec3 myPos = mc.thePlayer.getPositionVector();
+        Vec3 best = null;
+        double bestD2 = Double.POSITIVE_INFINITY;
+
+        for (Object o : mc.theWorld.playerEntities) {
+            if (!(o instanceof net.minecraft.entity.player.EntityPlayer))
+                continue;
+
+            net.minecraft.entity.player.EntityPlayer p = (net.minecraft.entity.player.EntityPlayer) o;
+            if (p == mc.thePlayer)
+                continue;
+
+            Vec3 pos = p.getPositionVector();
+            double dx = pos.xCoord - myPos.xCoord;
+            double dy = pos.yCoord - myPos.yCoord;
+            double dz = pos.zCoord - myPos.zCoord;
+            double d2 = dx * dx + dy * dy + dz * dz;
+
+            if (d2 < bestD2) {
+                bestD2 = d2;
+                best = pos;
+            }
+        }
+
+        return best;
     }
 
     private void findBestForGoals(List<BlockPos> goals, Vec3 eye, double reach) {
@@ -794,6 +917,271 @@ public class AutoBlockIn extends Feature {
         return (yaw > 180f) ? (yaw - 360f) : yaw;
     }
 
+    private float wrapYawDelta(float base, float target) {
+        float d = target - base;
+        while (d <= -180f)
+            d += 360f;
+        while (d > 180f)
+            d -= 360f;
+        return d;
+    }
+
+    private float unwrapYaw(float yaw, float prevYaw) {
+        return prevYaw + ((((yaw - prevYaw + 180f) % 360f) + 360f) % 360f - 180f);
+    }
+
+    private float[] getSmoothedRotations(float targetYaw, float targetPitch) {
+        float currentYaw = serverYaw;
+        float currentPitch = serverPitch;
+
+        float targetWrapped = normYaw(targetYaw);
+        float targetUnwrapped = unwrapYaw(targetWrapped, currentYaw);
+
+        float dYaw = targetUnwrapped - currentYaw;
+        float dPitch = targetPitch - currentPitch;
+
+        if (Math.abs(dYaw) < 0.1f)
+            currentYaw = targetUnwrapped;
+        if (Math.abs(dPitch) < 0.1f)
+            currentPitch = targetPitch;
+
+        if (currentYaw == targetUnwrapped && currentPitch == targetPitch) {
+            return new float[] { currentYaw, currentPitch };
+        }
+
+        float maxStep = getSpeed();
+        float stepYaw = MathHelper.clamp_float(dYaw, -maxStep, maxStep);
+        float stepPitch = MathHelper.clamp_float(dPitch, -maxStep, maxStep);
+
+        currentYaw += stepYaw;
+        currentPitch = MathHelper.clamp_float(currentPitch + stepPitch, -90f, 90f);
+
+        if (Math.signum(targetUnwrapped - currentYaw) != Math.signum(dYaw))
+            currentYaw = targetUnwrapped;
+        if (Math.signum(targetPitch - currentPitch) != Math.signum(dPitch))
+            currentPitch = targetPitch;
+
+        return new float[] { currentYaw, currentPitch };
+    }
+
+    private void applyLocalMoveFix() {
+        if (mc.thePlayer == null || mc.thePlayer.movementInput == null)
+            return;
+
+        int mode = getMoveFixMode();
+        if (mode <= 0)
+            return;
+
+        float forward = mc.thePlayer.movementInput.moveForward;
+        float strafe = mc.thePlayer.movementInput.moveStrafe;
+        if (Math.abs(forward) < 1.0E-4f && Math.abs(strafe) < 1.0E-4f)
+            return;
+
+        float fixYaw;
+        if (mode == 1) {
+            if (Math.abs(forward) < 1.0E-4f)
+                return;
+            if (targetBlock == null || targetFacing == null)
+                return;
+            fixYaw = aimYaw;
+        } else {
+            if (targetBlock == null || targetFacing == null)
+                return;
+            fixYaw = aimYaw;
+        }
+
+        float delta = (float) Math.toRadians(mc.thePlayer.rotationYaw - fixYaw);
+        float cos = MathHelper.cos(delta);
+        float sin = MathHelper.sin(delta);
+
+        float fixedForward = forward * cos + strafe * sin;
+        float fixedStrafe = strafe * cos - forward * sin;
+
+        mc.thePlayer.movementInput.moveForward = fixedForward;
+        mc.thePlayer.movementInput.moveStrafe = fixedStrafe;
+    }
+
+    private void applyCentering() {
+        if (mc.thePlayer == null)
+            return;
+
+        int mode = getCenteringMode();
+        if (mode <= 0)
+            return;
+
+        double centerX = Math.floor(mc.thePlayer.posX) + 0.5;
+        double centerZ = Math.floor(mc.thePlayer.posZ) + 0.5;
+        double dx = centerX - mc.thePlayer.posX;
+        double dz = centerZ - mc.thePlayer.posZ;
+
+        if (mode == 2) {
+            if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+                mc.thePlayer.setPosition(centerX, mc.thePlayer.posY, centerZ);
+                mc.thePlayer.motionX = 0.0;
+                mc.thePlayer.motionZ = 0.0;
+            }
+            return;
+        }
+
+        double softTolerance = 0.18;
+        if (Math.abs(dx) <= softTolerance && Math.abs(dz) <= softTolerance)
+            return;
+
+        double xStep = clamp(dx * 0.35, -0.08, 0.08);
+        double zStep = clamp(dz * 0.35, -0.08, 0.08);
+        mc.thePlayer.motionX = xStep;
+        mc.thePlayer.motionZ = zStep;
+    }
+
+    private void updatePlacementQueue() {
+        placeQueued = false;
+        queuedHitVec = null;
+
+        if (targetBlock == null || targetFacing == null)
+            return;
+        if (!withinRotationTolerance(aimYaw, aimPitch))
+            return;
+
+        MovingObjectPosition mop = rayTraceBlock(aimYaw, aimPitch, getRange());
+        if (mop == null || mop.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK)
+            return;
+        if (!targetBlock.equals(mop.getBlockPos()) || mop.sideHit != targetFacing)
+            return;
+
+        placeQueued = true;
+        queuedHitVec = mop.hitVec;
+    }
+
+    private void clearTargeting() {
+        targetBlock = null;
+        targetFacing = null;
+        targetHitVec = null;
+        queuedHitVec = null;
+        placeQueued = false;
+    }
+
+    private boolean isSuppressedByOtherModules() {
+        if (killAuraModule == null)
+            killAuraModule = manager.findModule("KillAura");
+        if (bedNukerModule == null)
+            bedNukerModule = manager.findModule("BedNuker");
+
+        return isKillAuraActivelyControlling() || isBedNukerActivelyControlling();
+    }
+
+    private boolean isKillAuraActivelyControlling() {
+        try {
+            if (killAuraModule == null || !manager.isModuleEnabled(killAuraModule)) {
+                return false;
+            }
+
+            if (killAuraTargetField != null) {
+                Object target = killAuraTargetField.get(killAuraModule);
+                if (target != null) {
+                    return true;
+                }
+            }
+
+            if (killAuraIsBlockingField != null && killAuraIsBlockingField.getBoolean(killAuraModule)) {
+                return true;
+            }
+
+            return false;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isBedNukerActivelyControlling() {
+        try {
+            if (bedNukerModule == null || !manager.isModuleEnabled(bedNukerModule)) {
+                return false;
+            }
+
+            if (bedNukerBreakingField != null && bedNukerBreakingField.getBoolean(bedNukerModule)) {
+                return true;
+            }
+
+            if (bedNukerTargetBedField != null) {
+                Object targetBed = bedNukerTargetBedField.get(bedNukerModule);
+                return targetBed != null;
+            }
+
+            return false;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isBedTriggerSatisfied() {
+        float bedRange = getBedRange();
+        if (bedRange <= 0f)
+            return true;
+
+        if (mc.thePlayer == null || mc.theWorld == null)
+            return false;
+
+        double nearest = getNearestBedDistanceFromEsp();
+        if (nearest >= 0d)
+            return nearest <= bedRange;
+
+        BlockPos feet = mc.thePlayer.getPosition();
+        int r = MathHelper.ceiling_float_int(bedRange);
+        double best = Double.POSITIVE_INFINITY;
+
+        for (int x = -r; x <= r; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -r; z <= r; z++) {
+                    BlockPos p = feet.add(x, y, z);
+                    Block block = mc.theWorld.getBlockState(p).getBlock();
+                    if (!(block instanceof BlockBed))
+                        continue;
+
+                    double dist = mc.thePlayer.getDistance(
+                            p.getX() + 0.5,
+                            p.getY(),
+                            p.getZ() + 0.5);
+                    if (dist < best)
+                        best = dist;
+                }
+            }
+        }
+
+        return best <= bedRange;
+    }
+
+    @SuppressWarnings("unchecked")
+    private double getNearestBedDistanceFromEsp() {
+        try {
+            if (bedEspModule == null)
+                bedEspModule = manager.findModule("BedESP");
+            if (bedEspModule == null)
+                return -1d;
+
+            if (bedEspBedsField == null) {
+                bedEspBedsField = manager.getCachedField(
+                        bedEspModule.getClass(), MyauMappings.FIELD_BED_ESP_BEDS);
+            }
+
+            Set<BlockPos> beds = (Set<BlockPos>) bedEspBedsField.get(bedEspModule);
+            if (beds == null || beds.isEmpty())
+                return -1d;
+
+            double best = Double.POSITIVE_INFINITY;
+            for (BlockPos p : beds) {
+                double dist = mc.thePlayer.getDistance(
+                        p.getX() + 0.5,
+                        p.getY(),
+                        p.getZ() + 0.5);
+                if (dist < best)
+                    best = dist;
+            }
+            return best;
+        } catch (Exception e) {
+            return -1d;
+        }
+    }
+
     // ==================== Property Accessors ====================
 
     private float getRange() {
@@ -836,6 +1224,30 @@ public class AutoBlockIn extends Feature {
         }
     }
 
+    private int getMoveFixMode() {
+        try {
+            return ((Number) properties.getPropertyValue(moveFixProperty)).intValue();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private float getBedRange() {
+        try {
+            return ((Number) properties.getPropertyValue(bedRangeProperty)).floatValue();
+        } catch (Exception e) {
+            return 0f;
+        }
+    }
+
+    private int getCenteringMode() {
+        try {
+            return ((Number) properties.getPropertyValue(centeringProperty)).intValue();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     @Override
     public void disable() {
         onModuleDisabled();
@@ -853,8 +1265,3 @@ public class AutoBlockIn extends Feature {
         }
     }
 }
-
-
-
-
-

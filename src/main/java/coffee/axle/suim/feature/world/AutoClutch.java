@@ -50,6 +50,7 @@ public class AutoClutch extends Feature {
     private long airTimeStart = 0;
     private long landTimeStart = 0;
     private long sprintTimer = 0;
+    private long scaffoldEnableTime = 0;
 
     private static final int FALL_SCAN_DEPTH = 10;
 
@@ -81,12 +82,12 @@ public class AutoClutch extends Feature {
 
             hurtTimeProperty = creator.createBooleanProperty("hurt-time", true);
             turnOffModeProperty = creator.createEnumProperty(
-                    "turn-off-mode", 0,
+                    "disable-mode", 0,
                     new String[] { "MOVE", "FORWARD", "NONE" });
             enableDelayProperty = creator.createIntegerProperty("enable-delay", 0, 0, 100);
-            disableDelayProperty = creator.createIntegerProperty("disable-delay", 50, 0, 100);
+            disableDelayProperty = creator.createIntegerProperty("disable-delay", 0, 0, 100);
             sprintReEnableProperty = creator.createIntegerProperty("sprint-re-enable", 150, 0, 500);
-            minFallDistProperty = creator.createIntegerProperty("min-fall-distance", 4, 1, 10);
+            minFallDistProperty = creator.createIntegerProperty("min-fall-distance", 0, 0, 10);
 
             creator.registerProperties(
                     moduleInstance,
@@ -125,6 +126,7 @@ public class AutoClutch extends Feature {
         airTimeStart = 0;
         landTimeStart = 0;
         sprintTimer = 0;
+        scaffoldEnableTime = 0;
     }
 
     private void onModuleDisabled() {
@@ -137,6 +139,7 @@ public class AutoClutch extends Feature {
         airTimeStart = 0;
         landTimeStart = 0;
         sprintTimer = 0;
+        scaffoldEnableTime = 0;
     }
 
     @SubscribeEvent
@@ -166,7 +169,7 @@ public class AutoClutch extends Feature {
             long sprintDelay = getSprintReEnable();
 
             updateFireballState();
-            handleTurnoff();
+            handleTurnoff(now);
 
             // Fall detection
             if (!mc.thePlayer.onGround && mc.thePlayer.motionY < -0.01) {
@@ -174,7 +177,12 @@ public class AutoClutch extends Feature {
                     airTimeStart = now;
                 }
 
-                boolean shouldTrigger = dist == -1 || dist >= minFall;
+                boolean shouldTrigger;
+                if (minFall == 0) {
+                    shouldTrigger = dist == -1;
+                } else {
+                    shouldTrigger = dist == -1 || dist >= minFall;
+                }
 
                 if (getHurtTimeEnabled()) {
                     shouldTrigger = shouldTrigger
@@ -192,12 +200,25 @@ public class AutoClutch extends Feature {
                         falling = true;
                         needsSprint = true;
                         sprintTimer = 0;
+                        scaffoldEnableTime = now;
                     }
                 }
             } else if (mc.thePlayer.onGround) {
                 airTimeStart = 0;
                 suppressed = false;
-                landTimeStart = 0;
+                if (!falling) {
+                    landTimeStart = 0;
+                    scaffoldEnableTime = 0;
+                }
+            }
+
+            // Auto-disable delay from scaffold enable time
+            if (falling
+                    && manager.isModuleEnabled(scaffoldModule)
+                    && disableDelay > 0
+                    && scaffoldEnableTime != 0
+                    && now - scaffoldEnableTime >= disableDelay) {
+                stopClutch(now, true);
             }
 
             // Land detection
@@ -210,10 +231,7 @@ public class AutoClutch extends Feature {
 
                 if (manager.isModuleEnabled(scaffoldModule)) {
                     if (now - landTimeStart >= disableDelay) {
-                        disableScaffold();
-                        falling = false;
-                        landTimeStart = 0;
-                        sprintTimer = now;
+                        stopClutch(now, false);
                     }
                 }
             }
@@ -253,28 +271,35 @@ public class AutoClutch extends Feature {
         }
     }
 
-    private void handleTurnoff() {
+    private void handleTurnoff(long now) {
         if (!falling)
             return;
 
         int turnOffMode = getTurnOffMode();
         switch (turnOffMode) {
             case 0: // MOVE
-                if (isMoving()) {
-                    disableScaffold();
-                    falling = false;
-                    suppressed = true;
+                if (isMoving() || isAnyMovementKeyDown()) {
+                    stopClutch(now, true);
                 }
                 break;
             case 1: // FORWARD
                 if (mc.gameSettings.keyBindForward.isKeyDown()) {
-                    disableScaffold();
-                    falling = false;
-                    suppressed = true;
+                    stopClutch(now, true);
                 }
                 break;
             case 2: // NONE
                 break;
+        }
+    }
+
+    private void stopClutch(long now, boolean suppress) {
+        disableScaffold();
+        falling = false;
+        suppressed = suppress;
+        landTimeStart = 0;
+        scaffoldEnableTime = 0;
+        if (needsSprint) {
+            sprintTimer = now;
         }
     }
 
@@ -324,6 +349,15 @@ public class AutoClutch extends Feature {
     private boolean isMoving() {
         return mc.thePlayer.movementInput.moveForward != 0.0f
                 || mc.thePlayer.movementInput.moveStrafe != 0.0f;
+    }
+
+    private boolean isAnyMovementKeyDown() {
+        return mc.gameSettings.keyBindForward.isKeyDown()
+                || mc.gameSettings.keyBindBack.isKeyDown()
+                || mc.gameSettings.keyBindLeft.isKeyDown()
+                || mc.gameSettings.keyBindRight.isKeyDown()
+                || mc.gameSettings.keyBindJump.isKeyDown()
+                || mc.gameSettings.keyBindSneak.isKeyDown();
     }
 
     // ==================== Property Accessors ====================
@@ -377,12 +411,7 @@ public class AutoClutch extends Feature {
             return ((Number) properties.getPropertyValue(minFallDistProperty))
                     .intValue();
         } catch (Exception e) {
-            return 4;
+            return 0;
         }
     }
 }
-
-
-
-
-
