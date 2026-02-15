@@ -50,9 +50,10 @@ public class AutoClutch extends Feature {
     private long airTimeStart = 0;
     private long landTimeStart = 0;
     private long sprintTimer = 0;
-    private long scaffoldEnableTime = 0;
+    private long lastClutchEndTime = 0;
 
     private static final int FALL_SCAN_DEPTH = 10;
+    private static final long CHAIN_WINDOW_MS = 750;
 
     @Override
     public String getName() {
@@ -107,11 +108,11 @@ public class AutoClutch extends Feature {
                     this::onModuleEnabled,
                     this::onModuleDisabled);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
+            MyauLogger.log(getName(), "FEATURE_MEOWW");
             return true;
 
         } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
+            MyauLogger.error("FEATURE_NO_TUNA", e);
             return false;
         }
     }
@@ -126,7 +127,7 @@ public class AutoClutch extends Feature {
         airTimeStart = 0;
         landTimeStart = 0;
         sprintTimer = 0;
-        scaffoldEnableTime = 0;
+        lastClutchEndTime = 0;
     }
 
     private void onModuleDisabled() {
@@ -139,7 +140,7 @@ public class AutoClutch extends Feature {
         airTimeStart = 0;
         landTimeStart = 0;
         sprintTimer = 0;
-        scaffoldEnableTime = 0;
+        lastClutchEndTime = 0;
     }
 
     @SubscribeEvent
@@ -177,8 +178,15 @@ public class AutoClutch extends Feature {
                     airTimeStart = now;
                 }
 
+                // Chain window: if we just finished a clutch cycle, skip
+                // the fall distance check so re-hits trigger immediately
+                boolean inChainWindow = lastClutchEndTime != 0
+                        && now - lastClutchEndTime < CHAIN_WINDOW_MS;
+
                 boolean shouldTrigger;
-                if (minFall == 0) {
+                if (inChainWindow) {
+                    shouldTrigger = true;
+                } else if (minFall == 0) {
                     shouldTrigger = dist == -1;
                 } else {
                     shouldTrigger = dist == -1 || dist >= minFall;
@@ -200,7 +208,7 @@ public class AutoClutch extends Feature {
                         falling = true;
                         needsSprint = true;
                         sprintTimer = 0;
-                        scaffoldEnableTime = now;
+                        lastClutchEndTime = 0;
                     }
                 }
             } else if (mc.thePlayer.onGround) {
@@ -208,17 +216,7 @@ public class AutoClutch extends Feature {
                 suppressed = false;
                 if (!falling) {
                     landTimeStart = 0;
-                    scaffoldEnableTime = 0;
                 }
-            }
-
-            // Auto-disable delay from scaffold enable time
-            if (falling
-                    && manager.isModuleEnabled(scaffoldModule)
-                    && disableDelay > 0
-                    && scaffoldEnableTime != 0
-                    && now - scaffoldEnableTime >= disableDelay) {
-                stopClutch(now, true);
             }
 
             // Land detection
@@ -297,7 +295,7 @@ public class AutoClutch extends Feature {
         falling = false;
         suppressed = suppress;
         landTimeStart = 0;
-        scaffoldEnableTime = 0;
+        lastClutchEndTime = now;
         if (needsSprint) {
             sprintTimer = now;
         }
@@ -306,7 +304,13 @@ public class AutoClutch extends Feature {
     private void disableScaffold() {
         try {
             manager.setModuleEnabled(scaffoldModule, false);
-        } catch (Exception ignored) {
+            if (manager.isModuleEnabled(scaffoldModule)) {
+                MyauLogger.log(getName(),
+                        "Scaffold still enabled after setModuleEnabled(false), retrying");
+                manager.setModuleEnabled(scaffoldModule, false);
+            }
+        } catch (Exception e) {
+            MyauLogger.error("AutoClutch:disableScaffold", e);
         }
     }
 
@@ -315,7 +319,8 @@ public class AutoClutch extends Feature {
             return;
         try {
             manager.setModuleEnabled(sprintModule, enabled);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            MyauLogger.error("AutoClutch:setSprint", e);
         }
     }
 

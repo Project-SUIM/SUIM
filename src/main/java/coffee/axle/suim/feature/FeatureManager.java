@@ -76,6 +76,7 @@ public class FeatureManager {
 
         // Exploit
         registerFeature(new Freeze());
+        registerFeature(new ShopBlink());
         registerFeature(new VelocityBuffer());
     }
 

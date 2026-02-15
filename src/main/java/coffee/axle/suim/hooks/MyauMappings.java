@@ -261,7 +261,7 @@ public class MyauMappings {
     public static final String SIG_MODULE_CONSTRUCTOR = "(Ljava/lang/String;ZIJ)V";
     public static final String SIG_ON_ENABLE = "(SIC)V";
     public static final String SIG_ON_DISABLE = "(J)V";
-    public static final String SIG_SET_ENABLED = "(SBSI)V";
+    public static final String SIG_SET_ENABLED = "(SZSI)V";
     public static final String SIG_COMMAND_RUN = "(Ljava/util/ArrayList;J)V";
     public static final String SIG_COMMAND_CONSTRUCTOR = "(Ljava/util/ArrayList;)V";
 

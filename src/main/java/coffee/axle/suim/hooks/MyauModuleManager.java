@@ -86,9 +86,43 @@ public class MyauModuleManager {
     }
 
     public void setModuleEnabled(Object module, boolean enabled) throws Exception {
-        Method setEnabled = module.getClass().getMethod(METHOD_SET_ENABLED,
-                short.class, boolean.class, short.class, int.class);
-        setEnabled.invoke(module, (short) 0, enabled, (short) 1, 0);
+        // Direct field manipulation — the obfuscated f(SZSI)V uses ZKM o_.a dispatch
+        // which throws ArrayIndexOutOfBoundsException with our junk parameter values.
+        // Setting the 'p' field directly and calling onEnabled/onDisabled callbacks
+        // is reliable: those methods don't use o_.a dispatch in native Myau modules,
+        // and our ASM-generated modules override them to call
+        // triggerOnEnable/triggerOnDisable.
+        Field enabledField = hook.findFieldInHierarchy(module.getClass(), FIELD_MODULE_ENABLED);
+        if (enabledField == null) {
+            throw new Exception("Cannot find enabled field on module " + getModuleName(module));
+        }
+
+        boolean currentState = enabledField.getBoolean(module);
+        if (currentState == enabled) {
+            return;
+        }
+
+        enabledField.setBoolean(module, enabled);
+
+        try {
+            if (enabled) {
+                Method onEnabled = hook.findMethodInHierarchy(
+                        module.getClass(), METHOD_ON_ENABLE,
+                        short.class, int.class, char.class);
+                if (onEnabled != null) {
+                    onEnabled.invoke(module, (short) 0, 0, (char) 0);
+                }
+            } else {
+                Method onDisabled = hook.findMethodInHierarchy(
+                        module.getClass(), METHOD_ON_DISABLE, long.class);
+                if (onDisabled != null) {
+                    onDisabled.invoke(module, 0L);
+                }
+            }
+        } catch (Exception callbackEx) {
+            MyauLogger.log("setModuleEnabled",
+                    "Callback failed for " + getModuleName(module) + " (field set OK)");
+        }
     }
 
     public void toggleModule(Object module) throws Exception {
