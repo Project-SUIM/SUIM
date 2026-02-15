@@ -600,8 +600,3 @@ public final class FontUtil {
         return INSTANCE.trimToWidth(text, width);
     }
 }
-
-
-
-
-
