@@ -28,9 +28,9 @@ public class ProjectSUIM {
         pendingDisplay = screen;
     }
 
-    public static final String MOD_NAME = "d'Myau";
-    public static final String MOD_NAME_LONG = "Soci\u00E9t\u00E9 des Utilitaires et Injections d'Myau";
-    public static final String LOG_PREFIX = "[d'Myau]";
+    public static final String MOD_NAME = "SUIM";
+    public static final String MOD_NAME_LONG = "Soci\u00E9t\u00E9 des Utilitaires et Injections pour Myau";
+    public static final String LOG_PREFIX = "[SUIM]";
 
     public static final String CHAT_PREFIX = "\u00A75[\u00A7dProject SUIM\u00A75]\u00A7r";
     public static final String SHORT_PREFIX = "\u00A75[\u00A7dSUIM\u00A75]\u00A7r";
