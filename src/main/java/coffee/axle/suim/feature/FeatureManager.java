@@ -1,5 +1,7 @@
 package coffee.axle.suim.feature;
 
+import coffee.axle.suim.api.SuimAddon;
+import coffee.axle.suim.api.SuimAddonRegistry;
 import coffee.axle.suim.feature.clickgui.ClickGui;
 import coffee.axle.suim.feature.clickgui.EditHud;
 import coffee.axle.suim.feature.combat.*;
@@ -85,11 +87,52 @@ public class FeatureManager {
         features.add(feature);
     }
 
+    /**
+     * Register a feature from an external addon.
+     * The feature will be injected with SUIM's hook infrastructure.
+     */
+    public void registerExternalFeature(Feature feature) {
+        registerFeature(feature);
+    }
+
+    /**
+     * Discovers and initializes all registered SUIM addons.
+     * Addons register themselves via {@link SuimAddonRegistry} during Forge init.
+     */
+    private void initializeAddons() {
+        List<SuimAddon> addons = SuimAddonRegistry.getAddons();
+        if (addons.isEmpty()) {
+            return;
+        }
+
+        MyauLogger.info("Initializing " + addons.size() + " addon(s)...");
+
+        for (SuimAddon addon : addons) {
+            try {
+                addon.onInitialize(creator, manager, propertyManager);
+
+                List<Feature> addonFeatures = addon.getFeatures();
+                if (addonFeatures != null) {
+                    for (Feature feature : addonFeatures) {
+                        registerFeature(feature);
+                    }
+                    MyauLogger.info("Addon '" + addon.getAddonId()
+                            + "' registered " + addonFeatures.size() + " feature(s)");
+                }
+            } catch (Exception e) {
+                MyauLogger.error("ADDON_FAIL:" + addon.getAddonId(), e);
+            }
+        }
+    }
+
     public boolean initializeAll() {
         if (!hook.initialize()) {
             MyauLogger.log("FM_HOOK_FAIL");
             return false;
         }
+
+        // Initialize addons — let them register their features
+        initializeAddons();
 
         int successCount = 0;
 
@@ -106,7 +149,27 @@ public class FeatureManager {
         }
 
         MyauLogger.summary(successCount, features.size());
+
+        // Post-init phase — addons can now interact with initialized modules
+        postInitAddons();
+
         return successCount > 0;
+    }
+
+    /**
+     * Runs the post-init phase for all addons.
+     * Called after every feature has been initialized, so cross-module
+     * operations (e.g. injecting properties into another module) work.
+     */
+    private void postInitAddons() {
+        List<SuimAddon> addons = SuimAddonRegistry.getAddons();
+        for (SuimAddon addon : addons) {
+            try {
+                addon.onPostInit(creator, manager, propertyManager);
+            } catch (Exception e) {
+                MyauLogger.error("ADDON_POST_INIT_FAIL:" + addon.getAddonId(), e);
+            }
+        }
     }
 
     public void disableAll() {

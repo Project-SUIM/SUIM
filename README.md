@@ -57,11 +57,9 @@ Or contact @axle.coffee on discord
 
 ### Other
 
-- **Custom ClickGUI** with blur, custom font, and autosave
+- **Custom ClickGUI** with blur, custom font, and autosave (doesnt work)
 - **Batch `.friend` and `.enemy` commands** Add/remove multiple players at once
 - **KillAura Sword NoSlow bypass** via slot-switch packets
-- **Anti-detection** Removes mod from FML handshake mod list
-- **Packet event system** Send/Receive packet events on the Forge event bus
 
 ---
 

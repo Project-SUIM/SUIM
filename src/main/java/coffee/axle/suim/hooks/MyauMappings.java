@@ -1,9 +1,32 @@
 package coffee.axle.suim.hooks;
 
 /**
- * All Myau class/field/method mappings in one place meow
- * Realistically this should be the only thing that needs to be updated every
- * Myau update (since obf should change the package names)
+ * Central registry of obfuscated class, field, and method mappings for the Myau
+ * client.
+ *
+ * <p>
+ * <strong>Notice:</strong> Decompiling Myau without express permission
+ * violates their Terms of Service. Using this class as reference for public
+ * deobfuscation is strictly prohibited and may result in license revocation.
+ * </p>
+ *
+ * <p>
+ * This class maintains all obfuscated identifiers for Myau classes, fields, and
+ * methods.
+ * Update this class when Myau releases new versions, as obfuscated names change
+ * with each release.
+ * </p>
+ *
+ * <p>
+ * <strong>Credits:</strong><br>
+ * Myau @ksyz and the Myau development team<br>
+ * SUIM developed by @axlecoffee and contributors
+ * </p>
+ * 
+ * @author axlecoffee
+ * @author ksyz (Myau Client)
+ * @author maybesomeday and others (Mappings)
+ * @version 250910 (2025-09-10)
  */
 public class MyauMappings {
     public static final String CLASS_MAIN = "myau.X";
