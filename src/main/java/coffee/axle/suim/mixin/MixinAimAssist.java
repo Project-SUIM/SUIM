@@ -1,13 +1,14 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.feature.combat.MultiPointAiming;
+import coffee.axle.suim.feature.combat.AimAssistExtras;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.rotation.AimAssistRotation;
+import coffee.axle.suim.rotation.RotationMath;
+import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.MyauLogger;
-import coffee.axle.suim.util.RotationUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -16,20 +17,22 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Locale;
 
 /**
- * Multi-point aiming for AimAssist (myau.mT).
+ * Hooks Myau's AimAssist (myau.mT) to override rotation deltas based on
+ * the aim-mode selected in {@link AimAssistExtras}.
  * <p>
- * AimAssist computes rotations via B.Q (through ZKM dispatch) then calls
- * {@code Myau.rotationManager.setRotation(yaw, pitch, priority, force)}
- * — it does NOT modify mc.thePlayer.rotationYaw/Pitch directly.
+ * Strategy: HEAD saves current yaw/pitch. TAIL reads the RM delta fields
+ * set by Myau, re-computes them using {@link AimAssistRotation} with the
+ * selected mode, and overwrites the RM deltas.
  * <p>
- * Strategy: in TAIL, find the aimed entity, compute multipoint pitch,
- * and call rotationManager.setRotation again to overwrite with adjusted
- * pitch. The second call with same priority overwrites the first.
+ * For DEFAULT mode (ordinal 0), no override is applied — Myau's native
+ * aim-assist runs unmodified.
  *
  * @author axle.coffee
  */
@@ -39,6 +42,9 @@ public class MixinAimAssist {
 
     @Unique
     private static final Minecraft suim$mc = Minecraft.getMinecraft();
+
+    @Unique
+    private static AimAssistRotation suim$aimRotation;
 
     @Unique
     private static Field suim$rotationManagerField;
@@ -57,6 +63,18 @@ public class MixinAimAssist {
 
     @Unique
     private static float suim$savedYaw, suim$savedPitch;
+
+    @Unique
+    private static long suim$lastProcessedTick = -1;
+
+    @Unique
+    private static Field suim$lagManagerField;
+    @Unique
+    private static Field suim$lagMgrDelayTicksField;
+    @Unique
+    private static Field suim$lagMgrIsLaggingField;
+    @Unique
+    private static boolean suim$lagReflectionFailed = false;
 
     @Unique
     private static void suim$ensureRotationManagerReflection()
@@ -85,6 +103,52 @@ public class MixinAimAssist {
     private static Object suim$getRotationManager() throws Exception {
         suim$ensureRotationManagerReflection();
         return suim$rotationManagerField.get(null);
+    }
+
+    @Unique
+    private static void suim$ensureLagManagerReflection() {
+        if (suim$lagReflectionFailed || suim$lagManagerField != null)
+            return;
+        try {
+            Class<?> clientClass = Class.forName(MyauMappings.CLASS_MAIN);
+            suim$lagManagerField = clientClass.getDeclaredField(MyauMappings.FIELD_LAG_MANAGER);
+            suim$lagManagerField.setAccessible(true);
+
+            Class<?> lagClass = Class.forName(MyauMappings.CLASS_LAG_MANAGER);
+            suim$lagMgrDelayTicksField = lagClass.getDeclaredField(MyauMappings.FIELD_LAG_MGR_DELAY_TICKS);
+            suim$lagMgrDelayTicksField.setAccessible(true);
+            suim$lagMgrIsLaggingField = lagClass.getDeclaredField(MyauMappings.FIELD_LAG_MGR_IS_LAGGING);
+            suim$lagMgrIsLaggingField.setAccessible(true);
+        } catch (Exception e) {
+            suim$lagReflectionFailed = true;
+            MyauLogger.error("AimAssist:LagManager reflection", e);
+        }
+    }
+
+    @Unique
+    private static int suim$getLagDelayTicks() {
+        if (suim$lagReflectionFailed)
+            return 0;
+        suim$ensureLagManagerReflection();
+        try {
+            Object lagMgr = suim$lagManagerField.get(null);
+            if (lagMgr == null)
+                return 0;
+            boolean isLagging = suim$lagMgrIsLaggingField.getBoolean(lagMgr);
+            if (!isLagging)
+                return 0;
+            return suim$lagMgrDelayTicksField.getInt(lagMgr);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    @Unique
+    private static AimAssistRotation suim$getAimRotation() {
+        if (suim$aimRotation == null) {
+            suim$aimRotation = new AimAssistRotation(RotationState.getInstance());
+        }
+        return suim$aimRotation;
     }
 
     @Unique
@@ -118,11 +182,11 @@ public class MixinAimAssist {
             if (player.isInvisible())
                 continue;
 
-            double dist = RotationUtil.distanceToEntity(player);
+            double dist = RotationMath.distanceToEntity(player);
             if (dist > range)
                 continue;
 
-            float angle = RotationUtil.angleToEntity(player);
+            float angle = RotationMath.angleToEntity(player);
             if (angle > (float) fov)
                 continue;
 
@@ -179,29 +243,37 @@ public class MixinAimAssist {
         if (!suim$loggedInit) {
             suim$loggedInit = true;
             MyauLogger.log(
-                    "AimAssist:MultiPoint", "mixin applied, injects active");
+                    "AimAssist:Modes", "mixin applied, injects active");
         }
         if (suim$mc.thePlayer != null) {
             suim$savedYaw = suim$mc.thePlayer.rotationYaw;
             suim$savedPitch = suim$mc.thePlayer.rotationPitch;
+            RotationState.getInstance().updatePing();
         }
     }
 
     /**
-     * After AimAssist runs, check if a rotation delta was set on the
-     * rotation manager. If multi-point is enabled: find the target,
-     * compute adjusted pitch, and overwrite the RM delta fields.
-     * <p>
-     * Note: RM field G stores the 'force' flag, not whether rotation
-     * was set. We detect rotation by checking non-zero yaw/pitch deltas.
+     * After Myau's AimAssist runs, check the aim-mode from AimAssistExtras.
+     * If not DEFAULT: find the target, compute rotations via AimAssistRotation,
+     * and overwrite the RM delta fields.
      */
     @Inject(method = "d(Lmyau/KP;)V", at = @At("TAIL"), remap = false, require = 0)
     private void suim$onTickTail(
             @Coerce Object tickEvent, CallbackInfo ci) {
-        if (!MultiPointAiming.isAimAssistDynamic())
+        if (!AimAssistExtras.isActive())
             return;
+
+        int modeOrdinal = AimAssistExtras.getAimModeOrdinal();
+        if (modeOrdinal == 0) // DEFAULT — passthrough
+            return;
+
         if (suim$mc.thePlayer == null || suim$mc.theWorld == null)
             return;
+
+        long currentTick = suim$mc.theWorld.getTotalWorldTime();
+        if (currentTick == suim$lastProcessedTick)
+            return;
+        suim$lastProcessedTick = currentTick;
 
         try {
             suim$ensureRotationManagerReflection();
@@ -211,6 +283,7 @@ public class MixinAimAssist {
 
             float yawDelta = suim$yawDeltaField.getFloat(rotMgr);
             float pitchDelta = suim$pitchDeltaField.getFloat(rotMgr);
+            // Only override if Myau actually set a rotation delta
             if (Math.abs(yawDelta) < 0.001f
                     && Math.abs(pitchDelta) < 0.001f)
                 return;
@@ -219,13 +292,17 @@ public class MixinAimAssist {
             if (target == null)
                 return;
 
-            AxisAlignedBB box = target.getEntityBoundingBox();
-            float border = target.getCollisionBorderSize();
-            AxisAlignedBB expandedBox = box.expand(border, border, border);
+            // Configure AimAssistRotation from injected properties
+            AimAssistRotation aim = suim$getAimRotation();
+            aim.setMode(modeOrdinal);
 
-            float verticalMultipoint = RotationUtil.computeVerticalMultipoint(target.posY);
-            if (verticalMultipoint == 0.5f)
-                return;
+            float hitboxBounds = AimAssistExtras.getHitboxBounds();
+            aim.setHitboxBounds(1.0f - hitboxBounds, hitboxBounds);
+
+            aim.setHeadBias(AimAssistExtras.getHeadBias());
+            aim.setExtrapolationEnabled(AimAssistExtras.isExtrapolationEnabled());
+            aim.setPingCompensation(AimAssistExtras.isPingCompEnabled());
+            aim.setContractionRange(AimAssistExtras.getContractionMin(), AimAssistExtras.getContractionMax());
 
             float smoothing = suim$getFloatProp(this, MyauMappings.FIELD_AIM_ASSIST_SMOOTHING, 50.0f) / 100.0f;
             float hSpeed = Math.min(
@@ -233,34 +310,44 @@ public class MixinAimAssist {
             float vSpeed = Math.min(
                     Math.abs(suim$getFloatProp(this, MyauMappings.FIELD_AIM_ASSIST_VSPEED, 0.0f)), 10.0f);
 
-            float[] mpRotations = RotationUtil.getRotationsToBoxDynamic(
-                    expandedBox,
-                    suim$savedYaw, suim$savedPitch,
-                    180.0f, smoothing, verticalMultipoint);
+            aim.setLagDelayTicks(suim$getLagDelayTicks());
 
-            float adjustedYaw = suim$savedYaw
-                    + (mpRotations[0] - suim$savedYaw) * 0.1f * hSpeed;
-            float adjustedPitch = suim$savedPitch
-                    + (mpRotations[1] - suim$savedPitch) * 0.1f * vSpeed;
+            float[] result = aim.aimAtEntity(target, smoothing, hSpeed, vSpeed, true);
+            if (result == null)
+                return;
 
             float currentYaw = suim$mc.thePlayer.rotationYaw;
             float currentPitch = suim$mc.thePlayer.rotationPitch;
 
             suim$yawDeltaField.setFloat(rotMgr,
                     MathHelper.wrapAngleTo180_float(
-                            adjustedYaw - currentYaw));
+                            result[0] - currentYaw));
             suim$pitchDeltaField.setFloat(rotMgr,
                     MathHelper.clamp_float(
-                            adjustedPitch - currentPitch,
+                            result[1] - currentPitch,
                             -90.0f, 90.0f));
             suim$lastUpdateField.setFloat(rotMgr, 0.0f);
         } catch (Exception e) {
-            MyauLogger.error("AimAssist:MultiPoint TAIL", e);
+            MyauLogger.error("AimAssist:Modes TAIL", e);
         }
     }
+
+    /**
+     * Override getSuffix to show the current aim-mode in the HUD arraylist.
+     * Returns the mode name in lowercase (e.g. "vsplit", "sightline").
+     * For DEFAULT mode, returns the original suffix (empty array).
+     */
+    @Inject(method = "E(J)[Ljava/lang/String;", at = @At("HEAD"), remap = false, require = 0, cancellable = true)
+    private void suim$onGetSuffix(long unused, CallbackInfoReturnable<String[]> cir) {
+        if (!AimAssistExtras.isActive())
+            return;
+
+        int modeOrdinal = AimAssistExtras.getAimModeOrdinal();
+        if (modeOrdinal <= 0 || modeOrdinal >= AimAssistRotation.MODE_NAMES.length)
+            return; // DEFAULT or out-of-range — let Myau return its default
+
+        String modeName = AimAssistRotation.MODE_NAMES[modeOrdinal]
+                .toLowerCase(Locale.ROOT);
+        cir.setReturnValue(new String[] { modeName });
+    }
 }
-
-
-
-
-
