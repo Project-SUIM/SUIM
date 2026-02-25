@@ -11,7 +11,7 @@ public class AimAssistRotation extends Rotation {
         SIGHTLINE,
         VSPLIT,
         SUIM,
-        PENIS
+        PENIS // ! TODO @Ghosty920 add head and base detection :trolled:
     }
 
     public static final String[] MODE_NAMES = { "DEFAULT", "SIGHTLINE", "VSPLIT", "SUIM", "PENIS" };
