@@ -4,6 +4,7 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
@@ -138,9 +139,10 @@ public class MoreKB extends Feature {
 
         // Intelligent check — skip if target is facing away
         if (getIntelligent()) {
-            double x = mc.thePlayer.posX - entity.posX;
-            double z = mc.thePlayer.posZ - entity.posZ;
-            float calcYaw = (float) (Math.atan2(z, x) * 180.0 / Math.PI - 90.0);
+            float calcYaw = RotationMath.toRotationsFromDelta(
+                    mc.thePlayer.posX - entity.posX,
+                    0,
+                    mc.thePlayer.posZ - entity.posZ)[0];
             float diffY = Math.abs(
                     MathHelper.wrapAngleTo180_float(calcYaw - entity.rotationYawHead));
             if (diffY > 120.0F)
@@ -226,8 +228,3 @@ public class MoreKB extends Feature {
         }
     }
 }
-
-
-
-
-

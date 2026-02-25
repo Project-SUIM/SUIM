@@ -1,6 +1,5 @@
 package coffee.axle.suim.feature.world;
 
-import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.feature.world.blockin.BlockInPlacement;
@@ -8,8 +7,9 @@ import coffee.axle.suim.feature.world.blockin.BlockInPlacement.PlaceResult;
 import coffee.axle.suim.feature.world.blockin.BlockInRenderer;
 import coffee.axle.suim.feature.world.blockin.BlockInScoring;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.rotation.BlockInRotation;
+import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.MyauLogger;
-import coffee.axle.suim.util.RotationUtil;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
@@ -17,7 +17,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.play.client.C03PacketPlayer;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
@@ -45,19 +44,16 @@ import java.util.Set;
  * @see BlockInPlacement placement finding logic
  * @see BlockInScoring block priority scoring
  * @see BlockInRenderer HUD overlay
- * @see RotationUtil CoffeeClient-style smoothing math
+ * @see BlockInRotation GCD-corrected rotation controller
  */
-@SuppressWarnings("unused")
 public class AutoBlockIn extends Feature {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
 
-    /** Max consecutive placement failures before auto-skipping a target. */
     private static final int MAX_FAIL_COUNT = 3;
 
     private Object moduleInstance;
 
-    // Properties
     private Object rangeProperty;
     private Object hSpeedProperty;
     private Object vSpeedProperty;
@@ -74,7 +70,6 @@ public class AutoBlockIn extends Feature {
     private Object disableOnMoveProperty;
     private Object placeRetryProperty;
 
-    // Context module references (for suppression checks)
     private Object killAuraModule;
     private Object bedNukerModule;
     private Object bedEspModule;
@@ -84,28 +79,17 @@ public class AutoBlockIn extends Feature {
     private Field bedNukerBreakingField;
     private Field bedEspBedsField;
 
-    // Rotation state — tracked from outgoing packets
-    private float serverYaw;
-    private float serverPitch;
+    private BlockInRotation rotation;
+    private RotationState rotationState;
 
-    // The visual yaw before we spoofed (for move-fix correction)
-    private float preSpoofYaw;
-
-    // Aim target (smoothed toward)
-    private float aimYaw;
-    private float aimPitch;
-
-    // Placement state
     private PlaceResult currentTarget;
     private long lastPlaceTime;
     private float progress;
     private boolean operationActive;
     private int savedSlot = -1;
 
-    // Disable-on-move tracking
     private BlockPos startPos;
 
-    // Failure tracking for auto-skip
     private BlockPos lastFailedGoal;
     private int consecutiveFailures;
 
@@ -162,6 +146,10 @@ public class AutoBlockIn extends Feature {
             manager.reloadModuleCommand();
             hookContextModules();
 
+            rotationState = RotationState.getInstance();
+            rotationState.register();
+            rotation = new BlockInRotation(rotationState);
+
             MinecraftForge.EVENT_BUS.register(this);
 
             manager.registerModuleCallbacks(moduleInstance,
@@ -217,11 +205,7 @@ public class AutoBlockIn extends Feature {
 
     private void onModuleEnabled() {
         if (mc.thePlayer != null) {
-            serverYaw = mc.thePlayer.rotationYaw;
-            serverPitch = mc.thePlayer.rotationPitch;
-            preSpoofYaw = serverYaw;
-            aimYaw = serverYaw;
-            aimPitch = serverPitch;
+            rotation.reset();
             progress = 0;
             savedSlot = mc.thePlayer.inventory.currentItem;
             startPos = mc.thePlayer.getPosition();
@@ -248,25 +232,6 @@ public class AutoBlockIn extends Feature {
         startPos = null;
         BlockInPlacement.clearSkippedGoals();
         MyauLogger.log(getName(), "MODULE_DISABLED");
-    }
-
-    /**
-     * Track actual server-side yaw/pitch from outgoing movement packets.
-     * This replaces the Myau UpdateEvent dependency entirely.
-     */
-    @SubscribeEvent
-    public void onSendPacket(SendPacketEvent event) {
-        if (!(event.getPacket() instanceof C03PacketPlayer))
-            return;
-
-        C03PacketPlayer packet = (C03PacketPlayer) event.getPacket();
-
-        // C05 (look-only) and C06 (pos+look) carry rotation data
-        if (packet instanceof C03PacketPlayer.C05PacketPlayerLook
-                || packet instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
-            serverYaw = packet.getYaw();
-            serverPitch = packet.getPitch();
-        }
     }
 
     @SubscribeEvent
@@ -354,67 +319,58 @@ public class AutoBlockIn extends Feature {
                 return;
             }
 
-            // Save visual yaw before spoofing (for move-fix correction)
-            preSpoofYaw = mc.thePlayer.rotationYaw;
+            rotationState.captureClientAngles();
 
-            // CoffeeClient-style smoothed rotations
-            float[] smoothed = getSmoothedRotations(
-                    currentTarget.yaw, currentTarget.pitch);
-            aimYaw = smoothed[0];
-            aimPitch = smoothed[1];
+            float[] smoothed = rotation.aimAtBlock(
+                    currentTarget.hitVec,
+                    getSmoothing() / 100.0f,
+                    getHSpeed(),
+                    getVSpeed());
 
-            // Apply server-side rotation via player fields
-            mc.thePlayer.rotationYaw = aimYaw;
-            mc.thePlayer.rotationPitch = aimPitch;
+            mc.thePlayer.rotationYaw = smoothed[0];
+            mc.thePlayer.rotationPitch = smoothed[1];
 
-            // Apply move fix (correct WASD input relative to spoofed rotation)
-            applyMoveFix();
+            if (getMoveFixMode() > 0) {
+                rotation.applyMoveFix(rotationState.getClientYaw());
+            }
 
-            // Check if rotation is close enough to attempt placement
-            if (!withinTolerance(currentTarget.yaw, currentTarget.pitch))
+            if (!rotation.withinTolerance(currentTarget.yaw, currentTarget.pitch,
+                    getRotationTolerance()))
                 return;
 
-            // REVALIDATE raytrace at current aim angles every tick
             MovingObjectPosition mop = BlockInPlacement.rayTraceBlock(
-                    aimYaw, aimPitch, getRange());
+                    rotation.getAimYaw(), rotation.getAimPitch(), getRange());
             if (mop == null
                     || mop.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
                     || !mop.getBlockPos().equals(currentTarget.supportBlock)
                     || mop.sideHit != currentTarget.face) {
-                // Raytrace no longer valid — track failure
                 trackFailure(goalPos);
                 return;
             }
 
-            // Verify the target position is still air (block might have been
-            // placed by another source or already filled)
             if (!BlockInPlacement.isAir(goalPos)) {
                 currentTarget = null;
                 return;
             }
 
-            // Place delay check
             long now = System.currentTimeMillis();
             if (now - lastPlaceTime < getPlaceDelay())
                 return;
             lastPlaceTime = now;
 
-            // Execute placement with retry support
             int maxRetries = getPlaceRetry();
 
             for (int attempt = 0; attempt < maxRetries; attempt++) {
-                // Re-aim between retries (re-smooth toward target)
                 if (attempt > 0) {
-                    float[] resmoothed = getSmoothedRotations(
-                            currentTarget.yaw, currentTarget.pitch);
-                    aimYaw = resmoothed[0];
-                    aimPitch = resmoothed[1];
-                    mc.thePlayer.rotationYaw = aimYaw;
-                    mc.thePlayer.rotationPitch = aimPitch;
-
-                    // Re-validate raytrace for this retry
+                    float[] resmoothed = rotation.aimAtBlock(
+                            currentTarget.hitVec,
+                            getSmoothing() / 100.0f,
+                            getHSpeed(),
+                            getVSpeed());
+                    mc.thePlayer.rotationYaw = resmoothed[0];
+                    mc.thePlayer.rotationPitch = resmoothed[1];
                     mop = BlockInPlacement.rayTraceBlock(
-                            aimYaw, aimPitch, getRange());
+                            rotation.getAimYaw(), rotation.getAimPitch(), getRange());
                     if (mop == null
                             || mop.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
                             || !mop.getBlockPos().equals(currentTarget.supportBlock)
@@ -441,13 +397,10 @@ public class AutoBlockIn extends Feature {
                             mc.gameSettings.keyBindSneak.getKeyCode(), true);
                     mc.thePlayer.setSneaking(true);
                 }
-
                 boolean placed = mc.playerController.onPlayerRightClick(
                         mc.thePlayer, mc.theWorld, held,
                         currentTarget.supportBlock, currentTarget.face,
                         mop.hitVec);
-
-                // Restore sneak state
                 if (currentTarget.requiresSneak && !wasSneaking) {
                     KeyBinding.setKeyBindState(
                             mc.gameSettings.keyBindSneak.getKeyCode(), false);
@@ -493,82 +446,6 @@ public class AutoBlockIn extends Feature {
             debugMsg("FAILED_PLACE " + formatPos(goalPos)
                     + " (" + consecutiveFailures + "/" + MAX_FAIL_COUNT + ")");
         }
-    }
-
-    /**
-     * CoffeeClient aimassist smoothing model:
-     * <ol>
-     * <li>{@link RotationUtil#getRotations} computes smoothed target angles
-     * using the smoothing factor (0-100% mapped to 0.0-1.0)</li>
-     * <li>Per-tick step is: {@code (target - current) * 0.1 * speed}</li>
-     * </ol>
-     *
-     * @see <a href="https://github.com/axlecoffee/CoffeeClient">CoffeeClient
-     *      AimAssist</a>
-     */
-    private float[] getSmoothedRotations(float targetYaw, float targetPitch) {
-        float currentYaw = serverYaw;
-        float currentPitch = serverPitch;
-
-        Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        float smoothFactor = getSmoothing() / 100.0f;
-
-        double dx = currentTarget.hitVec.xCoord - eye.xCoord;
-        double dy = currentTarget.hitVec.yCoord - eye.yCoord;
-        double dz = currentTarget.hitVec.zCoord - eye.zCoord;
-
-        float[] smoothedTarget = RotationUtil.getRotations(
-                dx, dy, dz,
-                currentYaw, currentPitch,
-                180.0f,
-                smoothFactor);
-
-        float hSpeed = Math.min(Math.abs(getHSpeed()), 10.0f);
-        float vSpeed = Math.min(Math.abs(getVSpeed()), 10.0f);
-
-        float newYaw = currentYaw
-                + (smoothedTarget[0] - currentYaw) * 0.1f * hSpeed;
-        float newPitch = currentPitch
-                + (smoothedTarget[1] - currentPitch) * 0.1f * vSpeed;
-
-        newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
-
-        return new float[] { newYaw, newPitch };
-    }
-
-    /**
-     * Input-based movement correction. Transforms WASD movement
-     * relative to the spoofed server yaw so the player walks in
-     * the direction they expect visually.
-     */
-    private void applyMoveFix() {
-        if (mc.thePlayer == null || mc.thePlayer.movementInput == null)
-            return;
-
-        int mode = getMoveFixMode();
-        if (mode <= 0)
-            return;
-        if (currentTarget == null)
-            return;
-
-        float forward = mc.thePlayer.movementInput.moveForward;
-        float strafe = mc.thePlayer.movementInput.moveStrafe;
-        if (Math.abs(forward) < 1.0E-4f && Math.abs(strafe) < 1.0E-4f)
-            return;
-
-        float delta = (float) Math.toRadians(preSpoofYaw - aimYaw);
-        float cos = MathHelper.cos(delta);
-        float sin = MathHelper.sin(delta);
-
-        mc.thePlayer.movementInput.moveForward = forward * cos + strafe * sin;
-        mc.thePlayer.movementInput.moveStrafe = strafe * cos - forward * sin;
-    }
-
-    private boolean withinTolerance(float targetYaw, float targetPitch) {
-        float dy = Math.abs(MathHelper.wrapAngleTo180_float(aimYaw - targetYaw));
-        float dp = Math.abs(MathHelper.wrapAngleTo180_float(aimPitch - targetPitch));
-        int tol = getRotationTolerance();
-        return dy <= tol && dp <= tol;
     }
 
     @SubscribeEvent

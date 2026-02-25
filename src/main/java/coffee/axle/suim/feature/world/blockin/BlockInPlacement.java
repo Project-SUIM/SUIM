@@ -17,6 +17,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.*;
 
+import coffee.axle.suim.rotation.RotationMath;
+
 import java.util.*;
 
 /**
@@ -548,16 +550,7 @@ public final class BlockInPlacement {
      * Calculate yaw/pitch to look at a target point from eye position.
      */
     public static float[] getRotations(Vec3 eye, double tx, double ty, double tz) {
-        double dx = tx - eye.xCoord;
-        double dy = ty - eye.yCoord;
-        double dz = tz - eye.zCoord;
-        double hd = Math.sqrt(dx * dx + dz * dz);
-
-        float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
-        yaw = MathHelper.wrapAngleTo180_float(yaw);
-
-        float pitch = (float) Math.toDegrees(-Math.atan2(dy, hd));
-        return new float[] { yaw, pitch };
+        return RotationMath.toRotations(eye, tx, ty, tz);
     }
 
     /**
