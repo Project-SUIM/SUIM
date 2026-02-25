@@ -52,7 +52,7 @@ public class FeatureManager {
         registerFeature(new ClientInfoCommand());
 
         // Combat
-        registerFeature(new MultiPointAiming());
+        registerFeature(new AimAssistExtras());
         registerFeature(new ArmorExceptions());
         registerFeature(new AutoClickerExtras());
         registerFeature(new HitSelect());

@@ -7,6 +7,7 @@ import coffee.axle.suim.hooks.MyauModuleManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Base class for all SUIM features.
@@ -105,6 +106,27 @@ public abstract class Feature {
      * Called when the feature should be disabled.
      */
     public void disable() throws Exception {
+        if (moduleInstance != null) {
+            SuffixRegistry.unregister(moduleInstance);
+        }
+    }
+
+    protected void setSuffix(String... suffix) {
+        if (moduleInstance != null) {
+            SuffixRegistry.registerStatic(moduleInstance, suffix);
+        }
+    }
+
+    protected void setSuffixDynamic(Supplier<String[]> supplier) {
+        if (moduleInstance != null) {
+            SuffixRegistry.register(moduleInstance, supplier);
+        }
+    }
+
+    protected void clearSuffix() {
+        if (moduleInstance != null) {
+            SuffixRegistry.unregister(moduleInstance);
+        }
     }
 
     /**
