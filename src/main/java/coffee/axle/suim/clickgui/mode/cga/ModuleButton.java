@@ -314,7 +314,6 @@ public class ModuleButton {
                 && my > getYAbsolute();
     }
 
-    // Accessors
     public double getX() {
         return x;
     }

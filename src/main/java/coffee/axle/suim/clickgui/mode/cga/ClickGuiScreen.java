@@ -289,7 +289,6 @@ public class ClickGuiScreen extends SuimScreen {
         }
     }
 
-    // Accessors for child components
     public String getSearchText() {
         return searchBar != null ? searchBar.getText() : "";
     }

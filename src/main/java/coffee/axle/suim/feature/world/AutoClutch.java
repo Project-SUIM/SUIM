@@ -365,8 +365,6 @@ public class AutoClutch extends Feature {
                 || mc.gameSettings.keyBindSneak.isKeyDown();
     }
 
-    // ==================== Property Accessors ====================
-
     private boolean getHurtTimeEnabled() {
         try {
             return (Boolean) properties.getPropertyValue(hurtTimeProperty);

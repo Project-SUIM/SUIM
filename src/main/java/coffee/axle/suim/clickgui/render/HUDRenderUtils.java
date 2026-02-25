@@ -704,9 +704,6 @@ public class HUDRenderUtils {
         GlStateManager.popMatrix();
     }
 
-    // --------------- static convenience methods (delegate to INSTANCE)
-    // ---------------
-
     /** Delegates to {@link #getSr()}. */
     public static ScaledResolution sr() {
         return INSTANCE.getSr();
@@ -852,8 +849,3 @@ public class HUDRenderUtils {
         INSTANCE.drawPlayerOnScreen(x, y, partialTicks);
     }
 }
-
-
-
-
-

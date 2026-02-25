@@ -57,8 +57,6 @@ public class MiscElementSelector extends MiscElement {
         this(style, defaultOption, options, Orientation.Vertical, 5, 0);
     }
 
-    // --- Accessors ---
-
     public int getIndex() {
         return index;
     }
@@ -101,8 +99,6 @@ public class MiscElementSelector extends MiscElement {
     public boolean isSelected(String option) {
         return _selected.equalsIgnoreCase(option);
     }
-
-    // --- Rendering ---
 
     @Override
     public void render(int mouseX, int mouseY) {
@@ -221,8 +217,6 @@ public class MiscElementSelector extends MiscElement {
         }
     }
 
-    // --- Input ---
-
     @Override
     public boolean mouseClicked(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0) {
@@ -260,8 +254,3 @@ public class MiscElementSelector extends MiscElement {
         return false;
     }
 }
-
-
-
-
-

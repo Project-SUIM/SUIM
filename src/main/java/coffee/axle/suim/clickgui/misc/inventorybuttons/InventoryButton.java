@@ -34,8 +34,6 @@ public class InventoryButton {
         this(x, y, "", "", false);
     }
 
-    // --- Accessors ---
-
     public int getX() {
         return x;
     }
@@ -72,8 +70,6 @@ public class InventoryButton {
         ChatUtils.INSTANCE.commandAny(command);
     }
 
-    // --- Rendering ---
-
     public void render(double xOff, double yOff) {
         render(xOff, yOff, colour, borderColour);
     }
@@ -98,8 +94,3 @@ public class InventoryButton {
         return mouseX >= x && mouseX <= x + 16 && mouseY >= y && mouseY <= y + 16;
     }
 }
-
-
-
-
-

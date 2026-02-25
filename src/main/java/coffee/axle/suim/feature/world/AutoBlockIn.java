@@ -176,8 +176,6 @@ public class AutoBlockIn extends Feature {
         }
     }
 
-    // ==================== Context Module Hooks ====================
-
     private void hookContextModules() {
         try {
             bedEspModule = manager.findModule("BedESP");
@@ -217,8 +215,6 @@ public class AutoBlockIn extends Feature {
         return null;
     }
 
-    // ==================== Module Lifecycle ====================
-
     private void onModuleEnabled() {
         if (mc.thePlayer != null) {
             serverYaw = mc.thePlayer.rotationYaw;
@@ -254,9 +250,6 @@ public class AutoBlockIn extends Feature {
         MyauLogger.log(getName(), "MODULE_DISABLED");
     }
 
-    // ==================== Packet Interception (rotation tracking)
-    // ====================
-
     /**
      * Track actual server-side yaw/pitch from outgoing movement packets.
      * This replaces the Myau UpdateEvent dependency entirely.
@@ -275,8 +268,6 @@ public class AutoBlockIn extends Feature {
             serverPitch = packet.getPitch();
         }
     }
-
-    // ==================== Main Tick Logic ====================
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
@@ -490,8 +481,6 @@ public class AutoBlockIn extends Feature {
         }
     }
 
-    // ==================== Failure Tracking ====================
-
     private void trackFailure(BlockPos goalPos) {
         if (lastFailedGoal != null && lastFailedGoal.equals(goalPos)) {
             consecutiveFailures++;
@@ -505,9 +494,6 @@ public class AutoBlockIn extends Feature {
                     + " (" + consecutiveFailures + "/" + MAX_FAIL_COUNT + ")");
         }
     }
-
-    // ==================== Rotation Smoothing (CoffeeClient-style)
-    // ====================
 
     /**
      * CoffeeClient aimassist smoothing model:
@@ -524,14 +510,9 @@ public class AutoBlockIn extends Feature {
         float currentYaw = serverYaw;
         float currentPitch = serverPitch;
 
-        // Compute target hit vector delta from eye
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-
-        // Use RotationUtil to get smoothed intermediate rotations
-        // smoothFactor: 0 = no smoothing (full step), 100 = max smoothing
         float smoothFactor = getSmoothing() / 100.0f;
 
-        // Get the ideal rotation with smoothing applied (from RotationUtil)
         double dx = currentTarget.hitVec.xCoord - eye.xCoord;
         double dy = currentTarget.hitVec.yCoord - eye.yCoord;
         double dz = currentTarget.hitVec.zCoord - eye.zCoord;
@@ -542,7 +523,6 @@ public class AutoBlockIn extends Feature {
                 180.0f,
                 smoothFactor);
 
-        // Apply per-tick speed multiplier (CoffeeClient approach)
         float hSpeed = Math.min(Math.abs(getHSpeed()), 10.0f);
         float vSpeed = Math.min(Math.abs(getVSpeed()), 10.0f);
 
@@ -555,8 +535,6 @@ public class AutoBlockIn extends Feature {
 
         return new float[] { newYaw, newPitch };
     }
-
-    // ==================== Move Fix ====================
 
     /**
      * Input-based movement correction. Transforms WASD movement
@@ -586,16 +564,12 @@ public class AutoBlockIn extends Feature {
         mc.thePlayer.movementInput.moveStrafe = strafe * cos - forward * sin;
     }
 
-    // ==================== Rotation Tolerance ====================
-
     private boolean withinTolerance(float targetYaw, float targetPitch) {
         float dy = Math.abs(MathHelper.wrapAngleTo180_float(aimYaw - targetYaw));
         float dp = Math.abs(MathHelper.wrapAngleTo180_float(aimPitch - targetPitch));
         int tol = getRotationTolerance();
         return dy <= tol && dp <= tol;
     }
-
-    // ==================== HUD Rendering ====================
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Post event) {
@@ -613,8 +587,6 @@ public class AutoBlockIn extends Feature {
         BlockInRenderer.renderProgress(progress);
     }
 
-    // ==================== Debug ====================
-
     private void debugMsg(String msg) {
         if (getDebugMode() <= 0)
             return;
@@ -624,8 +596,6 @@ public class AutoBlockIn extends Feature {
     private String formatPos(BlockPos pos) {
         return pos.getX() + "," + pos.getY() + "," + pos.getZ();
     }
-
-    // ==================== Suppression Checks ====================
 
     private boolean isSuppressed() {
         if (killAuraModule == null)
@@ -665,8 +635,6 @@ public class AutoBlockIn extends Feature {
             return false;
         }
     }
-
-    // ==================== Bed Trigger ====================
 
     private boolean isBedTriggerSatisfied() {
         float bedRange = getBedRange();
@@ -731,8 +699,6 @@ public class AutoBlockIn extends Feature {
             return -1d;
         }
     }
-
-    // ==================== Property Accessors ====================
 
     private float getRange() {
         try {

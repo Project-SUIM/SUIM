@@ -16,8 +16,6 @@ public abstract class MiscElement {
         this.style = style;
     }
 
-    // --- Style delegate getters / setters ---
-
     public MiscElementStyle getStyle() {
         return style;
     }
@@ -106,8 +104,6 @@ public abstract class MiscElement {
         style.setOutlineHoverColour(outlineHoverColour);
     }
 
-    // --- Methods ---
-
     public void render(int mouseX, int mouseY) {
     }
 
@@ -135,8 +131,3 @@ public abstract class MiscElement {
                 && mouseY >= getY() + yOff && mouseY <= getY() + getHeight() + yOff;
     }
 }
-
-
-
-
-

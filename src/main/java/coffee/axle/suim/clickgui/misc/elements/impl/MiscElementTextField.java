@@ -43,8 +43,6 @@ public class MiscElementTextField extends MiscElement {
         this(style, 0, "", 0, "");
     }
 
-    // --- Public accessors ---
-
     public String getText() {
         return text;
     }
@@ -88,8 +86,6 @@ public class MiscElementTextField extends MiscElement {
     public void setPrependText(String prependText) {
         this.prependText = prependText;
     }
-
-    // --- Internal helpers ---
 
     private String getFullText() {
         return prependText + text;
@@ -286,8 +282,6 @@ public class MiscElementTextField extends MiscElement {
         return sb.toString();
     }
 
-    // --- Rendering ---
-
     @Override
     public void render(int mouseX, int mouseY) {
         HUDRenderUtils.INSTANCE.drawRoundedBorderedRect(
@@ -345,8 +339,6 @@ public class MiscElementTextField extends MiscElement {
                     text.length() == maxLength ? Color.RED.getRGB() : Color.LIGHT_GRAY.getRGB());
         }
     }
-
-    // --- Input handling ---
 
     @Override
     public boolean mouseClicked(int mouseX, int mouseY, int mouseButton) {
@@ -495,8 +487,3 @@ public class MiscElementTextField extends MiscElement {
         return true;
     }
 }
-
-
-
-
-

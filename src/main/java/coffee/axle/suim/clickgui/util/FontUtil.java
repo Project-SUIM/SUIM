@@ -46,8 +46,6 @@ public final class FontUtil {
         return fontRenderer;
     }
 
-    // --------------- property-style getters ---------------
-
     public int getFontHeight() {
         return getFont().FONT_HEIGHT;
     }
@@ -55,8 +53,6 @@ public final class FontUtil {
     private boolean isFont() {
         return ClickGuiConfig.isCustomFontEnabled();
     }
-
-    // --------------- setup ---------------
 
     public void setupFontUtils() {
         try {
@@ -73,8 +69,6 @@ public final class FontUtil {
             e.printStackTrace();
         }
     }
-
-    // --------------- string width ---------------
 
     public int getStringWidth(String text) {
         return getStringWidth(text, isFont(), 1.0);
@@ -126,8 +120,6 @@ public final class FontUtil {
         return (int) (getFontHeight() * scale);
     }
 
-    // --------------- core draw helper ---------------
-
     private void drawText(String text, double x, double y, int color, boolean customFont, double scale) {
         drawText(text, x, y, color, customFont, scale, false);
     }
@@ -146,8 +138,6 @@ public final class FontUtil {
 
         GlStateManager.popMatrix();
     }
-
-    // --------------- drawAlignedString ---------------
 
     public void drawAlignedString(String text, double x, double y) {
         drawAlignedString(text, x, y, Alignment.LEFT, VAlignment.CENTRE, ColorUtil.textcolor, isFont(), 1.0);
@@ -202,8 +192,6 @@ public final class FontUtil {
         drawText(text, posX, posY, color, customFont, scale);
     }
 
-    // --------------- drawString (double coords) ---------------
-
     public void drawString(String text, double x, double y) {
         drawString(text, x, y, ColorUtil.textcolor, isFont(), 1.0, false);
     }
@@ -225,8 +213,6 @@ public final class FontUtil {
         drawText(text, x, y, color, customFont, scale, shadow);
     }
 
-    // --------------- drawString (int coords) ---------------
-
     public void drawString(String text, int x, int y) {
         drawString(text, (double) x, (double) y, ColorUtil.textcolor, isFont(), 1.0, false);
     }
@@ -242,8 +228,6 @@ public final class FontUtil {
     public void drawString(String text, int x, int y, int color, boolean customFont, double scale) {
         drawString(text, (double) x, (double) y, color, customFont, scale, false);
     }
-
-    // --------------- drawStringWithShadow ---------------
 
     public void drawStringWithShadow(String text, double x, double y) {
         drawStringWithShadow(text, x, y, ColorUtil.textcolor, isFont(), 1.0);
@@ -261,8 +245,6 @@ public final class FontUtil {
         drawText(text, x, y, color, customFont, scale, true);
     }
 
-    // --------------- drawCenteredString ---------------
-
     public void drawCenteredString(String text, double x, double y) {
         drawCenteredString(text, x, y, ColorUtil.textcolor, isFont(), 1.0);
     }
@@ -278,8 +260,6 @@ public final class FontUtil {
     public void drawCenteredString(String text, double x, double y, int color, boolean customFont, double scale) {
         drawText(text, x - getStringWidth(text, customFont) * scale / 2, y, color, customFont, scale);
     }
-
-    // --------------- drawCenteredStringWithShadow ---------------
 
     public void drawCenteredStringWithShadow(String text, double x, double y) {
         drawCenteredStringWithShadow(text, x, y, ColorUtil.textcolor, isFont(), 1.0);
@@ -298,8 +278,6 @@ public final class FontUtil {
         drawText(text, x - getStringWidth(text, customFont) * scale / 2, y, color, customFont, scale, true);
     }
 
-    // --------------- drawTotalCenteredString ---------------
-
     public void drawTotalCenteredString(String text, double x, double y) {
         drawTotalCenteredString(text, x, y, ColorUtil.textcolor, isFont(), 1.0);
     }
@@ -316,8 +294,6 @@ public final class FontUtil {
         drawText(text, x - getStringWidth(text, customFont) * scale / 2, y - getFontHeight(scale) / 2.0, color,
                 customFont, scale);
     }
-
-    // --------------- drawTotalCenteredStringWithShadow ---------------
 
     public void drawTotalCenteredStringWithShadow(String text, double x, double y) {
         drawTotalCenteredStringWithShadow(text, x, y, ColorUtil.textcolor, isFont(), 1.0);
@@ -336,8 +312,6 @@ public final class FontUtil {
         drawText(text, x - getStringWidth(text, customFont) * scale / 2, y - getFontHeight(scale) / 2.0, color,
                 customFont, scale, true);
     }
-
-    // --------------- drawWrappedText ---------------
 
     public void drawWrappedText(String text, double x, double y, double width) {
         drawWrappedText(text, x, y, width, ColorUtil.textcolor, isFont(), 1.0);
@@ -375,8 +349,6 @@ public final class FontUtil {
         drawWrappedText(text, (double) x, (double) y, (double) width, color, customFont, scale);
     }
 
-    // --------------- wrapText ---------------
-
     public List<String> wrapText(String text, double maxWidth) {
         return wrapText(text, maxWidth, isFont(), 1.0);
     }
@@ -407,8 +379,6 @@ public final class FontUtil {
         return lines;
     }
 
-    // --------------- getTruncatedText ---------------
-
     public String getTruncatedText(String text, double width) {
         return getTruncatedText(text, width, "...");
     }
@@ -423,8 +393,6 @@ public final class FontUtil {
         }
         return truncated + ellipsis;
     }
-
-    // --------------- static string utilities ---------------
 
     public static String capitalizeWords(String text) {
         String[] words = text.split(" ");
@@ -449,16 +417,11 @@ public final class FontUtil {
         return INSTANCE.getStringWidthDouble(text);
     }
 
-    // --------------- internal helpers ---------------
-
     private static String stripControlCodes(String text) {
         if (text == null)
             return "";
         return FORMATTING_CODE_PATTERN.matcher(text).replaceAll("");
     }
-
-    // --------------- static convenience methods (delegate to INSTANCE)
-    // ---------------
 
     /** Delegates to {@link #setupFontUtils()}. */
     public static void setup() {

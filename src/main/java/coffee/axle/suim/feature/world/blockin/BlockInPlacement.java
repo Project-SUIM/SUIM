@@ -517,8 +517,6 @@ public final class BlockInPlacement {
         return null;
     }
 
-    // ==================== Geometry Utilities ====================
-
     /**
      * Compute a hit position on a face of a block at (u, v) parametric coords.
      */
@@ -579,8 +577,6 @@ public final class BlockInPlacement {
 
         return mc.theWorld.rayTraceBlocks(start, end);
     }
-
-    // ==================== Helper Methods ====================
 
     /**
      * Check if a block position is effectively empty (air/liquid/fire).

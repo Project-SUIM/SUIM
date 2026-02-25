@@ -176,7 +176,6 @@ public class CategoryPanel {
         return source;
     }
 
-    // Accessors
     public GuiCategory getCategory() {
         return category;
     }
@@ -209,9 +208,3 @@ public class CategoryPanel {
         return height;
     }
 }
-
-
-
-
-
-

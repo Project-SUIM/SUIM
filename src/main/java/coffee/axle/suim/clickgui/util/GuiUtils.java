@@ -42,10 +42,6 @@ public final class GuiUtils {
     private GuiUtils() {
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // String utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Removes Minecraft formatting control codes (§-codes) from the string.
      */
@@ -123,10 +119,6 @@ public final class GuiUtils {
         return removeRangeSafe(text, at, at + amount);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // ItemStack utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Gets the lore lines from an ItemStack.
      */
@@ -156,10 +148,6 @@ public final class GuiUtils {
     public static List<String> getTooltip(ItemStack stack) {
         return getTooltip(stack, false);
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Event utilities
-    // ────────────────────────────────────────────────────────────────────────
 
     /**
      * Posts an event to the Forge event bus, catching and logging any exceptions.
@@ -191,20 +179,12 @@ public final class GuiUtils {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Formatting utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Removes both § and &amp; formatting codes from a string.
      */
     public static String removeFormatting(String text) {
         return text.replaceAll("[\u00A7&][0-9a-fk-or]", "");
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Distance utilities
-    // ────────────────────────────────────────────────────────────────────────
 
     public static double distanceToPlayer(double x, double y, double z) {
         double dx = mc.getRenderManager().viewerPosX - x;
@@ -220,10 +200,6 @@ public final class GuiUtils {
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Player utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Returns {@code true} if the given player is not null, not the local player,
      * and not an NPC (UUID version != 2).
@@ -231,10 +207,6 @@ public final class GuiUtils {
     public static boolean isOtherPlayer(EntityPlayer player) {
         return player != null && player != mc.thePlayer && player.getUniqueID().version() != 2;
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // NBT / Skyblock utilities
-    // ────────────────────────────────────────────────────────────────────────
 
     /**
      * Gets the unformatted display name of an ItemStack.
@@ -306,10 +278,6 @@ public final class GuiUtils {
         return null;
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Thread utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Runs the given {@link Runnable} on the Minecraft main thread.
      */
@@ -321,10 +289,6 @@ public final class GuiUtils {
             run.run();
         }
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Roman numeral utilities
-    // ────────────────────────────────────────────────────────────────────────
 
     private static final Map<Character, Integer> ROMAN_MAP = new HashMap<>();
     static {
@@ -368,10 +332,6 @@ public final class GuiUtils {
         }
         return sb.toString();
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Number formatting
-    // ────────────────────────────────────────────────────────────────────────
 
     /**
      * Formats a double with the specified number of decimal places, with grouping
@@ -425,10 +385,6 @@ public final class GuiUtils {
         return colour + capitalizeWords(enchantment.replace("_", " ")) + " " + intToRoman(tier);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Collection utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Safely gets an element from a collection by index.
      */
@@ -445,10 +401,6 @@ public final class GuiUtils {
             return null;
         }
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // Render utilities
-    // ────────────────────────────────────────────────────────────────────────
 
     /**
      * Renders text at specified position with scale and color.
@@ -489,10 +441,6 @@ public final class GuiUtils {
         renderText(text, x, y, scale, color);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Profiler utilities
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Profiles the specified runnable with the specified name.
      */
@@ -515,10 +463,6 @@ public final class GuiUtils {
     public static void endProfile() {
         mc.mcProfiler.endSection();
     }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // JSON / ItemStack conversion
-    // ────────────────────────────────────────────────────────────────────────
 
     private static final Map<String, ItemStack> itemStackCache = new HashMap<>();
 
@@ -658,10 +602,6 @@ public final class GuiUtils {
         return json;
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // String capitalization helper
-    // ────────────────────────────────────────────────────────────────────────
-
     /**
      * Capitalizes the first letter of each word in a string.
      */
@@ -684,8 +624,3 @@ public final class GuiUtils {
         return sb.toString();
     }
 }
-
-
-
-
-

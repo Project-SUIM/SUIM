@@ -21,8 +21,6 @@ public final class ColorUtil {
     private ColorUtil() {
     }
 
-    // --------------- computed color accessors (now static) ---------------
-
     public static Color getClickGUIColor() {
         return ClickGuiConfig.getColor();
     }
@@ -67,8 +65,6 @@ public final class ColorUtil {
     public static int sliderKnobColor(boolean dragging) {
         return withAlpha(getClickGUIColor(), dragging ? 255 : 230).getRGB();
     }
-
-    // --------------- static utility methods ---------------
 
     public static Color withAlpha(Color color, int alpha) {
         return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
@@ -126,8 +122,6 @@ public final class ColorUtil {
         return new Color((alpha << 24) | ((255 - red) << 16) | ((255 - green) << 8) | (255 - blue), true);
     }
 
-    // --------------- constants ---------------
-
     public static final int jellyColor = -0x44eaeaeb;
     public static final int newColor = -0xdcdcdd;
     public static final int moduleButtonColor = -0xe5e5e6;
@@ -146,8 +140,3 @@ public final class ColorUtil {
         return buttonColor;
     }
 }
-
-
-
-
-

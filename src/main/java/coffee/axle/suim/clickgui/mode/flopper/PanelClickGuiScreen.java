@@ -224,9 +224,7 @@ public class PanelClickGuiScreen extends GuiScreen {
         instance = null;
     }
 
-    // ======================================================================
     // Inner: DraggablePanel — per-category draggable panel
-    // ======================================================================
     static class DraggablePanel {
         private final GuiCategory category;
         private final PanelClickGuiScreen gui;
@@ -380,9 +378,7 @@ public class PanelClickGuiScreen extends GuiScreen {
         }
     }
 
-    // ======================================================================
     // Inner: PanelModuleButton — module toggle + settings elements
-    // ======================================================================
     static class PanelModuleButton {
         private final GuiModule module;
         private final DraggablePanel panel;
@@ -577,9 +573,7 @@ public class PanelClickGuiScreen extends GuiScreen {
         }
     }
 
-    // ======================================================================
     // Inner: PanelModuleButtonStub — bridges panel elements to GuiElement's parent
-    // ======================================================================
     static class PanelModuleButtonStub extends ModuleButton {
         private final DraggablePanel draggablePanel;
         private final PanelModuleButton parentButton;
@@ -601,9 +595,7 @@ public class PanelClickGuiScreen extends GuiScreen {
         }
     }
 
-    // ======================================================================
     // Inner: StubCategoryPanel — minimal CategoryPanel for panel-mode
-    // ======================================================================
     static class StubCategoryPanel extends CategoryPanel {
         private final DraggablePanel draggablePanel;
         private final PanelModuleButton parentButton;
