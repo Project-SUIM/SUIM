@@ -56,6 +56,23 @@ public class MyauMappings {
     public static final String CLASS_VALUE_MANAGER = "myau.mP";
     public static final String CLASS_ROTATION_MANAGER = "myau.mO";
 
+    // LagManager (myau.m9)
+    public static final String CLASS_LAG_MANAGER = "myau.m9";
+    public static final String FIELD_LAG_MANAGER = "A";
+    public static final String FIELD_LAG_MGR_DELAY_TICKS = "M";
+    public static final String FIELD_LAG_MGR_IS_LAGGING = "f";
+    public static final String METHOD_LAG_MGR_IS_LAGGING = "c";
+
+    // LagRange module (myau.Kd)
+    public static final String CLASS_LAG_RANGE = "myau.Kd";
+    public static final String FIELD_LAG_RANGE_TICK_COUNT = "K";
+    public static final String FIELD_LAG_RANGE_ACCUMULATOR = "k";
+    public static final String FIELD_LAG_RANGE_ACTIVE = "D";
+    public static final String FIELD_LAG_RANGE_DELAY_VALUE = "A";
+
+    // DelayManager (myau.G)
+    public static final String CLASS_DELAY_MANAGER = "myau.G";
+
     // RotationManager (myau.mO)
     public static final String FIELD_ROTATION_MANAGER = "N";
     public static final String FIELD_ROT_MGR_YAW_DELTA = "b";
@@ -134,6 +151,7 @@ public class MyauMappings {
     public static final String FIELD_MODULE_NAME = "o";
     public static final String FIELD_MODULE_ENABLED = "p";
     public static final String FIELD_MODULE_KEYBIND = "P";
+    public static final String METHOD_MODULE_GET_SUFFIX = "E";
 
     // Command
     public static final String FIELD_COMMAND_NAMES = "n";
