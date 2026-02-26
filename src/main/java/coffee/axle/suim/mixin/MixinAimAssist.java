@@ -17,11 +17,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
+
+import coffee.axle.suim.feature.SuffixRegistry;
 
 /**
  * Hooks Myau's AimAssist (myau.mT) to override rotation deltas based on
@@ -60,6 +61,9 @@ public class MixinAimAssist {
 
     @Unique
     private static boolean suim$loggedInit = false;
+
+    @Unique
+    private static boolean suim$suffixRegistered = false;
 
     @Unique
     private static float suim$savedYaw, suim$savedPitch;
@@ -245,6 +249,15 @@ public class MixinAimAssist {
             MyauLogger.log(
                     "AimAssist:Modes", "mixin applied, injects active");
         }
+        if (!suim$suffixRegistered) {
+            suim$suffixRegistered = true;
+            SuffixRegistry.register(this, () -> {
+                if (!AimAssistExtras.isActive()) return null;
+                int ord = AimAssistExtras.getAimModeOrdinal();
+                if (ord <= 0 || ord >= AimAssistRotation.MODE_NAMES.length) return null;
+                return new String[] { AimAssistRotation.MODE_NAMES[ord].toLowerCase(Locale.ROOT) };
+            });
+        }
         if (suim$mc.thePlayer != null) {
             suim$savedYaw = suim$mc.thePlayer.rotationYaw;
             suim$savedPitch = suim$mc.thePlayer.rotationPitch;
@@ -332,22 +345,4 @@ public class MixinAimAssist {
         }
     }
 
-    /**
-     * Override getSuffix to show the current aim-mode in the HUD arraylist.
-     * Returns the mode name in lowercase (e.g. "vsplit", "sightline").
-     * For DEFAULT mode, returns the original suffix (empty array).
-     */
-    @Inject(method = "E(J)[Ljava/lang/String;", at = @At("HEAD"), remap = false, require = 0, cancellable = true)
-    private void suim$onGetSuffix(long unused, CallbackInfoReturnable<String[]> cir) {
-        if (!AimAssistExtras.isActive())
-            return;
-
-        int modeOrdinal = AimAssistExtras.getAimModeOrdinal();
-        if (modeOrdinal <= 0 || modeOrdinal >= AimAssistRotation.MODE_NAMES.length)
-            return; // DEFAULT or out-of-range — let Myau return its default
-
-        String modeName = AimAssistRotation.MODE_NAMES[modeOrdinal]
-                .toLowerCase(Locale.ROOT);
-        cir.setReturnValue(new String[] { modeName });
-    }
 }

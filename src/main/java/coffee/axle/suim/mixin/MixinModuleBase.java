@@ -2,10 +2,8 @@ package coffee.axle.suim.mixin;
 
 import coffee.axle.suim.feature.SuffixRegistry;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Pseudo;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Hooks {@code Module.getSuffix()} on the base Module class ({@code myau.mD})
@@ -13,7 +11,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <p>
  * Delegates to {@link SuffixRegistry}: if a suffix is registered for
  * {@code this} module instance, return it; otherwise fall through to
- * the original (which returns {@code new String[0]}).
+ * the original behavior (returns {@code new String[0]}).
+ * <p>
+ * Uses {@code @Overwrite} instead of {@code @Inject(cancellable = true)}
+ * to work around a Mixin 0.7.11 bytecode generation bug where
+ * {@code CallbackInfoReturnable.getReturnValue()} returns {@code Object}
+ * without a {@code checkcast} to {@code String[]}, causing a
+ * {@code VerifyError: Bad return type} at runtime.
  *
  * @author axle.coffee
  */
@@ -22,14 +26,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinModuleBase {
 
     /**
-     * Intercept getSuffix — obfuscated as E(J)[Ljava/lang/String;
+     * Replaces getSuffix — obfuscated as E(J)[Ljava/lang/String;
      * The long param is a ZKM dummy.
+     * <p>
+     * Returns the SUIM-registered suffix if present, otherwise
+     * returns an empty array (original behavior).
+     *
+     * @author axle.coffee
+     * @reason Mixin 0.7.11 VerifyError workaround for array return types
      */
-    @Inject(method = "E(J)[Ljava/lang/String;", at = @At("HEAD"), remap = false, require = 0, cancellable = true)
-    private void suim$onGetSuffix(long unused, CallbackInfoReturnable<String[]> cir) {
+    @Overwrite
+    public String[] E(long unused) {
         String[] suffix = SuffixRegistry.getSuffix(this);
         if (suffix != null) {
-            cir.setReturnValue(suffix);
+            return suffix;
         }
+        return new String[0];
     }
 }
