@@ -252,9 +252,11 @@ public class MixinAimAssist {
         if (!suim$suffixRegistered) {
             suim$suffixRegistered = true;
             SuffixRegistry.register(this, () -> {
-                if (!AimAssistExtras.isActive()) return null;
+                if (!AimAssistExtras.isActive())
+                    return null;
                 int ord = AimAssistExtras.getAimModeOrdinal();
-                if (ord <= 0 || ord >= AimAssistRotation.MODE_NAMES.length) return null;
+                if (ord <= 0 || ord >= AimAssistRotation.MODE_NAMES.length)
+                    return null;
                 return new String[] { AimAssistRotation.MODE_NAMES[ord].toLowerCase(Locale.ROOT) };
             });
         }
