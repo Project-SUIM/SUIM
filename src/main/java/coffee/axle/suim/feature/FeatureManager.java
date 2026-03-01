@@ -44,6 +44,7 @@ public class FeatureManager {
         // Misc
         registerFeature(new TestCommand());
         registerFeature(new TestModule());
+        registerFeature(new TransRingsTest());
 
         // Commands
         registerFeature(new DMyauCommand());
