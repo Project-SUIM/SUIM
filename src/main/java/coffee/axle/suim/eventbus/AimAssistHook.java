@@ -23,24 +23,24 @@ import coffee.axle.suim.feature.SuffixRegistry;
  * my fucking god SuChen fuck you like actually fuck your antileak im going to jump
  *
  * <p>
- * <strong>Why not Mixin?</strong> In Myau 260313, {@code myau.HJ} (AimAssist) has SuChen's
+ * <strong>Why not Mixin?</strong> In Myau 260317, {@code myau.g3} (AimAssist) has SuChen's
  *  shitty anti-leak protection. The native hash check in {@code <clinit>} detects any bytecode
  * modification by the Mixin transformer, causing heap corruption crashes.
  * </p>
  *
  * <p>
  * <strong>How it works:</strong><br>
- * 1. Registers as a handler on Myau's internal event bus for {@code myau.b} (TickEvent POST)<br>
+ * 1. Registers as a handler on Myau's internal event bus for {@code myau.U} (TickEvent POST)<br>
  * 2. Appended AFTER AimAssist's own handler in the handler list<br>
- * 3. After AimAssist runs and stores rotation deltas via {@code ZU.N(FFIZ)V},
+ * 3. After AimAssist runs and stores rotation deltas via {@code v4.K(FFIZ)V},
  *    this handler reads the RM delta fields and overrides them with custom rotation<br>
- * 4. Deltas are consumed by RM's PreTick handler {@code ZU.G(V)} the next tick<br>
+ * 4. Deltas are consumed by RM's PreTick handler {@code v4.E(V)} the next tick<br>
  * </p>
  *
  * <p>
- * <strong>Timing advantage over Mixin:</strong> The mixin injected before {@code ZU.N} and
- * set delta fields which were immediately overwritten by {@code ZU.N}. The event-bus handler
- * runs AFTER {@code ZU.N} has stored deltas, so overrides persist until consumed.
+ * <strong>Timing advantage over Mixin:</strong> The mixin injected before {@code v4.K} and
+ * set delta fields which were immediately overwritten by {@code v4.K}. The event-bus handler
+ * runs AFTER {@code v4.K} has stored deltas, so overrides persist until consumed.
  * </p>
  *
  * @author axlecoffee
@@ -80,7 +80,7 @@ public class AimAssistHook {
     public static boolean register() {
         AimAssistHook hook = new AimAssistHook();
         return MyauEventBusHook.registerAfter(
-                MyauMappings.CLASS_TICK_EVENT_POST, // myau.b
+                MyauMappings.CLASS_TICK_EVENT_POST, // myau.U
                 hook,
                 "onPostTick",
                 Object.class,   // parameter type for dispatch compatibility
@@ -89,12 +89,12 @@ public class AimAssistHook {
     }
 
     /**
-     * Event handler for {@code myau.b} (TickEvent POST).
+     * Event handler for {@code myau.U} (TickEvent POST).
      * Called by the event bus dispatch via {@code method.invoke(this, event)}.
      *
      * <p>This runs AFTER AimAssist's handler has stored rotation deltas.</p>
      *
-     * @param event the TickEvent POST instance (myau.b) — treated as Object to avoid
+     * @param event the TickEvent POST instance (myau.U) — treated as Object to avoid
      *              compile-time dependency on Myau event types
      */
     public void onPostTick(Object event) {

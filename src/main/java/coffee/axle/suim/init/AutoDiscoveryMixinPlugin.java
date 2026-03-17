@@ -195,6 +195,8 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
 
     private static final Set<String> IGNORED_MIXINS = new HashSet<>(Arrays.asList(
             "MixinKillAuraArmorExceptions",
+            "MixinKillAura",
+            "MixinNoSlow",
             "MixinAimAssist",
             "MixinFastPlace"
     ));

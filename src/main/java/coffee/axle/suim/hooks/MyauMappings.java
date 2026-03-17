@@ -24,374 +24,364 @@ package coffee.axle.suim.hooks;
  * </p>
  *
  * <p>
- * <strong>Migration notes (250910 → 260313):</strong><br>
- * - ZKM trash parameters removed from most method signatures (onEnable, onDisable, setEnabled, getSuffix, commandRun, etc.)<br>
- * - Event system restructured: EventTyped removed; TickEvent/UpdateEvent/PacketEvent split into separate PRE/POST/SEND/RECEIVE classes<br>
- * - RotationManager.setRotation lost its long parameter<br>
- * - EventBus.register changed from static to instance method<br>
- * - New Timer module added (ZQ was LagRange rename, Zk is new Timer)<br>
- * - KillAura gained HYPIXEL+ autoblock mode (10th option)<br>
- * - FastPlace canPlace check method is now native<br>
- * - Several methods moved to native code for anti-leak protection<br>
- * - AttackData box field is now public (no getter needed)<br>
+ * <strong>Migration notes (260313 → 260317):</strong><br>
+ * - ALL 208 class names re-obfuscated including single-letter classes (total name collision)<br>
+ * - Key hierarchy shifts: J→n (EventBase), I→S (EventCancellable), HT→gj (ModuleBase), Q→gc (CommandBase)<br>
+ * - KillAura native PERFORM_ATTACK sig changed from (FFJ)Z to (FJF)Z (param reorder)<br>
+ * - KillAura native INTERACT_ATTACK sig changed from (JFF)V to (IFIFBF)V — part of "fixed not attacking enemies" fix<br>
+ * - PacketEvent receive now myau.O (was myau.R); packet field M→e<br>
+ * - PacketEvent send now myau.b (was myau.t); packet field s→S<br>
+ * - MODULE_BASE isEnabled/setEnabled no longer share method name: isEnabled=e(), setEnabled=G(Z)V<br>
+ * - 31 anti-leak protected classes (up from 28 in 260313)<br>
+ * - No structural changes to property constructors or event system layout<br>
  * </p>
  *
  * @author axlecoffee
  * @author ksyz (Myau Client)
  * @author maybesomeday and others (Mappings)
- * @version 260313 (2025-03-13)
+ * @version 260317 (2025-03-17)
  */
 public class MyauMappings {
-    public static final String CLASS_MAIN = "myau.Zd";
-    public static final String CLASS_MODULE_BASE = "myau.HT";
-    public static final String CLASS_EVENT_BUS = "myau.H2";
-    public static final String CLASS_EVENT_ANNOTATION = "myau.Ho";
-    public static final String CLASS_MODULE_COMMAND = "myau.T";
+    public static final String CLASS_MAIN = "myau.gJ";
+    public static final String CLASS_MODULE_BASE = "myau.gj";
+    public static final String CLASS_EVENT_BUS = "myau.h";
+    public static final String CLASS_EVENT_ANNOTATION = "myau.g";
+    public static final String CLASS_MODULE_COMMAND = "myau.g0";
 
     public static final String CLASS_EVIL_AUTUMN = "myau.a"; // please dm foxgirlfrot for information regarding this
-                                                             // class — UNVERIFIED for 260313, may have changed
+                                                              // class — UNVERIFIED for 260317, may have changed
 
     // Module classes
-    public static final String CLASS_HUD = "myau.H_";
-    public static final String CLASS_AIM_ASSIST = "myau.HJ";
-    public static final String CLASS_BED_ESP = "myau.Hd";
-    public static final String CLASS_BED_TRACKER = "myau.Hv";
-    public static final String CLASS_KILL_AURA = "myau.HD";
-    public static final String CLASS_NO_SLOW = "myau.ZM";
-    public static final String CLASS_FAST_PLACE = "myau.H7";        // old myau.m5
+    public static final String CLASS_HUD = "myau.vY";
+    public static final String CLASS_AIM_ASSIST = "myau.g3";
+    public static final String CLASS_BED_ESP = "myau.go";
+    public static final String CLASS_BED_TRACKER = "myau.gP";
+    public static final String CLASS_KILL_AURA = "myau.vc";
+    public static final String CLASS_NO_SLOW = "myau.vB";
+    public static final String CLASS_FAST_PLACE = "myau.vx";
 
     // Command classes
-    public static final String CLASS_TARGET_COMMAND = "myau.z";     // old myau.KA
-    public static final String CLASS_FRIEND_COMMAND = "myau.y";     // old myau.KW
+    public static final String CLASS_TARGET_COMMAND = "myau.gn";
+    public static final String CLASS_FRIEND_COMMAND = "myau.ga";
 
     // Utility classes
-    public static final String CLASS_CHAT_UTIL = "myau.Z0";
-    public static final String CLASS_PACKET_UTIL = "myau.D";
+    public static final String CLASS_CHAT_UTIL = "myau.g6";
+    public static final String CLASS_PACKET_UTIL = "myau.J";
 
     // Manager classes
-    public static final String CLASS_MODULE_MANAGER = "myau.HZ";
-    public static final String CLASS_COMMAND_MANAGER = "myau.ZL";
-    public static final String CLASS_VALUE_MANAGER = "myau.o";
-    public static final String CLASS_ROTATION_MANAGER = "myau.ZU";
+    public static final String CLASS_MODULE_MANAGER = "myau.k";
+    public static final String CLASS_COMMAND_MANAGER = "myau.v";
+    public static final String CLASS_VALUE_MANAGER = "myau.g8";
+    public static final String CLASS_ROTATION_MANAGER = "myau.v4";
 
-    // LagManager (myau.ZP)
-    public static final String CLASS_LAG_MANAGER = "myau.ZP";
-    public static final String FIELD_LAG_MANAGER = "T";
-    public static final String FIELD_LAG_MGR_DELAY_TICKS = "d";
-    public static final String FIELD_LAG_MGR_IS_LAGGING = "W";
-    public static final String METHOD_LAG_MGR_IS_LAGGING = "a";
+    // LagManager (myau.gy)
+    public static final String CLASS_LAG_MANAGER = "myau.gy";
+    public static final String FIELD_LAG_MANAGER = "i";
+    public static final String FIELD_LAG_MGR_DELAY_TICKS = "m";
+    public static final String FIELD_LAG_MGR_IS_LAGGING = "k";
+    public static final String METHOD_LAG_MGR_IS_LAGGING = "L";
 
-    // LagRange module (myau.ZQ)
-    public static final String CLASS_LAG_RANGE = "myau.ZQ";
-    public static final String FIELD_LAG_RANGE_TICK_COUNT = "p";
-    public static final String FIELD_LAG_RANGE_ACCUMULATOR = "y";
-    public static final String FIELD_LAG_RANGE_ACTIVE = "B";
-    public static final String FIELD_LAG_RANGE_DELAY_VALUE = "C";
+    // LagRange module (myau.v_)
+    public static final String CLASS_LAG_RANGE = "myau.v_";
+    public static final String FIELD_LAG_RANGE_TICK_COUNT = "N";
+    public static final String FIELD_LAG_RANGE_ACCUMULATOR = "w";
+    public static final String FIELD_LAG_RANGE_ACTIVE = "e";
+    public static final String FIELD_LAG_RANGE_DELAY_VALUE = "n";
 
-    // DelayManager (myau.j)
-    public static final String CLASS_DELAY_MANAGER = "myau.j";
+    // DelayManager (myau.gd)
+    public static final String CLASS_DELAY_MANAGER = "myau.gd";
 
-    // RotationManager (myau.ZU)
-    public static final String FIELD_ROTATION_MANAGER = "K";
-    public static final String FIELD_ROT_MGR_YAW_DELTA = "c";
-    public static final String FIELD_ROT_MGR_PITCH_DELTA = "m";
-    public static final String FIELD_ROT_MGR_ROTATED = "W";
-    public static final String FIELD_ROT_MGR_LAST_UPDATE = "s";
-    public static final String FIELD_ROT_MGR_PRIORITY = "q";
-    public static final String METHOD_ROT_MGR_SET_ROTATION = "N";
-    public static final String SIG_ROT_MGR_SET_ROTATION = "(FFIZ)V"; // was (FFJIZ)V — long param removed
-    public static final String METHOD_ROT_MGR_IS_ROTATED = "r";
-    public static final String METHOD_ROT_MGR_ON_TICK = "G";
-    public static final String METHOD_ROT_MGR_RESET = "N"; // overloaded with setRotation — sig: (J)V
+    // RotationManager (myau.v4)
+    public static final String FIELD_ROTATION_MANAGER = "A";
+    public static final String FIELD_ROT_MGR_YAW_DELTA = "m";
+    public static final String FIELD_ROT_MGR_PITCH_DELTA = "i";
+    public static final String FIELD_ROT_MGR_ROTATED = "V";
+    public static final String FIELD_ROT_MGR_LAST_UPDATE = "r";
+    public static final String FIELD_ROT_MGR_PRIORITY = "W";
+    public static final String METHOD_ROT_MGR_SET_ROTATION = "K";
+    public static final String SIG_ROT_MGR_SET_ROTATION = "(FFIZ)V"; // unchanged
+    public static final String METHOD_ROT_MGR_IS_ROTATED = "W";
+    public static final String METHOD_ROT_MGR_ON_TICK = "E";
+    public static final String METHOD_ROT_MGR_RESET = "m"; // overloaded with pitch_delta field name — sig: (J)V
 
-    // Property / Value classes — ALL long ZKM trash params removed from public constructors in 260313
-    public static final String CLASS_VALUE_BASE = "myau.H1";
-    public static final String CLASS_BOOLEAN_PROPERTY = "myau.Hm";
-    public static final String CLASS_INTEGER_PROPERTY = "myau.H3";
-    public static final String CLASS_INT_VALUE = "myau.HY";
-    public static final String CLASS_FLOAT_PROPERTY = "myau.HA";
-    public static final String CLASS_STRING_PROPERTY = "myau.Hk";
-    public static final String CLASS_ENUM_PROPERTY = "myau.Hq";
-    public static final String CLASS_COLOR_PROPERTY = "myau.Hy";
+    // Property / Value classes — constructor sigs unchanged from 260313
+    public static final String CLASS_VALUE_BASE = "myau.gx";
+    public static final String CLASS_BOOLEAN_PROPERTY = "myau.gq";
+    public static final String CLASS_INTEGER_PROPERTY = "myau.gF";
+    public static final String CLASS_INT_VALUE = "myau.gb";
+    public static final String CLASS_FLOAT_PROPERTY = "myau.gY";
+    public static final String CLASS_STRING_PROPERTY = "myau.gA";
+    public static final String CLASS_ENUM_PROPERTY = "myau.gv";
+    public static final String CLASS_COLOR_PROPERTY = "myau.gM";
 
-    // Property constructor signatures — long trash removed in 260313
-    // BooleanProperty: was (String, Boolean, long) → now (String, Boolean)
+    // Property constructor signatures — unchanged from 260313
+    // BooleanProperty: (String, Boolean)
     public static final String SIG_BOOLEAN_PROPERTY = "(Ljava/lang/String;Ljava/lang/Boolean;)V";
     public static final String SIG_BOOLEAN_PROPERTY_VIS = "(Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/function/BooleanSupplier;)V";
-    // FloatProperty: was (long, String, Float, Float, Float) → now (String, Float, Float, Float)
+    // FloatProperty: (String, Float, Float, Float)
     public static final String SIG_FLOAT_PROPERTY = "(Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;)V";
     public static final String SIG_FLOAT_PROPERTY_VIS = "(Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/util/function/BooleanSupplier;)V";
-    // EnumProperty: was (String, long, Integer, String[]) → now (String, Integer, String[])
+    // EnumProperty: (String, Integer, String[])
     public static final String SIG_ENUM_PROPERTY = "(Ljava/lang/String;Ljava/lang/Integer;[Ljava/lang/String;)V";
     public static final String SIG_ENUM_PROPERTY_VIS = "(Ljava/lang/String;Ljava/lang/Integer;[Ljava/lang/String;Ljava/util/function/BooleanSupplier;)V";
-    // RangedValue(H3): (String, Integer, Integer, Integer) — no long in old or new
+    // RangedValue(gF): (String, Integer, Integer, Integer) — unchanged
     public static final String SIG_RANGED_VALUE = "(Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;)V";
-    // ColorProperty(Hy): (String, Integer) — no long in old or new
+    // ColorProperty(gM): (String, Integer) — unchanged
     public static final String SIG_COLOR_PROPERTY = "(Ljava/lang/String;Ljava/lang/Integer;)V";
 
     // Event base classes
-    // NOTE: EventTyped (old myau.U) was REMOVED in 260313.
-    // Events are now split into separate PRE/POST classes.
-    // public static final String CLASS_EVENT_TYPED = "myau.U"; // REMOVED
-    public static final String CLASS_EVENT_CANCELLABLE = "myau.I";
+    public static final String CLASS_EVENT_CANCELLABLE = "myau.S";
 
-    // Event classes — RESTRUCTURED: events split from single typed class into separate classes
-    // TickEvent: OLD myau.KP (single class) → NEW myau.V (pre) + myau.b (post)
-    public static final String CLASS_TICK_EVENT = "myau.V";           // PRE only
-    public static final String CLASS_TICK_EVENT_POST = "myau.b";      // NEW: POST variant
-    // UpdateEvent: OLD myau.m6 (single class) → NEW myau.E (pre) + myau.w (post)
-    public static final String CLASS_UPDATE_EVENT = "myau.E";         // PRE only
-    public static final String CLASS_UPDATE_EVENT_POST = "myau.w";    // NEW: POST variant
-    // PacketEvent: OLD myau.R (single class) → NEW myau.R (receive) + myau.t (send)
-    public static final String CLASS_PACKET_EVENT = "myau.R";         // RECEIVE only
-    public static final String CLASS_PACKET_EVENT_SEND = "myau.t";    // NEW: SEND variant
-    public static final String CLASS_RENDER_3D_EVENT = "myau.n";      // old myau.mj; extends myau.J (Event)
-    public static final String CLASS_WINDOW_CLICK_EVENT = "myau.l";
-    public static final String CLASS_MOVE_INPUT_EVENT = "myau.HQ";
-    public static final String CLASS_SWAP_ITEM_EVENT = "myau.F";
+    // Event classes
+    // TickEvent: myau.N (pre) + myau.U (post)
+    public static final String CLASS_TICK_EVENT = "myau.N";           // PRE only
+    public static final String CLASS_TICK_EVENT_POST = "myau.U";      // POST variant
+    // UpdateEvent: myau.e (pre) + myau.j (post)
+    public static final String CLASS_UPDATE_EVENT = "myau.e";         // PRE only
+    public static final String CLASS_UPDATE_EVENT_POST = "myau.j";    // POST variant
+    // PacketEvent: myau.O (receive) + myau.b (send) — CORRECTED: receive is O not L
+    public static final String CLASS_PACKET_EVENT = "myau.O";         // RECEIVE only
+    public static final String CLASS_PACKET_EVENT_SEND = "myau.b";    // SEND variant
+    public static final String CLASS_RENDER_2D_EVENT = "myau.B";
+    public static final String CLASS_RENDER_3D_EVENT = "myau.I";
+    public static final String CLASS_WINDOW_CLICK_EVENT = "myau.s";
+    public static final String CLASS_MOVE_INPUT_EVENT = "myau.Q";
+    public static final String CLASS_SWAP_ITEM_EVENT = "myau.A";
 
-    // myau.Zd (Client)
-    public static final String FIELD_MODULE_MANAGER = "L";
-    public static final String FIELD_COMMAND_MANAGER = "w";
-    public static final String FIELD_PROPERTY_MANAGER = "V";
-    public static final String FIELD_CLIENT_NAME = "a";
-    public static final String FIELD_FRIEND_MANAGER = "F";
-    public static final String FIELD_TARGET_MANAGER = "J";
-    public static final String FIELD_EVENT_BUS = "A"; // NEW: EventBus instance field in Client
+    // myau.gJ (Client)
+    public static final String FIELD_MODULE_MANAGER = "z";
+    public static final String FIELD_COMMAND_MANAGER = "q";
+    public static final String FIELD_PROPERTY_MANAGER = "w";
+    public static final String FIELD_CLIENT_NAME = "M";
+    public static final String FIELD_FRIEND_MANAGER = "o";
+    public static final String FIELD_TARGET_MANAGER = "C";
+    public static final String FIELD_EVENT_BUS = "g"; // EventBus instance field in Client
 
-    // ChatUtil (myau.Z0) — all methods are static; long trash params removed in 260313
-    public static final String METHOD_CHAT_SEND_FORMATTED = "P"; // was d(String,long) → P(String)
-    public static final String SIG_CHAT_SEND_FORMATTED = "(Ljava/lang/String;)V"; // was (Ljava/lang/String;J)V
-    public static final String METHOD_CHAT_SEND_RAW = "b";       // was l(String,long) → b(String)
-    public static final String SIG_CHAT_SEND_RAW = "(Ljava/lang/String;)V";       // was (Ljava/lang/String;J)V
-    public static final String METHOD_CHAT_SEND = "l";           // was a(long,IChatComponent) → l(IChatComponent)
-    public static final String SIG_CHAT_SEND = "(Lnet/minecraft/util/IChatComponent;)V"; // was (JLnet/minecraft/util/IChatComponent;)V
+    // ChatUtil (myau.g6) — all methods are static
+    public static final String METHOD_CHAT_SEND_FORMATTED = "Z";
+    public static final String SIG_CHAT_SEND_FORMATTED = "(Ljava/lang/String;)V";
+    public static final String METHOD_CHAT_SEND_RAW = "C";
+    public static final String SIG_CHAT_SEND_RAW = "(Ljava/lang/String;)V";
+    public static final String METHOD_CHAT_SEND = "z";
+    public static final String SIG_CHAT_SEND = "(Lnet/minecraft/util/IChatComponent;)V";
 
-    // PlayerListManager superclass fields (base class: myau.r)
-    public static final String FIELD_PLAYER_LIST = "H";
-    public static final String FIELD_PLAYER_FILE = "U";
-    public static final String METHOD_PLAYER_LIST_CONTAINS = "s";
+    // PlayerListManager superclass fields (base class: myau.C)
+    public static final String FIELD_PLAYER_LIST = "m";
+    public static final String FIELD_PLAYER_FILE = "c";
+    public static final String METHOD_PLAYER_LIST_CONTAINS = "W";
 
-    // PacketUtil (myau.D)
-    public static final String METHOD_SEND_PACKET = "u";
+    // PacketUtil (myau.J)
+    public static final String METHOD_SEND_PACKET = "N";
 
     // Module methods
-    public static final String METHOD_GET_MODULE = "x";
-    public static final String METHOD_IS_ENABLED = "y";
+    public static final String METHOD_GET_MODULE = "W";
+    public static final String METHOD_IS_ENABLED = "e";
 
-    // KillAura (myau.HD) — mixin-specific fields
-    public static final String FIELD_KILL_AURA_AUTOBLOCK = "s";
-    public static final String FIELD_KILL_AURA_IS_BLOCKING = "H";
-    public static final String FIELD_KILL_AURA_TICK_STATE = "u";
-    public static final String METHOD_KILL_AURA_IS_PLAYER_BLOCKING = "p"; // was Q(int,int,char) — trash removed → p()
-    public static final String SIG_KILL_AURA_IS_PLAYER_BLOCKING = "()Z"; // was (IIC)Z
-    public static final String METHOD_KILL_AURA_UNBLOCK = "e";           // old r(J)V → native e()V — sends RELEASE_USE_ITEM
-    public static final String SIG_KILL_AURA_UNBLOCK = "()V";            // was (J)V — long trash removed, now native
+    // KillAura (myau.vc) — mixin-specific fields
+    public static final String FIELD_KILL_AURA_AUTOBLOCK = "b";
+    public static final String FIELD_KILL_AURA_IS_BLOCKING = "P";
+    public static final String FIELD_KILL_AURA_TICK_STATE = "l";
+    public static final String METHOD_KILL_AURA_IS_PLAYER_BLOCKING = "m";
+    public static final String SIG_KILL_AURA_IS_PLAYER_BLOCKING = "()Z"; // unchanged
+    public static final String METHOD_KILL_AURA_UNBLOCK = "k";           // native ()V
+    public static final String SIG_KILL_AURA_UNBLOCK = "()V";            // unchanged
 
     // ModuleManager
-    public static final String FIELD_MODULES_MAP = "T";
+    public static final String FIELD_MODULES_MAP = "U";
 
     // CommandManager
-    public static final String FIELD_COMMANDS_LIST = "l";
+    public static final String FIELD_COMMANDS_LIST = "E";
 
     // ValueManager
-    public static final String FIELD_PROPERTY_MAP = "a";
+    public static final String FIELD_PROPERTY_MAP = "j";
 
-    // Module (myau.HT)
-    public static final String FIELD_MODULE_NAME = "b";
-    public static final String FIELD_MODULE_ENABLED = "X";
-    public static final String FIELD_MODULE_KEYBIND = "g";
-    public static final String METHOD_MODULE_GET_SUFFIX = "G";
+    // Module (myau.gj)
+    public static final String FIELD_MODULE_NAME = "v";
+    public static final String FIELD_MODULE_ENABLED = "F";
+    public static final String FIELD_MODULE_KEYBIND = "B";
+    public static final String METHOD_MODULE_GET_SUFFIX = "N";
 
-    // Command (myau.Q)
-    public static final String FIELD_COMMAND_NAMES = "A";
+    // Command (myau.gc)
+    public static final String FIELD_COMMAND_NAMES = "q";
 
-    // HUD (myau.H_)
-    public static final String FIELD_HUD_COLOR_MODE = "a";
-    public static final String FIELD_HUD_CUSTOM1 = "k";
-    public static final String FIELD_HUD_CUSTOM2 = "V";
-    public static final String FIELD_HUD_CUSTOM3 = "L";
-    public static final String FIELD_HUD_COLOR_SPEED = "I";
-    public static final String FIELD_HUD_COLOR_SATURATION = "Q";
-    public static final String FIELD_HUD_COLOR_BRIGHTNESS = "f";
-    public static final String FIELD_HUD_SCALE = "w";
+    // HUD (myau.vY)
+    public static final String FIELD_HUD_COLOR_MODE = "e";
+    public static final String FIELD_HUD_CUSTOM1 = "O";
+    public static final String FIELD_HUD_CUSTOM2 = "S";
+    public static final String FIELD_HUD_CUSTOM3 = "k";
+    public static final String FIELD_HUD_COLOR_SPEED = "s";
+    public static final String FIELD_HUD_COLOR_SATURATION = "b";
+    public static final String FIELD_HUD_COLOR_BRIGHTNESS = "c";
+    public static final String FIELD_HUD_SCALE = "q";
 
-    // BedESP (myau.Hd)
-    public static final String FIELD_BED_ESP_BEDS = "W";
-    public static final String FIELD_BED_ESP_COLOR = "c";
-    public static final String FIELD_BED_ESP_MODE = "Z";
-    public static final String METHOD_BED_ESP_ON_RENDER_3D = "L"; // old b(myau.mj)V → L(myau.n)V
+    // BedESP (myau.go)
+    public static final String FIELD_BED_ESP_BEDS = "n";
+    public static final String FIELD_BED_ESP_COLOR = "M";
+    public static final String FIELD_BED_ESP_MODE = "f";
+    public static final String METHOD_BED_ESP_ON_RENDER_3D = "s"; // sig: (Lmyau/I;)V — RENDER_3D is myau.I
 
-    // RotationUtil (myau.Hh)
-    public static final String CLASS_ROTATION_UTIL = "myau.Hh";
-    public static final String METHOD_GET_ROTATIONS_TO_BOX = "y";
-    public static final String METHOD_GET_ROTATIONS = "O";
+    // RotationUtil (myau.vI)
+    public static final String CLASS_ROTATION_UTIL = "myau.vI";
+    public static final String METHOD_GET_ROTATIONS_TO_BOX = "a";
+    public static final String METHOD_GET_ROTATIONS = "F";
 
-    // RotationState (myau.HX)
-    public static final String CLASS_ROTATION_STATE = "myau.HX";
-    public static final String FIELD_ROTATION_STATE_PITCH = "c";
-    public static final String FIELD_ROTATION_STATE_YAW_HEAD = "V";
-    public static final String FIELD_ROTATION_STATE_SMOOTH_YAW = "I";
-    public static final String FIELD_ROTATION_STATE_PRIORITY = "H";
-    public static final String METHOD_ROTATION_STATE_APPLY = "q";
-    public static final String METHOD_ROTATION_STATE_IS_ACTIVE = "P";
-    public static final String METHOD_ROTATION_STATE_GET_SMOOTHED_YAW = "c"; // same name as pitch field (field vs method)
+    // RotationState (myau.vz)
+    public static final String CLASS_ROTATION_STATE = "myau.vz";
+    public static final String FIELD_ROTATION_STATE_PITCH = "c";     // UNCHANGED
+    public static final String FIELD_ROTATION_STATE_YAW_HEAD = "r";
+    public static final String FIELD_ROTATION_STATE_SMOOTH_YAW = "S";
+    public static final String FIELD_ROTATION_STATE_PRIORITY = "o";
+    public static final String METHOD_ROTATION_STATE_APPLY = "f";
+    public static final String METHOD_ROTATION_STATE_IS_ACTIVE = "r";
+    public static final String METHOD_ROTATION_STATE_GET_SMOOTHED_YAW = "f"; // same name as APPLY (field vs method overload)
 
-    // MoveUtil (myau.HV)
-    public static final String CLASS_MOVE_UTIL = "myau.HV";
-    public static final String METHOD_MOVE_UTIL_IS_FORWARD_PRESSED = "w";
-    public static final String METHOD_MOVE_UTIL_FIX_STRAFE = "j";
+    // MoveUtil (myau.M)
+    public static final String CLASS_MOVE_UTIL = "myau.M";
+    public static final String METHOD_MOVE_UTIL_IS_FORWARD_PRESSED = "r";
+    public static final String METHOD_MOVE_UTIL_FIX_STRAFE = "I";
 
-    // FastPlace (myau.H7)
-    public static final String METHOD_FAST_PLACE_CAN_PLACE = "e";      // old b(III)Z → native e(J)Z
-    public static final String SIG_FAST_PLACE_CAN_PLACE = "(J)Z";      // native — coords packed into long
-    public static final String METHOD_FAST_PLACE_ON_TICK = "e";        // old F(myau.KP)V → e(myau.V)V — same name as canPlace (overloaded)
-    public static final String SIG_FAST_PLACE_ON_TICK = "(Lmyau/V;)V";
+    // FastPlace (myau.vx)
+    public static final String METHOD_FAST_PLACE_CAN_PLACE = "R";      // native — sig: (J)Z
+    public static final String SIG_FAST_PLACE_CAN_PLACE = "(J)Z";      // unchanged
+    public static final String METHOD_FAST_PLACE_ON_TICK = "j";         // sig: (Lmyau/N;)V — TickEvent is now myau.N
+    public static final String SIG_FAST_PLACE_ON_TICK = "(Lmyau/N;)V";
 
-    // NoSlow (myau.ZM)
-    public static final String METHOD_NO_SLOW_CHECK = "L";             // old r(J)Z → L()Z — long trash removed
-    public static final String SIG_NO_SLOW_CHECK = "()Z";              // was (J)Z
+    // NoSlow (myau.vB)
+    public static final String METHOD_NO_SLOW_CHECK = "m";
+    public static final String SIG_NO_SLOW_CHECK = "()Z";              // unchanged
 
-    // SwapItemEvent (myau.F)
-    public static final String METHOD_SWAP_ITEM_SET_SLOT = "P";
+    // SwapItemEvent (myau.A)
+    public static final String METHOD_SWAP_ITEM_SET_SLOT = "o";
 
-    // AimAssist (myau.HJ)
-    public static final String FIELD_AIM_ASSIST_WEAPON_ONLY = "V";
-    public static final String FIELD_AIM_ASSIST_ALLOW_TOOLS = "o";
-    public static final String FIELD_AIM_ASSIST_RANGE = "M";
-    public static final String FIELD_AIM_ASSIST_HSPEED = "n";
-    public static final String FIELD_AIM_ASSIST_VSPEED = "B";
-    public static final String FIELD_AIM_ASSIST_SMOOTHING = "L";
-    public static final String FIELD_AIM_ASSIST_FOV = "N";
-    public static final String FIELD_AIM_ASSIST_TEAM = "W";
-    public static final String FIELD_AIM_ASSIST_BOT_CHECKS = "e";
-    public static final String FIELD_AIM_ASSIST_MC = "x";
-    public static final String METHOD_AIM_ASSIST_ON_TICK = "g";           // takes TickEvent POST (myau.b), not PRE — sig: (Lmyau/b;)V
-    public static final String SIG_AIM_ASSIST_ON_TICK = "(Lmyau/b;)V";    // NOTE: TickEvent POST, not myau.V (PRE)
-    public static final String METHOD_AIM_ASSIST_IS_VALID_TARGET = "G";
-    public static final String METHOD_AIM_ASSIST_IS_IN_REACH = "R";
-    public static final String METHOD_AIM_ASSIST_IS_LOOKING_AT_BLOCK = "X";
+    // AimAssist (myau.g3)
+    public static final String FIELD_AIM_ASSIST_WEAPON_ONLY = "x";
+    public static final String FIELD_AIM_ASSIST_ALLOW_TOOLS = "N";
+    public static final String FIELD_AIM_ASSIST_RANGE = "X";
+    public static final String FIELD_AIM_ASSIST_HSPEED = "O";
+    public static final String FIELD_AIM_ASSIST_VSPEED = "l";
+    public static final String FIELD_AIM_ASSIST_SMOOTHING = "L";       // UNCHANGED
+    public static final String FIELD_AIM_ASSIST_FOV = "U";
+    public static final String FIELD_AIM_ASSIST_TEAM = "w";
+    public static final String FIELD_AIM_ASSIST_BOT_CHECKS = "T";
+    public static final String FIELD_AIM_ASSIST_MC = "Z";
+    public static final String METHOD_AIM_ASSIST_ON_TICK = "D";           // takes TickEvent POST (myau.U) — sig: (Lmyau/U;)V
+    public static final String SIG_AIM_ASSIST_ON_TICK = "(Lmyau/U;)V";    // NOTE: TickEvent POST, not myau.N (PRE)
+    public static final String METHOD_AIM_ASSIST_IS_VALID_TARGET = "n";
+    public static final String METHOD_AIM_ASSIST_IS_IN_REACH = "r";
+    public static final String METHOD_AIM_ASSIST_IS_LOOKING_AT_BLOCK = "k";
 
-    // KillAura (myau.HD)
-    public static final String FIELD_KILL_AURA_TARGET = "t";
-    public static final String FIELD_KILL_AURA_ATTACK_RANGE = "ws";
-    public static final String FIELD_KILL_AURA_SWING_RANGE = "Z";
-    public static final String FIELD_KILL_AURA_FOV = "wy";
-    public static final String FIELD_KILL_AURA_SMOOTHING = "W";
-    public static final String FIELD_KILL_AURA_DEBUG_LOG = "T"; // unchanged — ModeValue with 2 options
-    public static final String FIELD_KILL_AURA_SORT = "m";
-    public static final String FIELD_KILL_AURA_ROTATIONS = "G";
-    public static final String FIELD_KILL_AURA_MC = "r";
-    public static final String FIELD_KILL_AURA_MODE = "o";
-    public static final String FIELD_KILL_AURA_PLAYERS = "l";
-    public static final String FIELD_KILL_AURA_MOBS = "d";
-    public static final String FIELD_KILL_AURA_ANIMALS = "L";
-    public static final String FIELD_KILL_AURA_TEAMS = "O";
-    public static final String FIELD_KILL_AURA_BOT_CHECK = "i";
-    public static final String FIELD_KILL_AURA_WEAPONS_ONLY = "V";
-    public static final String FIELD_KILL_AURA_ALLOW_TOOLS = "z";
-    public static final String METHOD_KILL_AURA_ON_UPDATE = "j";
-    public static final String METHOD_KILL_AURA_ON_TICK = "Q";
-    public static final String METHOD_KILL_AURA_PERFORM_ATTACK = "Z";
-    public static final String METHOD_KILL_AURA_INTERACT_ATTACK = "Y";
-    public static final String METHOD_KILL_AURA_GET_TARGET = "R";
-    public static final String METHOD_KILL_AURA_IS_VALID_TARGET = "v"; // unchanged — BUT still has long ZKM trash param
-    public static final String SIG_KILL_AURA_IS_VALID_TARGET = "(Lnet/minecraft/entity/EntityLivingBase;J)Z"; // long param NOT removed for this method
-    public static final String METHOD_KILL_AURA_IS_PLAYER_TARGET = "X";
+    // KillAura (myau.vc)
+    public static final String FIELD_KILL_AURA_TARGET = "iV";
+    public static final String FIELD_KILL_AURA_ATTACK_RANGE = "iy";
+    public static final String FIELD_KILL_AURA_SWING_RANGE = "Z";     // UNCHANGED
+    public static final String FIELD_KILL_AURA_FOV = "r";
+    public static final String FIELD_KILL_AURA_SMOOTHING = "p";
+    public static final String FIELD_KILL_AURA_DEBUG_LOG = "D";
+    public static final String FIELD_KILL_AURA_SORT = "iq";
+    public static final String FIELD_KILL_AURA_ROTATIONS = "G";       // UNCHANGED
+    public static final String FIELD_KILL_AURA_MC = "Q";
+    public static final String FIELD_KILL_AURA_MODE = "z";
+    public static final String FIELD_KILL_AURA_PLAYERS = "e";
+    public static final String FIELD_KILL_AURA_MOBS = "j";
+    public static final String FIELD_KILL_AURA_ANIMALS = "U";
+    public static final String FIELD_KILL_AURA_TEAMS = "T";
+    public static final String FIELD_KILL_AURA_BOT_CHECK = "q";
+    public static final String FIELD_KILL_AURA_WEAPONS_ONLY = "g";
+    public static final String FIELD_KILL_AURA_ALLOW_TOOLS = "h";
+    public static final String METHOD_KILL_AURA_ON_UPDATE = "n";      // sig: (Lmyau/e;)V — UpdateEvent is now myau.e
+    public static final String METHOD_KILL_AURA_ON_TICK = "G";         // sig: (Lmyau/N;)V — TickEvent is now myau.N
+    public static final String METHOD_KILL_AURA_PERFORM_ATTACK = "Y";  // native — sig changed: (FJF)Z (was (FFJ)Z — param reorder)
+    public static final String METHOD_KILL_AURA_INTERACT_ATTACK = "j"; // native — sig changed: (IFIFBF)V — part of "fixed not attacking enemies" fix
+    public static final String METHOD_KILL_AURA_GET_TARGET = "I";
+    public static final String METHOD_KILL_AURA_IS_VALID_TARGET = "S";
+    public static final String SIG_KILL_AURA_IS_VALID_TARGET = "(Lnet/minecraft/entity/EntityLivingBase;J)Z"; // long param still present
+    public static final String METHOD_KILL_AURA_IS_PLAYER_TARGET = "b";
 
-    // Value base (myau.H1)
-    public static final String FIELD_VALUE_CURRENT = "F";
-    public static final String FIELD_VALUE_NAME = "O";
-    public static final String FIELD_VALUE_OWNER = "Q";
-    public static final String FIELD_VALUE_DEFAULT = "V";
-    public static final String FIELD_VALUE_VISIBILITY = "E";
+    // Value base (myau.gx)
+    public static final String FIELD_VALUE_CURRENT = "J";
+    public static final String FIELD_VALUE_NAME = "Y";
+    public static final String FIELD_VALUE_OWNER = "B";
+    public static final String FIELD_VALUE_DEFAULT = "T";
+    public static final String FIELD_VALUE_VISIBILITY = "U";
 
-    // RangedValue (myau.H3) — extends H1<Integer>
-    public static final String FIELD_RANGED_MIN = "k";
-    public static final String FIELD_RANGED_MAX = "C";
+    // RangedValue (myau.gF) — extends gx<Integer>
+    public static final String FIELD_RANGED_MIN = "X";
+    public static final String FIELD_RANGED_MAX = "V";
 
-    // FloatValue (myau.HA) — extends H1<Float>
-    public static final String FIELD_FLOAT_MIN = "R";
-    public static final String FIELD_FLOAT_MAX = "Z";
+    // FloatValue (myau.gY) — extends gx<Float>
+    public static final String FIELD_FLOAT_MIN = "G";
+    public static final String FIELD_FLOAT_MAX = "M";
 
-    // IntValue (myau.HY) — extends H1<Integer>
-    public static final String FIELD_INT_MIN = "z";
-    public static final String FIELD_INT_MAX = "D";
+    // IntValue (myau.gb) — extends gx<Integer>
+    public static final String FIELD_INT_MIN = "P";
+    public static final String FIELD_INT_MAX = "L";
 
-    // EventTyped — REMOVED in 260313 (events split into separate classes)
-    // These fields no longer exist; event type is determined by class identity.
-    // public static final String FIELD_EVENT_TYPED_PRE = "PRE";
-    // public static final String FIELD_EVENT_TYPED_POST = "POST";
-    // public static final String FIELD_EVENT_TYPED_SEND = "SEND";
+    // EventCancellable (myau.S)
+    public static final String FIELD_EVENT_CANCELLED = "B";
 
-    // EventCancellable (myau.I)
-    public static final String FIELD_EVENT_CANCELLED = "l";
+    // PacketEvent receive (myau.O) — CORRECTED: was myau.R→myau.L, actually myau.R→myau.O
+    public static final String FIELD_PACKET_EVENT_PACKET = "e";
+    // PacketEvent send (myau.b) — packet field is "S"
+    public static final String FIELD_PACKET_EVENT_SEND_PACKET = "S";
 
-    // TickEvent (myau.V) — PRE variant; no type field (events split)
-    // public static final String FIELD_TICK_EVENT_TYPE = "p"; // REMOVED — use CLASS_TICK_EVENT / CLASS_TICK_EVENT_POST
+    // WindowClickEvent (myau.s)
+    public static final String FIELD_WINDOW_CLICK_MODE = "J";
+    public static final String FIELD_WINDOW_CLICK_BUTTON = "u";
+    public static final String FIELD_WINDOW_CLICK_SLOT = "m";
 
-    // UpdateEvent (myau.E) — PRE variant
-    // public static final String FIELD_UPDATE_EVENT_TYPE = "C"; // REMOVED — use CLASS_UPDATE_EVENT / CLASS_UPDATE_EVENT_POST
+    // ModeValue (myau.gv)
+    public static final String FIELD_ENUM_VALUES_ARRAY = "l";
 
-    // PacketEvent receive (myau.R)
-    public static final String FIELD_PACKET_EVENT_PACKET = "M";
-    // public static final String FIELD_PACKET_EVENT_TYPE = "M"; // REMOVED — use CLASS_PACKET_EVENT / CLASS_PACKET_EVENT_SEND
-    // PacketEvent send (myau.t) — packet field is "s"
-    public static final String FIELD_PACKET_EVENT_SEND_PACKET = "s"; // NEW: packet field in send variant
+    // Module methods (myau.gj) — NOTE: isEnabled/setEnabled no longer share name
+    public static final String METHOD_GET_NAME = "s";
+    public static final String METHOD_ON_ENABLE = "U";
+    public static final String METHOD_ON_DISABLE = "G";
+    public static final String METHOD_SET_ENABLED = "G"; // overloaded: e() = isEnabled, G(boolean) = setEnabled — G is now shared with onDisable name
 
-    // WindowClickEvent (myau.l)
-    public static final String FIELD_WINDOW_CLICK_MODE = "C";
-    public static final String FIELD_WINDOW_CLICK_BUTTON = "n";
-    public static final String FIELD_WINDOW_CLICK_SLOT = "M";
+    // Value methods (myau.gx)
+    public static final String METHOD_PROPERTY_GET_NAME = "I";
+    public static final String METHOD_PROPERTY_GET_VALUE = "g";
+    public static final String METHOD_PROPERTY_SET_OWNER = "l";
 
-    // ModeValue (myau.Hq)
-    public static final String FIELD_ENUM_VALUES_ARRAY = "y";
+    // Command (myau.gc)
+    public static final String METHOD_COMMAND_RUN = "Z";
 
-    // Module methods (myau.HT)
-    public static final String METHOD_GET_NAME = "K";
-    public static final String METHOD_ON_ENABLE = "a";
-    public static final String METHOD_ON_DISABLE = "s";
-    public static final String METHOD_SET_ENABLED = "y"; // overloaded: y() = isEnabled, y(boolean) = setEnabled
+    // Event bus (myau.h)
+    public static final String METHOD_EVENT_REGISTER = "J";
+    public static final String FIELD_EVENT_BUS_HANDLER_MAP = "K"; // Map<Class<? extends n>, List<i>>
 
-    // Value methods (myau.H1)
-    public static final String METHOD_PROPERTY_GET_NAME = "E";
-    public static final String METHOD_PROPERTY_GET_VALUE = "y";
-    public static final String METHOD_PROPERTY_SET_OWNER = "L";
+    // Handler wrapper (myau.i)
+    public static final String CLASS_HANDLER_WRAPPER = "myau.i";
+    public static final String METHOD_HANDLER_GET_HANDLER = "r"; // public Object r() { return this.j; }
 
-    // Command (myau.Q)
-    public static final String METHOD_COMMAND_RUN = "j";
-
-    // Event bus (myau.H2) — NOTE: changed from static to instance method
-    public static final String METHOD_EVENT_REGISTER = "X";
-
-    // ALL METHOD SIGS — Most ZKM trash parameters removed in 260313
-    public static final String SIG_MODULE_CONSTRUCTOR = "(Ljava/lang/String;ZI)V"; // was (Ljava/lang/String;ZIJ)V
-    public static final String SIG_ON_ENABLE = "()V"; // was (SIC)V
-    public static final String SIG_ON_DISABLE = "()V"; // was (J)V
-    public static final String SIG_SET_ENABLED = "(Z)V"; // was (SZSI)V
-    public static final String SIG_COMMAND_RUN = "(Ljava/util/ArrayList;)V"; // was (Ljava/util/ArrayList;J)V
+    // ALL METHOD SIGS — unchanged from 260313 unless noted
+    public static final String SIG_MODULE_CONSTRUCTOR = "(Ljava/lang/String;ZI)V"; // unchanged
+    public static final String SIG_ON_ENABLE = "()V";                              // unchanged
+    public static final String SIG_ON_DISABLE = "()V";                             // unchanged
+    public static final String SIG_SET_ENABLED = "(Z)V";                           // unchanged
+    public static final String SIG_COMMAND_RUN = "(Ljava/util/ArrayList;)V";       // unchanged
     public static final String SIG_COMMAND_CONSTRUCTOR = "(Ljava/util/ArrayList;)V"; // unchanged
 
     // RotationState method signatures
-    public static final String SIG_ROTATION_STATE_IS_ACTIVE = "()Z"; // was (SIS)Z
-    public static final String SIG_MOVE_UTIL_IS_FORWARD_PRESSED = "()Z"; // was (CII)Z
-    public static final String SIG_MOVE_UTIL_FIX_STRAFE = "(F)V"; // was (JF)V
+    public static final String SIG_ROTATION_STATE_IS_ACTIVE = "()Z";               // unchanged
+    public static final String SIG_MOVE_UTIL_IS_FORWARD_PRESSED = "()Z";           // unchanged
+    public static final String SIG_MOVE_UTIL_FIX_STRAFE = "(F)V";                  // unchanged
 
     // RotationUtil method signatures
-    public static final String SIG_GET_ROTATIONS_TO_BOX = "(Lnet/minecraft/util/AxisAlignedBB;)[F"; // was (Lnet/minecraft/util/AxisAlignedBB;JFFFF)[F
-    public static final String TARGET_GET_ROTATIONS_TO_BOX = "Lmyau/Hh;y(Lnet/minecraft/util/AxisAlignedBB;)[F";
+    public static final String SIG_GET_ROTATIONS_TO_BOX = "(Lnet/minecraft/util/AxisAlignedBB;)[F"; // unchanged
+    public static final String TARGET_GET_ROTATIONS_TO_BOX = "Lmyau/vI;a(Lnet/minecraft/util/AxisAlignedBB;)[F";
 
-    // UpdateEvent (myau.E) - rotation methods
-    public static final String METHOD_UPDATE_EVENT_SET_ROTATION = "O";
+    // UpdateEvent (myau.e) - rotation methods
+    public static final String METHOD_UPDATE_EVENT_SET_ROTATION = "X";
     public static final String SIG_UPDATE_EVENT_SET_ROTATION = "(FFI)V"; // unchanged
-    public static final String TARGET_UPDATE_EVENT_SET_ROTATION = "Lmyau/E;O(FFI)V";
-    public static final String METHOD_UPDATE_EVENT_GET_YAW = "u";
-    public static final String METHOD_UPDATE_EVENT_GET_PITCH = "r";
+    public static final String TARGET_UPDATE_EVENT_SET_ROTATION = "Lmyau/e;X(FFI)V";
+    public static final String METHOD_UPDATE_EVENT_GET_YAW = "j";
+    public static final String METHOD_UPDATE_EVENT_GET_PITCH = "U";
 
-    // AttackData (myau.Z5)
-    public static final String CLASS_ATTACK_DATA = "myau.Z5";
-    public static final String FIELD_ATTACK_DATA_BOX = "d"; // now public final — no getter needed
-    public static final String METHOD_ATTACK_DATA_GET_BOX = "d"; // field is public; direct access via .d
+    // AttackData (myau.r)
+    public static final String CLASS_ATTACK_DATA = "myau.r";
+    public static final String FIELD_ATTACK_DATA_BOX = "P"; // was "d" — public final field
+    public static final String METHOD_ATTACK_DATA_GET_BOX = "P"; // field is public; direct access via .P
 
     public static final String GENERATED_PACKAGE = "coffee.axle.suim.generated.";
     public static final String GENERATED_PACKAGE_INTERNAL = "coffee/axle/suim/generated/";

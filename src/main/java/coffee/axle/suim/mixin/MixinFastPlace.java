@@ -11,10 +11,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Mixin to hook into FastPlace's tick handler.
  * Cancels the tick when skip conditions are met (e.g. holding obsidian).
- * canPlace is native in 260313 so we intercept at the tick level instead.
+ * canPlace is native in 260317 so we intercept at the tick level instead.
  */
 @Pseudo
-@Mixin(targets = "myau.H7", remap = false)
+@Mixin(targets = "myau.vx", remap = false)
 public class MixinFastPlace {
 /* UNUSED: please see EventBus reference */
 }

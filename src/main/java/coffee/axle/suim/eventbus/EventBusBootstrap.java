@@ -20,13 +20,13 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
  * </p>
  *
  * <p>
- * <strong>Anti-leak class summary (260313):</strong><br>
+ * <strong>Anti-leak class summary (260317):</strong><br>
  * The following 31 classes have anti-leak protection and CANNOT be targeted by Mixins:<br>
- * {@code H2, H5, H7, HD, HH, HI, HJ, HN, HO, HU, HZ, Hn, Hr, Ht, Hu, Hv, Hx,
- *  Z, Z1, Z6, ZK, ZL, ZM, ZY, Zd, Zg, Zi, Zo}<br>
+ * {@code h, g3, gP, vc, vx, vB, k, v, g8, gy, v_, gd, vY, g6, J}<br>
+ * and others not yet fully mapped — 31 total anti-leak protected classes.<br>
  * <br>
  * Safe classes (no anti-leak — Mixins OK):<br>
- * {@code HT, Hf, Hd, Ho, J, V, b, ZU, m} and all other classes not listed above.
+ * {@code gj, Hf, go, g, n, N, U, v4} and all other classes not listed above.
  * </p>
  *
  * @author axlecoffee

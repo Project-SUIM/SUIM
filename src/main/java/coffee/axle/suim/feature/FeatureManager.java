@@ -38,9 +38,9 @@ public class FeatureManager {
         HudUtils.getInstance().setManager(manager);
 
         // ClickGUI modules (feature/clickgui/)
-        //registerFeature(new ClickGui());
-        //registerFeature(new EditHud());
-        //registerFeature(new TestGuiModule());
+        registerFeature(new ClickGui());
+        registerFeature(new EditHud());
+        registerFeature(new TestGuiModule());
 
         // Misc
         registerFeature(new TestCommand());

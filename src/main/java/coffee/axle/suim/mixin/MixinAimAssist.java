@@ -26,14 +26,13 @@ import java.util.Locale;
 import coffee.axle.suim.feature.SuffixRegistry;
 
 /**
- * Hooks Myau's AimAssist (myau.HJ) to override rotation deltas based on
+ * Hooks Myau's AimAssist (myau.g3) to override rotation deltas based on
  * the aim-mode selected in {@link AimAssistExtras}.
-
  *
  * @author axle.coffee
  */
 @Pseudo
-@Mixin(targets = "myau.HJ", remap = false)
+@Mixin(targets = "myau.g3", remap = false)
 public class MixinAimAssist {
 /** UNUSED: please see EventBus reference */
 }

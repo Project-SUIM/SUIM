@@ -13,17 +13,17 @@ import java.lang.reflect.Field;
  * Event-bus replacement for MixinFastPlace.
  *
  * <p>
- * <strong>Why not Mixin?</strong> In Myau 260313, {@code myau.H7} (FastPlace) has SuChen
+ * <strong>Why not Mixin?</strong> In Myau 260317, {@code myau.vx} (FastPlace) has SuChen
  * anti-leak protection, blocking all bytecode modification.
  * </p>
  *
  * <p>
  * <strong>How it works:</strong><br>
- * 1. Registers a handler on {@code myau.V} (TickEvent PRE) BEFORE FastPlace's handler<br>
+ * 1. Registers a handler on {@code myau.N} (TickEvent PRE) BEFORE FastPlace's handler<br>
  * 2. If the player is holding obsidian, temporarily disables FastPlace by setting
- *    {@code HT.X} (enabled flag) to {@code false} via reflection<br>
+ *    {@code gj.F} (enabled flag) to {@code false} via reflection<br>
  * 3. Registers a second handler AFTER FastPlace to restore the enabled state<br>
- * 4. FastPlace's handler calls {@code y()} (isEnabled) at the start and skips if disabled<br>
+ * 4. FastPlace's handler calls {@code e()} (isEnabled) at the start and skips if disabled<br>
  * </p>
  *
  * @author axlecoffee
@@ -34,7 +34,7 @@ public class FastPlaceHook {
     private static boolean loggedInit = false;
 
     // Reflection caches
-    private static Field enabledField;  // HT.X (boolean)
+    private static Field enabledField;  // gj.F (boolean)
     private static boolean reflectionFailed = false;
 
     // FastPlace instance from event bus
@@ -54,14 +54,14 @@ public class FastPlaceHook {
     public static boolean register() {
         FastPlaceHook hook = new FastPlaceHook();
         boolean pre = MyauEventBusHook.registerBefore(
-                MyauMappings.CLASS_TICK_EVENT, // myau.V
+                MyauMappings.CLASS_TICK_EVENT, // myau.N
                 hook,
                 "onTickPre",
                 Object.class,
                 0
         );
         boolean post = MyauEventBusHook.registerAfter(
-                MyauMappings.CLASS_TICK_EVENT, // myau.V
+                MyauMappings.CLASS_TICK_EVENT, // myau.N
                 hook,
                 "onTickPost",
                 Object.class,

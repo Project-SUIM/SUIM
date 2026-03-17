@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Registers custom event handlers with Myau's internal event bus ({@code myau.H2}).
+ * Registers custom event handlers with Myau's internal event bus ({@code myau.h}).
  *
  * <p>
- * <strong>Why this exists:</strong> Myau 260313 introduced SuChen anti-leak protection
- * on many module classes (including AimAssist {@code myau.HJ} and FastPlace {@code myau.H7}).
+ * <strong>Why this exists:</strong> Myau 260317 has SuChen anti-leak protection
+ * on many module classes (including AimAssist {@code myau.g3} and FastPlace {@code myau.vx}).
  * Anti-leak native hash verification in {@code <clinit>} detects ANY bytecode modification,
  * making SpongePowered Mixin injection impossible on those classes.
  * </p>
@@ -29,19 +29,19 @@ import java.util.Map;
  *
  * <p>
  * <strong>Registration method:</strong> Direct map manipulation — we access the internal
- * handler map {@code H2.f} and insert our own {@code Hf} (handler wrapper) entries.
- * This bypasses the native {@code H2.X(Object)} registration method entirely,
+ * handler map {@code h.f} and insert our own {@code Hf} (handler wrapper) entries.
+ * This bypasses the native {@code h.J(Object)} registration method entirely,
  * avoiding any potential native-code class verification.
  * </p>
  *
  * <p>
- * <strong>Event bus internals (260313):</strong><br>
- * - {@code myau.H2} — EventBus class (anti-leak protected)<br>
- * - {@code myau.H2.f} — {@code Map<Class<? extends J>, List<Hf>>} — handler map<br>
- * - {@code myau.Hf} — handler wrapper: (Object handler, Method method, int priority)<br>
- * - {@code myau.Ho} — {@code @Target(METHOD) @Retention(RUNTIME)} annotation, {@code int v() default 0}<br>
- * - {@code myau.J} — base Event class<br>
- * - Dispatch: {@code H2.C(J event)} iterates list in order, calls {@code method.invoke(handler, event)}<br>
+ * <strong>Event bus internals (260317):</strong><br>
+ * - {@code myau.h} — EventBus class (anti-leak protected)<br>
+ * - {@code myau.h.f} — {@code Map<Class<? extends n>, List<Hf>>} — handler map<br>
+ * - {@code myau.Hf} — handler wrapper: (Object handler, Method method, int priority) — UNVERIFIED for 260317<br>
+ * - {@code myau.g} — {@code @Target(METHOD) @Retention(RUNTIME)} annotation<br>
+ * - {@code myau.n} — base Event class<br>
+ * - Dispatch: {@code h.C(n event)} iterates list in order, calls {@code method.invoke(handler, event)}<br>
  * - No sorting during dispatch — insertion order determines execution order<br>
  * </p>
  *
@@ -55,8 +55,8 @@ public final class MyauEventBusHook {
     private static Object eventBusInstance;
 
     // Reflection caches
-    private static Field eventBusField;      // Zd.A
-    private static Field handlerMapField;    // H2.f
+    private static Field eventBusField;      // gJ.g
+    private static Field handlerMapField;    // h.f
     private static Constructor<?> hfConstructor; // Hf(Object, Method, int)
 
     private MyauEventBusHook() {}
@@ -81,12 +81,12 @@ public final class MyauEventBusHook {
 
             if (handlerMapField == null) {
                 Class<?> eventBusClass = Class.forName(MyauMappings.CLASS_EVENT_BUS);
-                handlerMapField = eventBusClass.getDeclaredField("f");
+                handlerMapField = eventBusClass.getDeclaredField(MyauMappings.FIELD_EVENT_BUS_HANDLER_MAP);
                 handlerMapField.setAccessible(true);
             }
 
             if (hfConstructor == null) {
-                Class<?> hfClass = Class.forName("myau.Hf");
+                Class<?> hfClass = Class.forName(MyauMappings.CLASS_HANDLER_WRAPPER);
                 hfConstructor = hfClass.getDeclaredConstructor(Object.class, Method.class, int.class);
                 hfConstructor.setAccessible(true);
             }
@@ -175,7 +175,7 @@ public final class MyauEventBusHook {
      * Useful for accessing module fields via reflection (e.g., reading AimAssist properties).
      *
      * @param eventClassName the event class name this module handles
-     * @param moduleClassName the module class name to find (e.g., "myau.HJ")
+     * @param moduleClassName the module class name to find (e.g., "myau.g3")
      * @return the module instance, or null if not found
      */
     @SuppressWarnings("unchecked")
@@ -189,7 +189,7 @@ public final class MyauEventBusHook {
             if (handlers == null) return null;
 
             // Hf.h() returns the handler object
-            Method hfGetHandler = Class.forName("myau.Hf").getMethod("h");
+            Method hfGetHandler = Class.forName(MyauMappings.CLASS_HANDLER_WRAPPER).getMethod(MyauMappings.METHOD_HANDLER_GET_HANDLER);
             for (Object hf : handlers) {
                 Object handlerObj = hfGetHandler.invoke(hf);
                 if (handlerObj.getClass().getName().equals(moduleClassName)) {

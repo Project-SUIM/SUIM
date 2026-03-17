@@ -10,15 +10,15 @@ import java.io.FileWriter;
 import java.io.File;
 
 /**
- * Mixin to override TargetCommand (myau.z) to support multiple usernames
+ * Mixin to override TargetCommand (myau.gn) to support multiple usernames
  */
 @SuppressWarnings("unchecked")
 @Pseudo
-@Mixin(targets = "myau.z", remap = false)
+@Mixin(targets = "myau.gn", remap = false)
 public class MixinTargetCommand {
 
     @Overwrite
-    public void j(ArrayList<String> args) {
+    public void Z(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
             java.lang.reflect.Field targetManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_TARGET_MANAGER);
