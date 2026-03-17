@@ -35,6 +35,7 @@ public final class FontUtil {
     private final Minecraft mc = Minecraft.getMinecraft();
     private FontRenderer fontRenderer = mc.fontRendererObj;
     private CFontRenderer customFontRenderer;
+    private volatile boolean fontSetupAttempted = false;
 
     private FontUtil() {
     }
@@ -46,6 +47,12 @@ public final class FontUtil {
         return fontRenderer;
     }
 
+    private void ensureSetup() {
+        if (!fontSetupAttempted) {
+            setupFontUtils();
+        }
+    }
+
     public int getFontHeight() {
         return getFont().FONT_HEIGHT;
     }
@@ -55,6 +62,8 @@ public final class FontUtil {
     }
 
     public void setupFontUtils() {
+        if (fontSetupAttempted) return;
+        fontSetupAttempted = true;
         try {
             java.io.InputStream stream = mc.getResourceManager()
                     .getResource(new ResourceLocation(RESOURCE_DOMAIN, "Roboto-Regular.ttf"))
@@ -81,6 +90,9 @@ public final class FontUtil {
     public int getStringWidth(String text, boolean customFont, double scale) {
         String stripped = stripControlCodes(text);
         int width;
+        if (customFont) {
+            ensureSetup();
+        }
         if (customFont && customFontRenderer != null) {
             width = (int) customFontRenderer.getStringWidth(stripped);
         } else {
@@ -100,6 +112,9 @@ public final class FontUtil {
     public double getStringWidthDouble(String text, boolean customFont, double scale) {
         String stripped = stripControlCodes(text);
         double width;
+        if (customFont) {
+            ensureSetup();
+        }
         if (customFont && customFontRenderer != null) {
             width = customFontRenderer.getStringWidth(stripped);
         } else {
@@ -130,6 +145,9 @@ public final class FontUtil {
         GlStateManager.translate(x, y, 0.0);
         GlStateManager.scale(scale, scale, 1.0);
 
+        if (customFont) {
+            ensureSetup();
+        }
         if (customFont && customFontRenderer != null) {
             customFontRenderer.drawString(text, 0.0, 0.0, color, shadow);
         } else {

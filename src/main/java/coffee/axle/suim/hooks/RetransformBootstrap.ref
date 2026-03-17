@@ -1,0 +1,82 @@
+package coffee.axle.suim.hooks;
+
+import coffee.axle.suim.util.MyauLogger;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+//import suim.agent.SuimAgent;
+
+public class RetransformBootstrap {
+
+    private boolean done = false;
+    private int tickCount = 0;
+    private static final int INIT_DELAY_TICKS = 40;
+
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (done) return;
+        if (event.phase != TickEvent.Phase.START) return;
+
+        tickCount++;
+        if (tickCount < INIT_DELAY_TICKS) return;
+
+        done = true;
+        MinecraftForge.EVENT_BUS.unregister(this);
+
+        if (tryRetransform()) {
+            MyauLogger.log("Bootstrap", "Retransform path succeeded — hooks injected via agent");
+            return;
+        }
+
+        MyauLogger.log("Bootstrap",
+                "WARNING: Retransform failed. AimAssist/FastPlace hooks are NOT active.");
+    }
+
+    private boolean tryRetransform() {
+        if (!isAgentAvailable()) {
+            MyauLogger.log("Bootstrap", "SuimAgent not loaded (missing -javaagent?)");
+            return false;
+        }
+
+        if (!SuimAgent.isReady()) {
+            MyauLogger.log("Bootstrap", "SuimAgent loaded but not ready");
+            return false;
+        }
+
+        boolean aaOk = false;
+        boolean fpOk = false;
+
+        try {
+            aaOk = SuimAgent.hookAndRetransform("myau/HJ", RetransformHooks.aimAssist());
+            if (aaOk) {
+                MyauLogger.log("Bootstrap", "AimAssist retransform OK");
+            } else {
+                MyauLogger.log("Bootstrap", "AimAssist retransform returned false");
+            }
+        } catch (Exception e) {
+            MyauLogger.error("Bootstrap:AimAssist retransform", e);
+        }
+
+        try {
+            fpOk = SuimAgent.hookAndRetransform("myau/H7", RetransformHooks.fastPlace());
+            if (fpOk) {
+                MyauLogger.log("Bootstrap", "FastPlace retransform OK");
+            } else {
+                MyauLogger.log("Bootstrap", "FastPlace retransform returned false");
+            }
+        } catch (Exception e) {
+            MyauLogger.error("Bootstrap:FastPlace retransform", e);
+        }
+
+        return aaOk || fpOk;
+    }
+
+    private boolean isAgentAvailable() {
+        try {
+            Class.forName("suim.agent.SuimAgent");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+}

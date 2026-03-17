@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static coffee.axle.suim.hooks.MyauMappings.*;
-
 /**
  * MyauHook reflection based ASM thingy
  * Ported from meow's ClientHook
@@ -29,6 +28,7 @@ public class MyauHook {
     // Cached managers from Myau
     private Object moduleManager;
     private Object commandManager;
+    private Object eventBus;
     private LinkedHashMap<Class<?>, Object> modulesMap;
     private Class<?> commandBaseClass;
 
@@ -89,6 +89,7 @@ public class MyauHook {
 
             cacheCommonMethods();
             cacheCommandManager();
+            cacheEventBus();
 
             MyauLogger.logMore("HOOK_SUCCESS", this.modulesMap.size() + " modules");
             return true;
@@ -130,10 +131,19 @@ public class MyauHook {
         if (!commands.isEmpty()) {
             Object firstCommand = commands.get(0);
             this.commandBaseClass = firstCommand.getClass().getSuperclass();
-            this.commandRunMethod = this.commandBaseClass.getDeclaredMethod(METHOD_COMMAND_RUN, ArrayList.class,
-                    long.class);
+            this.commandRunMethod = this.commandBaseClass.getDeclaredMethod(METHOD_COMMAND_RUN, ArrayList.class);
         } else {
             throw new Exception("No commands found");
+        }
+    }
+
+    private void cacheEventBus() throws Exception {
+        Class<?> mainClass = getCachedClass(CLASS_MAIN);
+        Field ebField = mainClass.getDeclaredField(FIELD_EVENT_BUS);
+        ebField.setAccessible(true);
+        this.eventBus = ebField.get(null);
+        if (this.eventBus == null) {
+            throw new Exception("EventBus field is null");
         }
     }
 
@@ -208,7 +218,6 @@ public class MyauHook {
         mv.visitVarInsn(ALOAD, 1);
         mv.visitVarInsn(ILOAD, 2);
         mv.visitVarInsn(ILOAD, 3);
-        mv.visitVarInsn(LLOAD, 4);
         mv.visitMethodInsn(INVOKESPECIAL, moduleBase, "<init>", SIG_MODULE_CONSTRUCTOR, false);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
@@ -218,9 +227,6 @@ public class MyauHook {
         mv = cw.visitMethod(ACC_PUBLIC, METHOD_ON_ENABLE, SIG_ON_ENABLE, null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitVarInsn(ILOAD, 1);
-        mv.visitVarInsn(ILOAD, 2);
-        mv.visitVarInsn(ILOAD, 3);
         mv.visitMethodInsn(INVOKESPECIAL, moduleBase, METHOD_ON_ENABLE, SIG_ON_ENABLE, false);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESTATIC, "coffee/axle/suim/hooks/MyauHook", "triggerOnEnable",
@@ -233,7 +239,6 @@ public class MyauHook {
         mv = cw.visitMethod(ACC_PUBLIC, METHOD_ON_DISABLE, SIG_ON_DISABLE, null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
-        mv.visitVarInsn(LLOAD, 1);
         mv.visitMethodInsn(INVOKESPECIAL, moduleBase, METHOD_ON_DISABLE, SIG_ON_DISABLE, false);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESTATIC, "coffee/axle/suim/hooks/MyauHook", "triggerOnDisable",
@@ -270,7 +275,7 @@ public class MyauHook {
 
         // Run method
         mv = cw.visitMethod(ACC_PUBLIC, METHOD_COMMAND_RUN, SIG_COMMAND_RUN,
-                "(Ljava/util/ArrayList<Ljava/lang/String;>;J)V",
+                "(Ljava/util/ArrayList<Ljava/lang/String;>;)V",
                 null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
@@ -386,6 +391,10 @@ public class MyauHook {
 
     public Object getCommandManager() {
         return this.commandManager;
+    }
+
+    public Object getEventBus() {
+        return this.eventBus;
     }
 
     public LinkedHashMap<Class<?>, Object> getModulesMap() {

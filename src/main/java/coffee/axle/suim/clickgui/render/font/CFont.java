@@ -10,7 +10,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 public class CFont {
-    private float imgSize = 4096.0f;
+    private float imgSize = 512.0f;
     protected CharData[] charData = new CharData[256];
     private Font font;
     private boolean antiAlias;

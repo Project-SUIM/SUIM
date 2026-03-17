@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 import static coffee.axle.suim.hooks.MyauMappings.*;
-
 /**
  * Creates and injects new modules, properties, commands, and event handlers
  * into Myau.
@@ -33,10 +32,9 @@ public class MyauModuleCreator {
         ClassLoader loader = new MyauHook.FastClassLoader(getClass().getClassLoader(), className, classBytes);
         Class<?> generatedClass = loader.loadClass(className);
 
-        Constructor<?> constructor = generatedClass.getDeclaredConstructor(String.class, boolean.class, int.class,
-                long.class);
+        Constructor<?> constructor = generatedClass.getDeclaredConstructor(String.class, boolean.class, int.class);
         constructor.setAccessible(true);
-        Object instance = constructor.newInstance(moduleName, false, 0, 0L);
+        Object instance = constructor.newInstance(moduleName, false, 0);
 
         Field nameField = hook.findFieldInHierarchy(instance.getClass(), FIELD_MODULE_NAME);
         if (nameField != null) {
@@ -56,9 +54,9 @@ public class MyauModuleCreator {
 
     public Object createBooleanProperty(String name, boolean defaultValue) throws Exception {
         Class<?> propClass = hook.getCachedClass(CLASS_BOOLEAN_PROPERTY);
-        Constructor<?> ctor = propClass.getDeclaredConstructor(String.class, Boolean.class, long.class);
+        Constructor<?> ctor = propClass.getDeclaredConstructor(String.class, Boolean.class);
         ctor.setAccessible(true);
-        return ctor.newInstance(name, defaultValue, 0L);
+        return ctor.newInstance(name, defaultValue);
     }
 
     public Object createIntegerProperty(String name, int defaultValue, int min, int max) throws Exception {
@@ -119,12 +117,11 @@ public class MyauModuleCreator {
 
         for (Constructor<?> c : propClass.getDeclaredConstructors()) {
             Class<?>[] params = c.getParameterTypes();
-            if (params.length == 5
-                    && params[0] == long.class
-                    && params[1] == String.class
+            if (params.length == 4
+                    && params[0] == String.class
+                    && params[1] == Float.class
                     && params[2] == Float.class
-                    && params[3] == Float.class
-                    && params[4] == Float.class) {
+                    && params[3] == Float.class) {
                 constructor = c;
                 break;
             }
@@ -135,7 +132,7 @@ public class MyauModuleCreator {
         }
 
         constructor.setAccessible(true);
-        return constructor.newInstance(0L, name, defaultValue, min, max);
+        return constructor.newInstance(name, defaultValue, min, max);
     }
 
     public Object createStringProperty(String name, String defaultValue) throws Exception {
@@ -148,16 +145,6 @@ public class MyauModuleCreator {
                 constructor = c;
                 break;
             }
-            if (params.length == 3) {
-                if (params[0] == String.class && params[1] == String.class) {
-                    constructor = c;
-                    break;
-                }
-                if (params[0] == long.class && params[1] == String.class && params[2] == String.class) {
-                    constructor = c;
-                    break;
-                }
-            }
         }
 
         if (constructor == null) {
@@ -165,22 +152,14 @@ public class MyauModuleCreator {
         }
 
         constructor.setAccessible(true);
-        Class<?>[] params = constructor.getParameterTypes();
-        if (params.length == 2) {
-            return constructor.newInstance(name, defaultValue);
-        } else if (params.length == 3) {
-            return params[0] == long.class
-                    ? constructor.newInstance(0L, name, defaultValue)
-                    : constructor.newInstance(name, defaultValue, 0L);
-        }
-        throw new NoSuchMethodException("Unexpected StringProperty constructor signature");
+        return constructor.newInstance(name, defaultValue);
     }
 
     public Object createEnumProperty(String name, int defaultValue, String[] values) throws Exception {
         Class<?> propClass = hook.getCachedClass(CLASS_ENUM_PROPERTY);
-        Constructor<?> ctor = propClass.getDeclaredConstructor(String.class, long.class, Integer.class, String[].class);
+        Constructor<?> ctor = propClass.getDeclaredConstructor(String.class, Integer.class, String[].class);
         ctor.setAccessible(true);
-        return ctor.newInstance(name, 0L, defaultValue, values);
+        return ctor.newInstance(name, defaultValue, values);
     }
 
     public boolean injectProperty(Object module, Object property) {
@@ -296,8 +275,9 @@ public class MyauModuleCreator {
         Object handlerInstance = ctor.newInstance(handler);
 
         Class<?> eventBusClass = hook.getCachedClass(CLASS_EVENT_BUS);
+        Object eventBusInstance = hook.getEventBus();
         Method registerMethod = eventBusClass.getMethod(METHOD_EVENT_REGISTER, Object.class);
-        registerMethod.invoke(null, handlerInstance);
+        registerMethod.invoke(eventBusInstance, handlerInstance);
     }
 }
 

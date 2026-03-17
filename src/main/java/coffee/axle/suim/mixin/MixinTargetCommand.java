@@ -10,15 +10,15 @@ import java.io.FileWriter;
 import java.io.File;
 
 /**
- * Mixin to override TargetCommand (myau.KA) to support multiple usernames
+ * Mixin to override TargetCommand (myau.z) to support multiple usernames
  */
 @SuppressWarnings("unchecked")
 @Pseudo
-@Mixin(targets = "myau.KA", remap = false)
+@Mixin(targets = "myau.z", remap = false)
 public class MixinTargetCommand {
 
     @Overwrite
-    public void J(ArrayList<String> args, long unused) {
+    public void j(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
             java.lang.reflect.Field targetManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_TARGET_MANAGER);
@@ -31,9 +31,9 @@ public class MixinTargetCommand {
 
             Class<?> chatUtilClass = Class.forName(MyauMappings.CLASS_CHAT_UTIL);
             java.lang.reflect.Method sendFormattedMethod = chatUtilClass
-                    .getMethod(MyauMappings.METHOD_CHAT_SEND_FORMATTED, String.class, long.class);
+                    .getMethod(MyauMappings.METHOD_CHAT_SEND_FORMATTED, String.class);
             java.lang.reflect.Method sendRawMethod = chatUtilClass.getMethod(MyauMappings.METHOD_CHAT_SEND_RAW,
-                    String.class, long.class);
+                    String.class);
 
             java.lang.reflect.Field playersField = targetManager.getClass().getSuperclass()
                     .getDeclaredField(MyauMappings.FIELD_PLAYER_LIST);
@@ -53,19 +53,17 @@ public class MixinTargetCommand {
                         if (args.size() < 3) {
                             sendFormattedMethod.invoke(null,
                                     String.format("%sUsage: .%s add <&oname&r> [&oname&r] ...&r",
-                                            clientName, args.get(0).toLowerCase()),
-                                    0L);
+                                            clientName, args.get(0).toLowerCase()));
                             return;
                         }
                         for (String name : args.subList(2, args.size())) {
                             if (playersList.contains(name)) {
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%s&o%s&r is already in your enemy list&r", clientName, name),
-                                        0L);
+                                        String.format("%s&o%s&r is already in your enemy list&r", clientName, name));
                             } else {
                                 playersList.add(name);
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%sAdded &o%s&r to your enemy list&r", clientName, name), 0L);
+                                        String.format("%sAdded &o%s&r to your enemy list&r", clientName, name));
                             }
                         }
                         saveToFile(file, playersList);
@@ -76,18 +74,17 @@ public class MixinTargetCommand {
                         if (args.size() < 3) {
                             sendFormattedMethod.invoke(null,
                                     String.format("%sUsage: .%s remove <&oname&r> [&oname&r] ...&r",
-                                            clientName, args.get(0).toLowerCase()),
-                                    0L);
+                                            clientName, args.get(0).toLowerCase()));
                             return;
                         }
                         for (String name : args.subList(2, args.size())) {
                             if (!playersList.contains(name)) {
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%s&o%s&r is not in your enemy list&r", clientName, name), 0L);
+                                        String.format("%s&o%s&r is not in your enemy list&r", clientName, name));
                             } else {
                                 playersList.remove(name);
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%sRemoved &o%s&r from your enemy list&r", clientName, name), 0L);
+                                        String.format("%sRemoved &o%s&r from your enemy list&r", clientName, name));
                             }
                         }
                         saveToFile(file, playersList);
@@ -96,13 +93,13 @@ public class MixinTargetCommand {
                     case "l":
                     case "list":
                         if (playersList.isEmpty()) {
-                            sendFormattedMethod.invoke(null, String.format("%sNo enemies&r", clientName), 0L);
+                            sendFormattedMethod.invoke(null, String.format("%sNo enemies&r", clientName));
                             return;
                         }
-                        sendFormattedMethod.invoke(null, String.format("%sEnemies:&r", clientName), 0L);
+                        sendFormattedMethod.invoke(null, String.format("%sEnemies:&r", clientName));
 
                         for (String player : playersList) {
-                            sendRawMethod.invoke(null, String.format("   §o%s§r", player), 0L);
+                            sendRawMethod.invoke(null, String.format("   §o%s§r", player));
                         }
                         return;
 
@@ -110,14 +107,13 @@ public class MixinTargetCommand {
                     case "clear":
                         playersList.clear();
                         saveToFile(file, playersList);
-                        sendFormattedMethod.invoke(null, String.format("%sCleared your enemy list&r", clientName), 0L);
+                        sendFormattedMethod.invoke(null, String.format("%sCleared your enemy list&r", clientName));
                         return;
                 }
             }
             sendFormattedMethod.invoke(null,
                     String.format("%sUsage: .%s <&oa(dd)&r/&or(emove)&r/&ol(ist)&r/&oc(lear)&r>&r",
-                            clientName, args.get(0).toLowerCase()),
-                    0L);
+                            clientName, args.get(0).toLowerCase()));
 
         } catch (Exception e) {
             MyauLogger.error("MixinTargetCommand", e);

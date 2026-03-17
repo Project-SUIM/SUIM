@@ -30,6 +30,7 @@ public class FeatureManager {
     private final ModulePropertyManager propertyManager;
 
     public FeatureManager() {
+        System.out.println("WE GOT HERE (FeatureManager");
         this.hook = MyauHook.getInstance();
         this.creator = new MyauModuleCreator(hook);
         this.manager = new MyauModuleManager(hook);
@@ -37,9 +38,9 @@ public class FeatureManager {
         HudUtils.getInstance().setManager(manager);
 
         // ClickGUI modules (feature/clickgui/)
-        registerFeature(new ClickGui());
-        registerFeature(new EditHud());
-        registerFeature(new TestGuiModule());
+        //registerFeature(new ClickGui());
+        //registerFeature(new EditHud());
+        //registerFeature(new TestGuiModule());
 
         // Misc
         registerFeature(new TestCommand());
@@ -52,9 +53,9 @@ public class FeatureManager {
         registerFeature(new StatusCommand());
         registerFeature(new ClientInfoCommand());
 
-        // Combat
+        // Combat (no myau mixin dependency)
         registerFeature(new AimAssistExtras());
-        registerFeature(new ArmorExceptions());
+        //registerFeature(new ArmorExceptions());  // needs MixinKillAuraArmorExceptions (disabled)
         registerFeature(new AutoClickerExtras());
         registerFeature(new HitSelect());
         registerFeature(new KillAuraDisableOnDeath());
@@ -62,7 +63,7 @@ public class FeatureManager {
 
         // Render
         registerFeature(new AimAssistShowTarget());
-        registerFeature(new BedESPTeamColor());
+        registerFeature(new BedESPTeamColor()); // needs MixinBedESP
         registerFeature(new Bedplates());
         registerFeature(new Freelook());
         registerFeature(new SkullESP());

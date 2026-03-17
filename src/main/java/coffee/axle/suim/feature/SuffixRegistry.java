@@ -7,8 +7,7 @@ import java.util.function.Supplier;
 /**
  * Global registry mapping Myau module instances to suffix suppliers.
  * <p>
- * {@link MixinModuleBase} hooks into {@code Module.getSuffix()} and checks
- * this registry. Features register via {@link Feature#setSuffix} helpers.
+ * Features register via {@link Feature#setSuffix} helpers.
  *
  * @author axle.coffee
  */

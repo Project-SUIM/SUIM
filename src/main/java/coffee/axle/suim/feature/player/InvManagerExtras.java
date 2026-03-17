@@ -3,6 +3,7 @@ package coffee.axle.suim.feature.player;
 import coffee.axle.suim.feature.Feature;
 
 import coffee.axle.suim.hooks.MyauMappings;
+
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiInventory;

@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(EntityRenderer.class)
 public class MixinEntityRenderer {
 
-    @Inject(method = "renderWorldPass", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderGlobal;renderEntities(Lnet/minecraft/entity/Entity;Lnet/minecraft/client/renderer/culling/ICamera;F)V", shift = At.Shift.AFTER))
+    @Inject(method = "renderWorldPass", at = @At("RETURN"))
     private void onRenderWorldPass(int pass, float partialTicks, long finishTimeNano, CallbackInfo ci) {
         TestModuleRenderer.renderMixinBox(partialTicks);
     }

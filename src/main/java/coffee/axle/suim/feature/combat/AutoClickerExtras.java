@@ -10,15 +10,10 @@ import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Random;
 
-/**
- * AutoClicker Extras
- * 
- * @maybsomeday
- */
+
 public class AutoClickerExtras extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -27,10 +22,6 @@ public class AutoClickerExtras extends Feature {
     private Object requirePressProperty;
     private Object leftCpsMinProperty;
     private Object leftCpsMaxProperty;
-
-    private Class<?> tickEventClass;
-    private Field eventTypeField;
-    private Object preEventType;
 
     private long lastClickTime = 0;
     private final Random random = new Random();
@@ -71,17 +62,6 @@ public class AutoClickerExtras extends Feature {
 
     private void initializeEventHook() {
         try {
-            tickEventClass = Class.forName(MyauMappings.CLASS_TICK_EVENT);
-
-            eventTypeField = tickEventClass.getDeclaredField(MyauMappings.FIELD_TICK_EVENT_TYPE);
-            eventTypeField.setAccessible(true);
-
-            Class<?> eventTypeEnum = eventTypeField.getType();
-            Object[] enumConstants = eventTypeEnum.getEnumConstants();
-            if (enumConstants != null && enumConstants.length > 0) {
-                preEventType = enumConstants[0];
-            }
-
             creator.registerEventHandler(MyauMappings.CLASS_TICK_EVENT, this::onMyauTickPre, (byte) 1);
         } catch (Exception e) {
             MyauLogger.error("Failed to init event hook", e);
@@ -91,10 +71,6 @@ public class AutoClickerExtras extends Feature {
     private void onMyauTickPre(Object eventObj) {
         try {
             if (!manager.isModuleEnabled(autoClickerModule))
-                return;
-
-            Object eventType = eventTypeField.get(eventObj);
-            if (eventType != preEventType)
                 return;
 
             boolean invFill = getBooleanProperty(inventoryFillProperty, false);
@@ -214,8 +190,3 @@ public class AutoClickerExtras extends Feature {
     public void disable() {
     }
 }
-
-
-
-
-

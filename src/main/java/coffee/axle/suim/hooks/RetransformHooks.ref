@@ -1,0 +1,99 @@
+package coffee.axle.suim.hooks;
+
+import org.objectweb.asm.*;
+
+import java.util.function.BiFunction;
+
+public final class RetransformHooks {
+
+    private static final String CALLBACKS = "coffee/axle/suim/hooks/RetransformCallbacks";
+
+    private RetransformHooks() {}
+
+    public static BiFunction<String, byte[], byte[]> aimAssist() {
+        return (name, bytes) -> {
+            ClassReader cr = new ClassReader(bytes);
+            ClassWriter cw = new ClassWriter(cr, 0);
+            cr.accept(new ClassVisitor(Opcodes.ASM5, cw) {
+                @Override
+                public MethodVisitor visitMethod(int access, String mName, String mDesc,
+                                                 String signature, String[] exceptions) {
+                    MethodVisitor mv = super.visitMethod(access, mName, mDesc, signature, exceptions);
+                    if ("g".equals(mName) && "(Lmyau/b;)V".equals(mDesc)) {
+                        return new AimAssistAdapter(mv);
+                    }
+                    return mv;
+                }
+            }, 0);
+            return cw.toByteArray();
+        };
+    }
+
+    private static class AimAssistAdapter extends MethodVisitor {
+
+        AimAssistAdapter(MethodVisitor mv) {
+            super(Opcodes.ASM5, mv);
+        }
+
+        @Override
+        public void visitCode() {
+            super.visitCode();
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, CALLBACKS,
+                    "onAimAssistHead", "(Ljava/lang/Object;)V", false);
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String owner, String name,
+                                    String desc, boolean itf) {
+            super.visitMethodInsn(opcode, owner, name, desc, itf);
+
+            if (opcode == Opcodes.INVOKEVIRTUAL
+                    && "myau/ZU".equals(owner)
+                    && "N".equals(name)
+                    && "(FFIZ)V".equals(desc)) {
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, CALLBACKS,
+                        "onAimAssistAfterRotation", "(Ljava/lang/Object;)V", false);
+            }
+        }
+    }
+
+    public static BiFunction<String, byte[], byte[]> fastPlace() {
+        return (name, bytes) -> {
+            ClassReader cr = new ClassReader(bytes);
+            ClassWriter cw = new ClassWriter(cr, 0);
+            cr.accept(new ClassVisitor(Opcodes.ASM5, cw) {
+                @Override
+                public MethodVisitor visitMethod(int access, String mName, String mDesc,
+                                                 String signature, String[] exceptions) {
+                    MethodVisitor mv = super.visitMethod(access, mName, mDesc, signature, exceptions);
+                    if ("e".equals(mName) && "(Lmyau/V;)V".equals(mDesc)) {
+                        return new FastPlaceAdapter(mv);
+                    }
+                    return mv;
+                }
+            }, 0);
+            return cw.toByteArray();
+        };
+    }
+
+    private static class FastPlaceAdapter extends MethodVisitor {
+
+        FastPlaceAdapter(MethodVisitor mv) {
+            super(Opcodes.ASM5, mv);
+        }
+
+        @Override
+        public void visitCode() {
+            super.visitCode();
+            Label continueLabel = new Label();
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, CALLBACKS,
+                    "shouldCancelFastPlace", "()Z", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, continueLabel);
+            mv.visitInsn(Opcodes.RETURN);
+            mv.visitLabel(continueLabel);
+            mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+        }
+    }
+}

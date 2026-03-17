@@ -15,13 +15,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @SuppressWarnings("unused")
 
 @Pseudo
-@Mixin(targets = "myau.Kf", remap = false)
+@Mixin(targets = "myau.HD", remap = false)
 public class MixinKillAuraArmorExceptions {
     private static final long RANDOM_LONG = 0L;
     private static boolean loggedOnce = false;
 
     @Inject(method = "v(Lnet/minecraft/entity/EntityLivingBase;J)Z", at = @At("HEAD"), cancellable = true, remap = false)
-    private void onIsValidTarget(EntityLivingBase entityLivingBase, long param, CallbackInfoReturnable<Boolean> cir) {
+    private void onIsValidTarget(EntityLivingBase entityLivingBase, long zkm, CallbackInfoReturnable<Boolean> cir) {
         try {
             ArmorExceptions armorExceptions = ArmorExceptions.getInstance();
 

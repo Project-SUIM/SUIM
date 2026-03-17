@@ -3,7 +3,7 @@ package coffee.axle.suim.feature.combat;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 
-import coffee.axle.suim.hooks.MyauMappings;
+import static coffee.axle.suim.hooks.MyauMappings.*;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;

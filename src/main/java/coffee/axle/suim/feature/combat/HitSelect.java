@@ -17,9 +17,11 @@ import net.minecraft.util.Vec3;
 import java.lang.reflect.Field;
 
 /**
+ *
  * Half working hitselect
  * 
  * @maybsomeday
+///
  */
 @SuppressWarnings("unused")
 
@@ -75,8 +77,8 @@ public class HitSelect extends Feature {
 
             manager.reloadModuleCommand();
 
-            creator.registerEventHandler(MyauMappings.CLASS_UPDATE_EVENT, this::onUpdate, (byte) 3);
-            creator.registerEventHandler(MyauMappings.CLASS_PACKET_EVENT, this::onPacket, (byte) 0);
+            creator.registerEventHandler(MyauMappings.CLASS_UPDATE_EVENT_POST, this::onUpdatePost, (byte) 3);
+            creator.registerEventHandler(MyauMappings.CLASS_PACKET_EVENT_SEND, this::onPacket, (byte) 0);
 
             MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
@@ -87,18 +89,9 @@ public class HitSelect extends Feature {
         }
     }
 
-    private void onUpdate(Object eventObj) {
+    private void onUpdatePost(Object eventObj) {
         try {
-            Class<?> ec = eventObj.getClass();
-
-            Field typeField = ec.getDeclaredField(MyauMappings.FIELD_UPDATE_EVENT_TYPE);
-            typeField.setAccessible(true);
-            Object eventType = typeField.get(eventObj);
-
-            if (eventType != null && eventType.toString().equals(MyauMappings.FIELD_EVENT_TYPED_POST)) {
-                resetMotion();
-            }
-
+            resetMotion();
         } catch (Exception e) {
             MyauLogger.error("HitSelect:tick", e);
         }
@@ -111,7 +104,7 @@ public class HitSelect extends Feature {
 
             Class<?> eventClass = eventObj.getClass();
 
-            Field packetField = eventClass.getDeclaredField(MyauMappings.FIELD_PACKET_EVENT_PACKET);
+            Field packetField = eventClass.getDeclaredField(MyauMappings.FIELD_PACKET_EVENT_SEND_PACKET);
             packetField.setAccessible(true);
             Packet<?> packet = (Packet<?>) packetField.get(eventObj);
 
@@ -315,8 +308,3 @@ public class HitSelect extends Feature {
         }
     }
 }
-
-
-
-
-

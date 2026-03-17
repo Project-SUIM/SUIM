@@ -10,15 +10,15 @@ import java.io.FileWriter;
 import java.io.File;
 
 /**
- * Mixin to override FriendCommand (myau.KW) to support multiple usernames
+ * Mixin to override FriendCommand (myau.y) to support multiple usernames
  */
 @SuppressWarnings("unchecked")
 @Pseudo
-@Mixin(targets = "myau.KW", remap = false)
+@Mixin(targets = "myau.y", remap = false)
 public class MixinFriendCommand {
 
     @Overwrite
-    public void J(ArrayList<String> args, long unused) {
+    public void j(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
             java.lang.reflect.Field friendManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_FRIEND_MANAGER);
@@ -31,9 +31,9 @@ public class MixinFriendCommand {
 
             Class<?> chatUtilClass = Class.forName(MyauMappings.CLASS_CHAT_UTIL);
             java.lang.reflect.Method sendFormattedMethod = chatUtilClass
-                    .getMethod(MyauMappings.METHOD_CHAT_SEND_FORMATTED, String.class, long.class);
+                    .getMethod(MyauMappings.METHOD_CHAT_SEND_FORMATTED, String.class);
             java.lang.reflect.Method sendRawMethod = chatUtilClass.getMethod(MyauMappings.METHOD_CHAT_SEND_RAW,
-                    String.class, long.class);
+                    String.class);
 
             java.lang.reflect.Field playersField = friendManager.getClass().getSuperclass()
                     .getDeclaredField(MyauMappings.FIELD_PLAYER_LIST);
@@ -54,19 +54,17 @@ public class MixinFriendCommand {
                         if (args.size() < 3) {
                             sendFormattedMethod.invoke(null,
                                     String.format("%sUsage: .%s add <&oname&r> [&oname&r] ...&r",
-                                            clientName, args.get(0).toLowerCase()),
-                                    0L);
+                                            clientName, args.get(0).toLowerCase()));
                             return;
                         }
                         for (String name : args.subList(2, args.size())) {
                             if (playersList.contains(name)) {
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%s&o%s&r is already in your friend list&r", clientName, name),
-                                        0L);
+                                        String.format("%s&o%s&r is already in your friend list&r", clientName, name));
                             } else {
                                 playersList.add(name);
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%sAdded &o%s&r to your friend list&r", clientName, name), 0L);
+                                        String.format("%sAdded &o%s&r to your friend list&r", clientName, name));
                             }
                         }
                         saveToFile(file, playersList);
@@ -77,19 +75,17 @@ public class MixinFriendCommand {
                         if (args.size() < 3) {
                             sendFormattedMethod.invoke(null,
                                     String.format("%sUsage: .%s remove <&oname&r> [&oname&r] ...&r",
-                                            clientName, args.get(0).toLowerCase()),
-                                    0L);
+                                            clientName, args.get(0).toLowerCase()));
                             return;
                         }
                         for (String name : args.subList(2, args.size())) {
                             if (!playersList.contains(name)) {
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%s&o%s&r is not in your friend list&r", clientName, name), 0L);
+                                        String.format("%s&o%s&r is not in your friend list&r", clientName, name));
                             } else {
                                 playersList.remove(name);
                                 sendFormattedMethod.invoke(null,
-                                        String.format("%sRemoved &o%s&r from your friend list&r", clientName, name),
-                                        0L);
+                                        String.format("%sRemoved &o%s&r from your friend list&r", clientName, name));
                             }
                         }
                         saveToFile(file, playersList);
@@ -98,13 +94,13 @@ public class MixinFriendCommand {
                     case "l":
                     case "list":
                         if (playersList.isEmpty()) {
-                            sendFormattedMethod.invoke(null, String.format("%sNo friends&r", clientName), 0L);
+                            sendFormattedMethod.invoke(null, String.format("%sNo friends&r", clientName));
                             return;
                         }
-                        sendFormattedMethod.invoke(null, String.format("%sFriends:&r", clientName), 0L);
+                        sendFormattedMethod.invoke(null, String.format("%sFriends:&r", clientName));
 
                         for (String friend : playersList) {
-                            sendRawMethod.invoke(null, String.format("   §o%s§r", friend), 0L);
+                            sendRawMethod.invoke(null, String.format("   §o%s§r", friend));
                         }
                         return;
 
@@ -112,7 +108,7 @@ public class MixinFriendCommand {
                     case "clear":
                         playersList.clear();
                         saveToFile(file, playersList);
-                        sendFormattedMethod.invoke(null, String.format("%sCleared your friend list&r", clientName), 0L);
+                        sendFormattedMethod.invoke(null, String.format("%sCleared your friend list&r", clientName));
                         return;
 
                     default:
@@ -126,15 +122,14 @@ public class MixinFriendCommand {
                             newArgs.add(args.get(0));
                             newArgs.add(isFriend ? "remove" : "add");
                             newArgs.add(args.get(1));
-                            J(newArgs, 0L);
+                            j(newArgs);
                             return;
                         }
                 }
             }
             sendFormattedMethod.invoke(null,
                     String.format("%sUsage: .%s <&oa(dd)&r/&or(emove)&r/&ol(ist)&r/&oc(lear)&r>&r",
-                            clientName, args.get(0).toLowerCase()),
-                    0L);
+                            clientName, args.get(0).toLowerCase()));
 
         } catch (Exception e) {
             MyauLogger.error("MixinFriendCommand", e);
