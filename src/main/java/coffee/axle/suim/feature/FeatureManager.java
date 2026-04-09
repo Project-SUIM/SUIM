@@ -8,6 +8,7 @@ import coffee.axle.suim.feature.combat.*;
 import coffee.axle.suim.feature.command.*;
 import coffee.axle.suim.feature.exploit.*;
 import coffee.axle.suim.feature.misc.*;
+import coffee.axle.suim.feature.movement.*;
 import coffee.axle.suim.feature.player.*;
 import coffee.axle.suim.feature.render.*;
 import coffee.axle.suim.feature.world.*;
@@ -60,6 +61,8 @@ public class FeatureManager {
         registerFeature(new HitSelect());
         registerFeature(new KillAuraDisableOnDeath());
         registerFeature(new MoreKB());
+        registerFeature(new KnockbackDelay());
+        registerFeature(new Displace());
 
         // Render
         registerFeature(new AimAssistShowTarget());
@@ -75,13 +78,22 @@ public class FeatureManager {
         registerFeature(new EagleAutoSwap());
         registerFeature(new FastPlaceExtras());
 
+        // Movement
+        registerFeature(new Stasis());
+        registerFeature(new InstantStop());
+        registerFeature(new NullMove());
+
         // Player
         registerFeature(new InvManagerExtras());
+        registerFeature(new InvWalk());
+        registerFeature(new ClickOutOfContainers());
 
         // Exploit
         registerFeature(new Freeze());
         registerFeature(new ShopBlink());
+        registerFeature(new Chester());
         registerFeature(new VelocityBuffer());
+
     }
 
     private void registerFeature(Feature feature) {
