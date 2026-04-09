@@ -2,45 +2,61 @@ package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityLargeFireball;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.Packet;
-import net.minecraft.network.play.client.C0BPacketEntityAction;
 import net.minecraft.network.play.client.C02PacketUseEntity;
-import net.minecraft.util.Vec3;
+import net.minecraft.potion.Potion;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.lang.reflect.Field;
-
-/**
- *
- * Half working hitselect
- * 
- * @maybsomeday
-///
- */
-@SuppressWarnings("unused")
-
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+@SuppressWarnings({ "unused" })
 public class HitSelect extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
+    private static final double HIT_RANGE = 3.0;
+    private static final double HIT_RANGE_SQ = HIT_RANGE * HIT_RANGE;
+    private static final int HURT_WINDOW_TICKS = 10;
+    private static final int SERVER_CONFIRM_COOLDOWN_TICKS = HURT_WINDOW_TICKS;
+    private static final int SERVER_CONFIRM_TIMEOUT_TICKS = 30;
+
+    private static final int BLOCK_WAIT_FIRST = 1;
+    private static final int BLOCK_SERVER_COOLDOWN = 1 << 3;
+    private static final int BLOCK_PREDICTED_BURST = 1 << 4;
+    private static final int BLOCK_CRITICALS = 1 << 5;
+
+    private static final String[] MODES = {"Burst", "Criticals"};
 
     private Object moduleInstance;
+    private Object pauseDurationProperty;
     private Object modeProperty;
+    private Object waitFirstHitProperty;
+    private Object disableKBProperty;
+    private Object onlyDamagedProperty;
+    private Object serverAttackProperty;
+    private Object fakeSwingProperty;
+    private Object combatCancelProperty;
+    private Object missedCancelProperty;
 
-    private Object keepSprintModule;
-    private Object keepSprintSlowProperty;
-
-    private boolean sprintState = false;
-
-    private boolean set = false;
-    private double val = 0.0;
-    private Class<?> updateEventClass = null;
-    private int blockedHits = 0;
-    private int allowedHits = 0;
+    private EntityPlayer currentTarget;
+    private final Map<Integer, TargetState> targetStates = new HashMap<>();
+    private int lastSelfHurtTime;
+    private boolean takingKnockback;
+    private boolean waitFirstTracking;
+    private int waitFirstStartTick = -1;
+    private boolean waitFirstUnlocked;
+    private int tickCounter;
 
     @Override
     public String getName() {
@@ -55,256 +71,339 @@ public class HitSelect extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, HitSelect.class);
 
-            modeProperty = creator.createEnumProperty(
-                    "mode",
-                    0,
-                    new String[] {
-                            "second",
-                            "criticals",
-                            "wtap"
-                    });
-            creator.registerProperties(moduleInstance, modeProperty);
+            pauseDurationProperty = creator.createIntegerProperty("pause-ms", 500, 0, 500);
+            modeProperty = creator.createEnumProperty("mode", 0, MODES);
+            waitFirstHitProperty = creator.createIntegerProperty("wait-first-ms", 0, 0, 500);
+            disableKBProperty = creator.createBooleanProperty("disable-during-kb", false);
+            onlyDamagedProperty = creator.createBooleanProperty("only-while-damaged", false);
+            serverAttackProperty = creator.createBooleanProperty("server-attack-time", false);
+            fakeSwingProperty = creator.createBooleanProperty("fake-swing", false);
+            combatCancelProperty = creator.createIntegerProperty("combat-cancel-%", 100, 0, 100);
+            missedCancelProperty = creator.createIntegerProperty("missed-cancel-%", 0, 0, 100);
 
-            keepSprintModule = manager.findModule("KeepSprint");
-            if (keepSprintModule != null) {
-                keepSprintSlowProperty = manager.findProperty(keepSprintModule, "slowdown");
-            }
+            creator.registerProperties(moduleInstance, pauseDurationProperty, modeProperty,
+                    waitFirstHitProperty, disableKBProperty, onlyDamagedProperty,
+                    serverAttackProperty, fakeSwingProperty, combatCancelProperty, missedCancelProperty);
 
             manager.reloadModuleCommand();
+            MinecraftForge.EVENT_BUS.register(this);
 
-            creator.registerEventHandler(MyauMappings.CLASS_UPDATE_EVENT_POST, this::onUpdatePost, (byte) 3);
-            creator.registerEventHandler(MyauMappings.CLASS_PACKET_EVENT_SEND, this::onPacket, (byte) 0);
+            manager.registerModuleCallbacks(moduleInstance,
+                    () -> { tickCounter = 0; resetAllState(); },
+                    this::resetAllState);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
-
         } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
+            MyauLogger.error("HitSelect:init", e);
             return false;
         }
     }
 
-    private void onUpdatePost(Object eventObj) {
-        try {
-            resetMotion();
-        } catch (Exception e) {
-            MyauLogger.error("HitSelect:tick", e);
-        }
+    private int msToTicks(double ms) {
+        if (ms <= 0.0) return 0;
+        return (int) Math.ceil(ms / 50.0);
     }
 
-    private void onPacket(Object eventObj) {
-        try {
-            if (!manager.isModuleEnabled(moduleInstance))
-                return;
-
-            Class<?> eventClass = eventObj.getClass();
-
-            Field packetField = eventClass.getDeclaredField(MyauMappings.FIELD_PACKET_EVENT_SEND_PACKET);
-            packetField.setAccessible(true);
-            Packet<?> packet = (Packet<?>) packetField.get(eventObj);
-
-            if (packet == null)
-                return;
-
-            if (packet instanceof C0BPacketEntityAction) {
-                C0BPacketEntityAction p = (C0BPacketEntityAction) packet;
-
-                switch (p.getAction()) {
-                    case START_SPRINTING:
-                        sprintState = true;
-                        break;
-                    case STOP_SPRINTING:
-                        sprintState = false;
-                        break;
-                    default:
-                        break;
-                }
-                return;
-            }
-
-            if (packet instanceof C02PacketUseEntity) {
-                C02PacketUseEntity use = (C02PacketUseEntity) packet;
-
-                if (use.getAction() != C02PacketUseEntity.Action.ATTACK)
-                    return;
-
-                Entity target = use.getEntityFromWorld(mc.theWorld);
-                if (target == null || target instanceof EntityLargeFireball)
-                    return;
-                if (!(target instanceof EntityLivingBase))
-                    return;
-
-                EntityLivingBase living = (EntityLivingBase) target;
-
-                int mode = getMode();
-                boolean allow = true;
-
-                switch (mode) {
-                    case 0:
-                        allow = prioritizeSecondHit(mc.thePlayer, living);
-                        break;
-
-                    case 1:
-                        allow = prioritizeCriticalHits(mc.thePlayer);
-                        break;
-
-                    case 2:
-                        allow = prioritizeWTapHits(mc.thePlayer, sprintState);
-                        break;
-                }
-
-                if (!allow) {
-                    Field cancelledField = eventClass.getSuperclass()
-                            .getDeclaredField(MyauMappings.FIELD_EVENT_CANCELLED);
-                    cancelledField.setAccessible(true);
-                    cancelledField.setBoolean(eventObj, true);
-
-                    blockedHits++;
-                } else {
-                    allowedHits++;
-                }
-            }
-
-        } catch (Exception e) {
-        }
-    }
-
-    private boolean prioritizeSecondHit(EntityLivingBase player, EntityLivingBase target) {
-        if (target.hurtTime != 0)
-            return true;
-
-        if (player.hurtTime <= player.maxHurtTime - 1)
-            return true;
-
-        double dist = player.getDistanceToEntity(target);
-        if (dist < 2.5)
-            return true;
-
-        if (!isMovingTowards(target, player, 60))
-            return true;
-
-        if (!isMovingTowards(player, target, 60))
-            return true;
-
-        fixMotion();
-
-        return false;
-    }
-
-    private boolean prioritizeCriticalHits(EntityLivingBase player) {
-        if (player.onGround)
-            return true;
-        if (player.hurtTime != 0)
-            return true;
-        if (player.fallDistance > 0)
-            return true;
-
-        fixMotion();
-
-        return false;
-    }
-
-    private boolean prioritizeWTapHits(EntityLivingBase player, boolean sprinting) {
-        if (player.isCollidedHorizontally)
-            return true;
-        if (!mc.gameSettings.keyBindForward.isKeyDown())
-            return true;
-        if (sprinting)
-            return true;
-
-        fixMotion();
-
-        return false;
-    }
-
-    private void fixMotion() {
-        if (set)
+    @SubscribeEvent
+    public void onTick(TickEvent.ClientTickEvent e) {
+        if (e.phase != TickEvent.Phase.START) return;
+        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!Utils.nullCheck() || mc.thePlayer.isDead) {
+            resetAllState();
             return;
-        if (keepSprintModule == null || keepSprintSlowProperty == null)
-            return;
-
-        try {
-            Object raw = properties.getPropertyValue(keepSprintSlowProperty);
-            if (raw instanceof Number)
-                val = ((Number) raw).doubleValue();
-
-            Field enabledField = manager.findFieldInHierarchy(keepSprintModule.getClass(),
-                    MyauMappings.FIELD_MODULE_ENABLED);
-            if (enabledField != null) {
-                enabledField.setAccessible(true);
-                enabledField.setBoolean(keepSprintModule, true);
-            }
-
-            Field valueField = keepSprintSlowProperty.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            valueField.setAccessible(true);
-            valueField.set(keepSprintSlowProperty, 0);
-
-            set = true;
-
-        } catch (Exception e) {
-        }
-    }
-
-    private void resetMotion() {
-        if (!set)
-            return;
-        if (keepSprintModule == null || keepSprintSlowProperty == null)
-            return;
-
-        try {
-            Field valueField = keepSprintSlowProperty.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            valueField.setAccessible(true);
-            valueField.set(keepSprintSlowProperty, (int) val);
-
-            Field enabledField = manager.findFieldInHierarchy(keepSprintModule.getClass(),
-                    MyauMappings.FIELD_MODULE_ENABLED);
-            if (enabledField != null) {
-                enabledField.setAccessible(true);
-                enabledField.setBoolean(keepSprintModule, false);
-            }
-
-        } catch (Exception e) {
         }
 
-        set = false;
-        val = 0.0;
+        tickCounter++;
+        pruneTargetStates();
+
+        EntityPlayer nextTarget = findTarget(HIT_RANGE_SQ);
+        updateCurrentTarget(nextTarget, tickCounter);
+        updateSelfDamage(tickCounter);
+        updateTargetDamage(tickCounter);
     }
 
-    private boolean isMovingTowards(EntityLivingBase source, EntityLivingBase target, double ang) {
-        Vec3 cur = source.getPositionVector();
-        Vec3 last = new Vec3(source.lastTickPosX, source.lastTickPosY, source.lastTickPosZ);
-        Vec3 posT = target.getPositionVector();
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onAttack(AttackEntityEvent e) {
+        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!Utils.nullCheck() || mc.thePlayer.isDead) return;
 
-        double mx = cur.xCoord - last.xCoord;
-        double mz = cur.zCoord - last.zCoord;
-        double ml = Math.sqrt(mx * mx + mz * mz);
-        if (ml == 0)
-            return false;
-        mx /= ml;
-        mz /= ml;
+        Entity target = e.target;
 
-        double tx = posT.xCoord - cur.xCoord;
-        double tz = posT.zCoord - cur.zCoord;
-        double tl = Math.sqrt(tx * tx + tz * tz);
-        if (tl == 0)
-            return false;
-        tx /= tl;
-        tz /= tl;
-        return (mx * tx + mz * tz) >= Math.cos(Math.toRadians(ang));
+        MovingObjectPosition mop = mc.objectMouseOver;
+        ClickType clickType = classifyClick(mop);
+
+        if (clickType == ClickType.BLOCK_INTERACTION) return;
+
+        if (clickType == ClickType.MISSED_SWING) {
+            if (shouldCancel(properties.getInt(missedCancelProperty, 0))) {
+                e.setCanceled(true);
+            }
+            return;
+        }
+
+        EntityPlayer clickedTarget = asValidPlayer(target, HIT_RANGE_SQ);
+        if (clickedTarget == null) return;
+
+        updateCurrentTarget(clickedTarget, tickCounter);
+        TargetState state = getTargetState(clickedTarget, tickCounter);
+
+        int blockMask = getValidHitBlockMask(state, tickCounter);
+
+        boolean shouldBlock = (blockMask & BLOCK_WAIT_FIRST) != 0
+                || (blockMask & BLOCK_PREDICTED_BURST) != 0
+                || applyPauseDuration(state, blockMask & ~BLOCK_PREDICTED_BURST, tickCounter);
+
+        if (shouldBlock && shouldCancel(properties.getInt(combatCancelProperty, 100))) {
+            if (properties.getBoolean(fakeSwingProperty, false)) {
+                mc.thePlayer.swingItem();
+            }
+            e.setCanceled(true);
+            return;
+        }
+
+        recordPassedValidHit(clickedTarget, tickCounter);
     }
 
-    private int getMode() {
-        try {
-            return (Integer) properties.getPropertyValue(modeProperty);
-        } catch (Exception e) {
+    private ClickType classifyClick(MovingObjectPosition mop) {
+        if (mop == null) return ClickType.MISSED_SWING;
+        if (mop.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) return ClickType.BLOCK_INTERACTION;
+        if (mop.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY) {
+            return asValidPlayer(mop.entityHit, HIT_RANGE_SQ) != null ? ClickType.VALID_HIT : ClickType.MISSED_SWING;
+        }
+        return ClickType.MISSED_SWING;
+    }
+
+    private void updateCurrentTarget(EntityPlayer nextTarget, int currentTick) {
+        if (sameTarget(nextTarget)) {
+            if (nextTarget != null) {
+                currentTarget = nextTarget;
+                getTargetState(nextTarget, currentTick);
+            }
+            return;
+        }
+        currentTarget = nextTarget;
+        if (nextTarget == null) {
+            resetWaitFirstState();
+        } else if (!waitFirstTracking) {
+            waitFirstTracking = true;
+            waitFirstStartTick = currentTick;
+            waitFirstUnlocked = false;
+        }
+        if (nextTarget != null) getTargetState(nextTarget, currentTick);
+    }
+
+    private void updateSelfDamage(int currentTick) {
+        int hurtTime = mc.thePlayer.hurtTime;
+        boolean hurtAgain = hurtTime > lastSelfHurtTime;
+        if (hurtAgain) {
+            if (waitFirstTracking && !waitFirstUnlocked) waitFirstUnlocked = true;
+            if (!takingKnockback) takingKnockback = true;
+            if (currentTarget != null) {
+                TargetState state = getTargetState(currentTarget, currentTick);
+                state.firstSelfHitSeen = true;
+            }
+        }
+        if (takingKnockback && mc.thePlayer.onGround && !hurtAgain) takingKnockback = false;
+        lastSelfHurtTime = hurtTime;
+    }
+
+    private void updateTargetDamage(int currentTick) {
+        if (currentTarget == null || !properties.getBoolean(serverAttackProperty, false)) return;
+        TargetState state = getTargetState(currentTarget, currentTick);
+        int targetHurtTime = currentTarget.hurtTime;
+        if (state.pendingServerConfirmationTick >= 0
+                && currentTick - state.pendingServerConfirmationTick > SERVER_CONFIRM_TIMEOUT_TICKS)
+            state.pendingServerConfirmationTick = -1;
+        if (state.pendingServerConfirmationTick >= 0 && targetHurtTime > state.lastObservedTargetHurtTime) {
+            state.pendingServerConfirmationTick = -1;
+            state.lastConfirmedTargetDamageTick = currentTick;
+            state.rawBlockMask = BLOCK_SERVER_COOLDOWN;
+            state.rawBlockStartTick = currentTick;
+        }
+        state.lastObservedTargetHurtTime = targetHurtTime;
+    }
+
+    private int getValidHitBlockMask(TargetState state, int currentTick) {
+        if (currentTarget == null) return 0;
+        if (properties.getBoolean(disableKBProperty, false) && isTakingKnockback()) return 0;
+        int blockMask = 0;
+        if (isWaitingForFirstHit(currentTick)) blockMask |= BLOCK_WAIT_FIRST;
+        blockMask |= getBurstBlockMask(state, currentTick);
+        if (isCriticalsBlocked(state, currentTick)) blockMask |= BLOCK_CRITICALS;
+        return blockMask;
+    }
+
+    private int getBurstBlockMask(TargetState state, int currentTick) {
+        if (properties.getBoolean(serverAttackProperty, false)) {
+            if (state.lastConfirmedTargetDamageTick >= 0
+                    && currentTick - state.lastConfirmedTargetDamageTick < SERVER_CONFIRM_COOLDOWN_TICKS)
+                return BLOCK_SERVER_COOLDOWN;
             return 0;
         }
+        if (!isPredictedBurstWindowActive(state, currentTick)) return 0;
+        int pauseTicks = msToTicks(properties.getInt(pauseDurationProperty, 500));
+        return pauseTicks > 0 && currentTick - state.predictedBurstWindowStartTick < pauseTicks
+                ? BLOCK_PREDICTED_BURST : 0;
+    }
+
+    private boolean isCriticalsBlocked(TargetState state, int currentTick) {
+        if (properties.getInt(modeProperty, 0) != 1) return false;
+        if (mc.thePlayer.onGround) return false;
+        if (properties.getBoolean(onlyDamagedProperty, false) && !state.firstSelfHitSeen) return false;
+        if (properties.getBoolean(disableKBProperty, false) && isTakingKnockback()) return false;
+        return !canCriticalHit();
+    }
+
+    private boolean isWaitingForFirstHit(int currentTick) {
+        int waitMs = properties.getInt(waitFirstHitProperty, 0);
+        if (waitMs <= 0 || currentTarget == null || !waitFirstTracking || waitFirstUnlocked || waitFirstStartTick < 0)
+            return false;
+        int requiredTicks = msToTicks(waitMs);
+        return requiredTicks > 0 && currentTick - waitFirstStartTick < requiredTicks;
+    }
+
+    private boolean canCriticalHit() {
+        return mc.thePlayer.fallDistance > 0.0f
+                && !mc.thePlayer.onGround
+                && !mc.thePlayer.isOnLadder()
+                && !mc.thePlayer.isInWater()
+                && !mc.thePlayer.isPotionActive(Potion.blindness)
+                && mc.thePlayer.ridingEntity == null;
+    }
+
+    private boolean isTakingKnockback() {
+        return takingKnockback || mc.thePlayer.hurtTime > 0;
+    }
+
+    private boolean applyPauseDuration(TargetState state, int blockMask, int currentTick) {
+        if (blockMask == 0) {
+            state.rawBlockMask = 0;
+            state.rawBlockStartTick = -1;
+            return false;
+        }
+        int pauseMs = properties.getInt(pauseDurationProperty, 500);
+        if (pauseMs <= 0) {
+            state.rawBlockMask = blockMask;
+            state.rawBlockStartTick = currentTick;
+            return false;
+        }
+        if (blockMask != state.rawBlockMask) {
+            state.rawBlockMask = blockMask;
+            state.rawBlockStartTick = currentTick;
+        } else if (state.rawBlockStartTick < 0) {
+            state.rawBlockStartTick = currentTick;
+        }
+        int requiredTicks = msToTicks(pauseMs);
+        return requiredTicks > 0 && currentTick - state.rawBlockStartTick < requiredTicks;
+    }
+
+    private void recordPassedValidHit(EntityPlayer target, int currentTick) {
+        if (target == null) return;
+        updateCurrentTarget(target, currentTick);
+        TargetState state = getTargetState(target, currentTick);
+        if (properties.getBoolean(serverAttackProperty, false)) {
+            state.pendingServerConfirmationTick = currentTick;
+            state.lastConfirmedTargetDamageTick = -1;
+            return;
+        }
+        if (!isPredictedBurstWindowActive(state, currentTick))
+            startPredictedBurstWindow(state, currentTick, HURT_WINDOW_TICKS);
+    }
+
+    private boolean shouldCancel(double chance) {
+        if (chance <= 0.0) return false;
+        if (chance >= 100.0) return true;
+        return Math.random() * 100.0 < chance;
+    }
+
+    private boolean sameTarget(EntityPlayer nextTarget) {
+        if (currentTarget == null || nextTarget == null) return currentTarget == nextTarget;
+        return currentTarget.getEntityId() == nextTarget.getEntityId();
+    }
+
+    private void resetWaitFirstState() {
+        waitFirstTracking = false;
+        waitFirstStartTick = -1;
+        waitFirstUnlocked = false;
+    }
+
+    private boolean isPredictedBurstWindowActive(TargetState state, int currentTick) {
+        return state.predictedBurstWindowEndTick >= 0 && currentTick < state.predictedBurstWindowEndTick;
+    }
+
+    private void startPredictedBurstWindow(TargetState state, int startTick, int windowTicks) {
+        state.predictedBurstWindowStartTick = startTick;
+        state.predictedBurstWindowEndTick = startTick + Math.max(1, windowTicks);
+    }
+
+    private TargetState getTargetState(EntityPlayer target, int currentTick) {
+        TargetState state = targetStates.get(target.getEntityId());
+        if (state == null) {
+            state = new TargetState();
+            if (properties.getBoolean(serverAttackProperty, false))
+                state.lastObservedTargetHurtTime = target.hurtTime;
+            targetStates.put(target.getEntityId(), state);
+        }
+        return state;
+    }
+
+    private void pruneTargetStates() {
+        if (mc.theWorld == null) {
+            targetStates.clear();
+            return;
+        }
+        Iterator<Map.Entry<Integer, TargetState>> it = targetStates.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, TargetState> entry = it.next();
+            Entity entity = mc.theWorld.getEntityByID(entry.getKey());
+            if (!(entity instanceof EntityPlayer) || entity.isDead || ((EntityPlayer) entity).deathTime != 0)
+                it.remove();
+        }
+    }
+
+    private void resetAllState() {
+        currentTarget = null;
+        targetStates.clear();
+        lastSelfHurtTime = 0;
+        takingKnockback = false;
+        resetWaitFirstState();
+    }
+
+    private EntityPlayer findTarget(double rangeSq) {
+        EntityPlayer closest = null;
+        double closestDist = rangeSq;
+        for (EntityPlayer player : mc.theWorld.playerEntities) {
+            if (player == mc.thePlayer || player.isDead || player.deathTime != 0) continue;
+            double dist = mc.thePlayer.getDistanceSqToEntity(player);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = player;
+            }
+        }
+        return closest;
+    }
+
+    private EntityPlayer asValidPlayer(Entity entity, double rangeSq) {
+        if (!(entity instanceof EntityPlayer)) return null;
+        EntityPlayer player = (EntityPlayer) entity;
+        if (player == mc.thePlayer || player.isDead || player.deathTime != 0) return null;
+        if (mc.thePlayer.getDistanceSqToEntity(player) > rangeSq) return null;
+        return player;
+    }
+
+    private enum ClickType { VALID_HIT, BLOCK_INTERACTION, MISSED_SWING }
+
+    private static class TargetState {
+        boolean firstSelfHitSeen;
+        int lastConfirmedTargetDamageTick = -1;
+        int pendingServerConfirmationTick = -1;
+        int predictedBurstWindowStartTick = -1;
+        int predictedBurstWindowEndTick = -1;
+        int lastObservedTargetHurtTime;
+        int rawBlockStartTick = -1;
+        int rawBlockMask;
     }
 }
