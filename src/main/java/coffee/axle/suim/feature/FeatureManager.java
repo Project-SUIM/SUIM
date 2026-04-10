@@ -75,6 +75,7 @@ public class FeatureManager {
         // World
         registerFeature(new AutoBlockIn());
         registerFeature(new AutoClutch());
+        //registerFeature(new BedDefender());
         registerFeature(new EagleAutoSwap());
         registerFeature(new FastPlaceExtras());
 

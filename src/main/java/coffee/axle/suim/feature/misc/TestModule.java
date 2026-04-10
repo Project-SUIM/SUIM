@@ -16,6 +16,7 @@ import java.util.ArrayList;
 public class TestModule extends Feature {
 
     private Object moduleInstance;
+    private Object evilWeirdBoxTestThing;
     private Object useMixinProperty;
     private Object aimDotsProperty;
 
@@ -36,9 +37,10 @@ public class TestModule extends Feature {
             creator.injectModule(this.moduleInstance, TestModule.class);
 
             // Create properties
+            this.evilWeirdBoxTestThing = creator.createBooleanProperty("evil-weird-box-test-thing", false);
             this.useMixinProperty = creator.createBooleanProperty("use-mixin", false);
             this.aimDotsProperty = creator.createBooleanProperty("debug-aim-dots", false);
-            creator.registerProperties(this.moduleInstance, this.useMixinProperty, this.aimDotsProperty);
+            creator.registerProperties(this.moduleInstance, this.evilWeirdBoxTestThing, this.useMixinProperty, this.aimDotsProperty);
 
             // Reload module command so it appears in .myau list
             manager.reloadModuleCommand();

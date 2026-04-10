@@ -39,7 +39,7 @@ public class Stasis extends Feature {
         try {
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, Stasis.class);
-            restoreMotionProperty = creator.createBooleanProperty("restore-motion", false);
+            restoreMotionProperty = creator.createBooleanProperty("restore-motion", false); // :ponder:
             creator.registerProperties(moduleInstance, restoreMotionProperty);
             manager.reloadModuleCommand();
 
