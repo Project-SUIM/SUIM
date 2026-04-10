@@ -12,6 +12,8 @@ import net.minecraft.util.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Mouse;
 
 import java.util.HashMap;
@@ -35,6 +37,7 @@ public class Displace extends Feature {
     private boolean compensateNextTick = false;
     private boolean displaceLeft = false;
     private boolean wasDisplacingLastTick = false;
+    private boolean hasKB = false;
     private int tickCounter = 0;
     private final Map<Integer, Integer> targetWindowStartTicks = new HashMap<>();
 
@@ -77,6 +80,7 @@ public class Displace extends Feature {
     private void onEnable() {
         displaceThisTick = false;
         active = false;
+        hasKB = false;
         compensateNextTick = false;
         wasDisplacingLastTick = false;
         tickCounter = 0;
@@ -85,6 +89,7 @@ public class Displace extends Feature {
 
     private void onDisable() {
         active = false;
+        hasKB = false;
         compensateNextTick = false;
         wasDisplacingLastTick = false;
         targetWindowStartTicks.clear();
@@ -185,7 +190,7 @@ public class Displace extends Feature {
             return;
         }
 
-        if (!displaceThisTick) return;
+        if (!displaceThisTick || hasKB) return;
         if (!anyMovementKey()) return;
 
         e.setForward(1);
@@ -205,11 +210,13 @@ public class Displace extends Feature {
         tickCounter++;
         int currentTick = tickCounter;
         pruneTargetDelayStates();
+        boolean hasKBEnchant = EnchantmentHelper.getKnockbackModifier(mc.thePlayer) > 0;
 
         boolean attacking = Mouse.isButtonDown(0);
         EntityPlayer target = attacking ? findClosestTarget(9.0) : null;
 
-        active = target != null && anyMovementKey();
+        active = target != null && (hasKBEnchant || anyMovementKey());
+        hasKB = hasKBEnchant;
         if (!active) {
             displaceThisTick = false;
             compensateNextTick = false;
@@ -231,6 +238,12 @@ public class Displace extends Feature {
             return;
         }
 
+        if (!displaceThisTick && wasDisplacingLastTick) {
+            int key = mc.gameSettings.keyBindAttack.getKeyCode();
+            if (key != 0) {
+                KeyBinding.onTick(key);
+            }
+        }
         wasDisplacingLastTick = displaceThisTick;
 
         if (!displaceThisTick) return;

@@ -19,6 +19,10 @@ public class Stasis extends Feature {
 
     private Object moduleInstance;
     private boolean allowNextC03 = false;
+    private Object restoreMotionProperty;
+    private double savedMotionX = 0.0;
+    private double savedMotionY = 0.0;
+    private double savedMotionZ = 0.0;
 
     @Override
     public String getName() {
@@ -35,12 +39,21 @@ public class Stasis extends Feature {
         try {
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, Stasis.class);
+            restoreMotionProperty = creator.createBooleanProperty("restore-motion", false);
+            creator.registerProperties(moduleInstance, restoreMotionProperty);
             manager.reloadModuleCommand();
 
             MinecraftForge.EVENT_BUS.register(this);
             manager.registerModuleCallbacks(moduleInstance,
                     () -> allowNextC03 = false,
-                    () -> allowNextC03 = false);
+                    () -> {
+                        allowNextC03 = false;
+                        if (properties.getBoolean(restoreMotionProperty, false) && Utils.nullCheck()) {
+                            mc.thePlayer.motionX = savedMotionX;
+                            mc.thePlayer.motionY = savedMotionY;
+                            mc.thePlayer.motionZ = savedMotionZ;
+                        }
+                    });
 
             return true;
         } catch (Exception e) {
@@ -54,6 +67,9 @@ public class Stasis extends Feature {
         if (!manager.isModuleEnabled(moduleInstance)) return;
         if (!Utils.nullCheck()) return;
         if (mc.thePlayer.hurtTime != 0) return;
+        savedMotionX = mc.thePlayer.motionX;
+        savedMotionY = mc.thePlayer.motionY;
+        savedMotionZ = mc.thePlayer.motionZ;
         mc.thePlayer.motionX = 0.0;
         mc.thePlayer.motionY = 0.0;
         mc.thePlayer.motionZ = 0.0;
