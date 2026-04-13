@@ -23,4 +23,4 @@ plugins {
 }
 
 
-rootProject.name = "myau-injection-template"
+rootProject.name = "SUIM"
