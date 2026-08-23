@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
- * AutoClutch — automatic fall-clutch via Scaffold.
+ * AutoClutch - automatic fall-clutch via Scaffold.
  * Detects when the player is falling and enables Scaffold
  * to place blocks underneath, then disables on landing.
  *
@@ -51,6 +51,9 @@ public class AutoClutch extends Feature {
     private long landTimeStart = 0;
     private long sprintTimer = 0;
     private long lastClutchEndTime = 0;
+    private long clutchStartTime = 0;
+    private int prevHurtTime = 0;
+    private boolean hurtLatched = false;
 
     private static final int FALL_SCAN_DEPTH = 10;
     private static final long CHAIN_WINDOW_MS = 750;
@@ -68,8 +71,6 @@ public class AutoClutch extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             scaffoldModule = manager.findModule("Scaffold");
             if (scaffoldModule == null) {
                 MyauLogger.log(getName(), "Scaffold module not found");
@@ -81,7 +82,7 @@ public class AutoClutch extends Feature {
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, AutoClutch.class);
 
-            hurtTimeProperty = creator.createBooleanProperty("hurt-time", true);
+            hurtTimeProperty = creator.createBooleanProperty("hurt-time", false);
             turnOffModeProperty = creator.createEnumProperty(
                     "disable-mode", 0,
                     new String[] { "MOVE", "FORWARD", "NONE" });
@@ -128,6 +129,9 @@ public class AutoClutch extends Feature {
         landTimeStart = 0;
         sprintTimer = 0;
         lastClutchEndTime = 0;
+        clutchStartTime = 0;
+        prevHurtTime = 0;
+        hurtLatched = false;
     }
 
     private void onModuleDisabled() {
@@ -141,6 +145,9 @@ public class AutoClutch extends Feature {
         landTimeStart = 0;
         sprintTimer = 0;
         lastClutchEndTime = 0;
+        clutchStartTime = 0;
+        prevHurtTime = 0;
+        hurtLatched = false;
     }
 
     @SubscribeEvent
@@ -170,7 +177,15 @@ public class AutoClutch extends Feature {
             long sprintDelay = getSprintReEnable();
 
             updateFireballState();
-            handleTurnoff(now);
+            handleTurnoff(now, disableDelay);
+
+            // Latch a hurt edge so the fall-check doesn't miss the damage window
+            // (hurtTime counts down 10->0 fast; the knockback launch precedes the descent)
+            int curHurtTime = mc.thePlayer.hurtTime;
+            if (curHurtTime > prevHurtTime) {
+                hurtLatched = true;
+            }
+            prevHurtTime = curHurtTime;
 
             // Fall detection
             if (!mc.thePlayer.onGround && mc.thePlayer.motionY < -0.01) {
@@ -187,14 +202,14 @@ public class AutoClutch extends Feature {
                 if (inChainWindow) {
                     shouldTrigger = true;
                 } else if (minFall == 0) {
-                    shouldTrigger = dist == -1;
+                    // default: clutch on any fall (outer block already guarantees in-air, descending)
+                    shouldTrigger = true;
                 } else {
                     shouldTrigger = dist == -1 || dist >= minFall;
                 }
 
                 if (getHurtTimeEnabled()) {
-                    shouldTrigger = shouldTrigger
-                            && mc.thePlayer.hurtTime > 0;
+                    shouldTrigger = shouldTrigger && hurtLatched;
                 }
 
                 if (shouldTrigger
@@ -203,17 +218,20 @@ public class AutoClutch extends Feature {
                         && !mc.thePlayer.capabilities.isFlying
                         && !fireballActive) {
                     if (now - airTimeStart >= enableDelay) {
+                        MyauLogger.log(getName(), "clutch trigger - enabling Scaffold (dist=" + dist + ")");
                         manager.setModuleEnabled(scaffoldModule, true);
                         setSprint(false);
                         falling = true;
                         needsSprint = true;
                         sprintTimer = 0;
                         lastClutchEndTime = 0;
+                        clutchStartTime = now;
                     }
                 }
             } else if (mc.thePlayer.onGround) {
                 airTimeStart = 0;
                 suppressed = false;
+                hurtLatched = false;
                 if (!falling) {
                     landTimeStart = 0;
                 }
@@ -269,8 +287,14 @@ public class AutoClutch extends Feature {
         }
     }
 
-    private void handleTurnoff(long now) {
+    private void handleTurnoff(long now, long disableDelay) {
         if (!falling)
+            return;
+
+        // give Scaffold time to place before the movement-based turnoff can kill it -
+        // otherwise (holding the key you walked off with) it disables a tick after enabling
+        long grace = Math.max(disableDelay, 150);
+        if (clutchStartTime != 0 && now - clutchStartTime < grace)
             return;
 
         int turnOffMode = getTurnOffMode();

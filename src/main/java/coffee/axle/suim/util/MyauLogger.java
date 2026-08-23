@@ -31,8 +31,6 @@ public class MyauLogger {
         ERROR_TO_MSG.put("MODULE_NOT_FOUND", "Module not found");
         ERROR_TO_MSG.put("MODULE_FAIL", "Module initialization failed");
         ERROR_TO_MSG.put("PROPERTY_NOT_FOUND", "Property not found");
-        ERROR_TO_MSG.put("FEATURE_INIT", "Initializing feature...");
-        ERROR_TO_MSG.put("FEATURE_SUCCESS", "Feature initialized!");
         ERROR_TO_MSG.put("FEATURE_FAIL", "Feature initialization failed");
         ERROR_TO_MSG.put("PROPERTY_INJECT_FAIL", "Property injection failed");
         ERROR_TO_MSG.put("PROPERTY_INJECT_SUCCESS", "Property injected!");
@@ -91,9 +89,9 @@ public class MyauLogger {
 
     public static void status(String component, boolean success) {
         if (success) {
-            System.out.println(PREFIX + " [" + component + "] ✓");
+            System.out.println(PREFIX + " [" + component + "] OK");
         } else {
-            System.out.println(PREFIX + " [" + component + "] ✗");
+            System.out.println(PREFIX + " [" + component + "] err");
         }
     }
 

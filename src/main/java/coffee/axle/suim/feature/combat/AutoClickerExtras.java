@@ -34,8 +34,6 @@ public class AutoClickerExtras extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             autoClickerModule = manager.findModule("AutoClicker");
             if (autoClickerModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
@@ -52,7 +50,6 @@ public class AutoClickerExtras extends Feature {
 
             initializeEventHook();
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception e) {
             MyauLogger.error("FEATURE_FAIL", e);

@@ -22,12 +22,9 @@ public class FindCommand extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("find", "locate"));
             creator.registerCommand(commandNames, this::handleCommand);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception e) {
             MyauLogger.error("FEATURE_FAIL", e);
@@ -72,7 +69,7 @@ public class FindCommand extends Feature {
             } catch (Exception e) {
                 mc.addScheduledTask(() -> manager.sendMessage("&cError: " + e.getMessage()));
             }
-        }, "dmyau-find").start();
+        }, "suim-find").start();
     }
 
     private BlockPos findClosestBlock(String blockName) {

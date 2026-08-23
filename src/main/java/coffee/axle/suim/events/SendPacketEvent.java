@@ -7,7 +7,7 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 /**
  * SendPacketEvent - Fired when sending a packet to server
  * 
- * @author maybsomeday (meow) - ported to d'Myau
+ * @author maybsomeday (meow) - ported to SUIM
  */
 @Cancelable
 public class SendPacketEvent extends Event {

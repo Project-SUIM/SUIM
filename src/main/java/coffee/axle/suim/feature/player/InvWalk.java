@@ -15,7 +15,6 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
-@SuppressWarnings({ "unused" })
 public class InvWalk extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 

@@ -21,10 +21,7 @@ public abstract class Feature {
     protected MyauModuleManager manager;
     protected ModulePropertyManager properties;
 
-    /** The Myau module instance, set after createModule(). */
     private Object moduleInstance;
-
-    /** Myau property objects registered on this feature's module. */
     private final List<Object> myauProperties = new ArrayList<>();
 
     public void inject(MyauModuleCreator creator, MyauModuleManager manager, ModulePropertyManager properties) {
@@ -55,56 +52,30 @@ public abstract class Feature {
         return null;
     }
 
-    /**
-     * Whether this feature creates a standalone Myau module (shown in GUI).
-     */
     public boolean isStandaloneModule() {
         return getGuiCategory() != null;
     }
 
-    /**
-     * Get the Myau module instance created by this feature.
-     */
     public Object getModuleInstance() {
         return moduleInstance;
     }
 
-    /**
-     * Set the Myau module instance (called from subclasses or createModule).
-     */
     protected void setModuleInstance(Object instance) {
         this.moduleInstance = instance;
     }
 
-    /**
-     * Track a Myau property created for this feature's module.
-     */
     protected void trackProperty(Object property) {
         myauProperties.add(property);
     }
 
-    /**
-     * Get all Myau properties registered on this feature's module.
-     */
     public List<Object> getMyauProperties() {
         return myauProperties;
     }
 
-    /**
-     * Called when the feature should initialize.
-     *
-     * @return true if successful, false otherwise
-     */
     public abstract boolean initialize() throws Exception;
 
-    /**
-     * Get the feature name.
-     */
     public abstract String getName();
 
-    /**
-     * Called when the feature should be disabled.
-     */
     public void disable() throws Exception {
         if (moduleInstance != null) {
             SuffixRegistry.unregister(moduleInstance);

@@ -10,8 +10,6 @@ import java.util.Random;
  * MEOW
  *
  * @author axle.coffee
- * @see AimAssistRotation combat aiming
- * @see BlockInRotation block placement aiming
  */
 public abstract class Rotation {
 
@@ -23,66 +21,31 @@ public abstract class Rotation {
         this.state = state;
     }
 
-    /**
-     * Compute the GCD step based on the current mouse sensitivity.
-     * This is the smallest angle increment Minecraft can produce from
-     * a single mouse movement event.
-     * <p>
-     * Formula: {@code f = sens * 0.6 + 0.2; gcd = f³ * 8}
-     */
+    // smallest angle increment MC can produce: f = sens * 0.6 + 0.2; gcd = f^3 * 8
     protected float computeGCD() {
         float sens = mc.gameSettings.mouseSensitivity;
         float f = sens * 0.6f + 0.2f;
         return f * f * f * 8.0f;
     }
 
-    /**
-     * Snap a rotation delta to the GCD grid.
-     *
-     * @param currentAngle the angle before this tick's rotation
-     * @param targetAngle  the desired angle after this tick
-     * @return the target angle snapped to the nearest GCD step from current
-     */
     protected float applyGCD(float currentAngle, float targetAngle) {
         float gcd = computeGCD();
         float delta = targetAngle - currentAngle;
         return currentAngle + delta - (delta % gcd);
     }
 
-    /**
-     * Clamp an angle delta to a maximum rotation per tick.
-     */
     protected float clampAngle(float angle, float maxAngle) {
         maxAngle = Math.max(0.0f, Math.min(180.0f, maxAngle));
         return MathHelper.clamp_float(angle, -maxAngle, maxAngle);
     }
 
-    /**
-     * Apply smoothing dampening to an angle delta.
-     * Includes slight randomization for human-like jitter.
-     *
-     * @param delta        rotation delta in degrees
-     * @param smoothFactor 0.0 = no smoothing (instant), 1.0 = maximum smoothing
-     */
+    // slight randomization for human-like jitter
     protected float smoothDelta(float delta, float smoothFactor) {
         float jitter = (float) (random.nextGaussian() * 0.015);
         return delta * (0.5f + 0.5f * (1.0f - MathHelper.clamp_float(
                 smoothFactor + jitter, 0.0f, 1.0f)));
     }
 
-    /**
-     * Full rotation pipeline: compute delta, smooth, apply speed scaling, GCD snap.
-     * <p>
-     * This is the standard path for any feature that aims at something with
-     * per-tick interpolation.
-     *
-     * @param targetYaw    raw target yaw
-     * @param targetPitch  raw target pitch
-     * @param smoothFactor 0.0-1.0 dampening
-     * @param hSpeed       horizontal speed multiplier (0-10)
-     * @param vSpeed       vertical speed multiplier (0-10)
-     * @return GCD-corrected {@code [yaw, pitch]} for this tick
-     */
     protected float[] smoothAndGCD(float targetYaw, float targetPitch,
             float smoothFactor, float hSpeed, float vSpeed) {
         float sYaw = state.getServerYaw();
@@ -104,13 +67,7 @@ public abstract class Rotation {
         return new float[] { newYaw, newPitch };
     }
 
-    /**
-     * Rotate WASD movement inputs to compensate for a yaw spoof.
-     * Call after setting rotationYaw to the spoofed value.
-     *
-     * @param preSpoofYaw  the visual yaw before spoofing
-     * @param postSpoofYaw the spoofed yaw that was applied
-     */
+    // rotate WASD inputs to compensate for a yaw spoof; call after setting rotationYaw
     protected void applyMoveFix(float preSpoofYaw, float postSpoofYaw) {
         if (mc.thePlayer == null || mc.thePlayer.movementInput == null)
             return;
@@ -128,29 +85,12 @@ public abstract class Rotation {
         mc.thePlayer.movementInput.moveStrafe = strafe * cos - forward * sin;
     }
 
-    /**
-     * Check if current aim is within tolerance of the target angles.
-     *
-     * @param currentYaw   current aimed yaw
-     * @param currentPitch current aimed pitch
-     * @param targetYaw    desired yaw
-     * @param targetPitch  desired pitch
-     * @param tolerance    max degrees of deviation allowed
-     */
     protected boolean withinTolerance(float currentYaw, float currentPitch,
             float targetYaw, float targetPitch,
             float tolerance) {
         float dy = Math.abs(MathHelper.wrapAngleTo180_float(currentYaw - targetYaw));
         float dp = Math.abs(MathHelper.wrapAngleTo180_float(currentPitch - targetPitch));
         return dy <= tolerance && dp <= tolerance;
-    }
-
-    protected float[] smoothAndGCDAdaptive(float targetYaw, float targetPitch,
-            float baseSmoothFactor, float hSpeed, float vSpeed,
-            float trackingConfidence, double targetLateralVel,
-            double distance) {
-        return smoothAndGCDAdaptive(targetYaw, targetPitch, baseSmoothFactor,
-                hSpeed, vSpeed, trackingConfidence, targetLateralVel, distance, 0);
     }
 
     protected float[] smoothAndGCDAdaptive(float targetYaw, float targetPitch,

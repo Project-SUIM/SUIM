@@ -1,7 +1,6 @@
 package coffee.axle.suim.mixin;
 
 import coffee.axle.suim.feature.combat.ArmorExceptions;
-import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.entity.EntityLivingBase;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -10,39 +9,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Mixin to inject armor-exceptions check into KillAura's isValidTarget method
+ * Inject armor-exceptions check into KillAura's isValidTarget.
+ * isValidTarget is B(long, EntityLivingBase)Z in 260729 (was v(EntityLivingBase, long)Z in 260317).
  */
-@SuppressWarnings("unused")
-
 @Pseudo
-@Mixin(targets = "myau.vc", remap = false)
+@Mixin(targets = "myau.Jh", remap = false)
 public class MixinKillAuraArmorExceptions {
-    private static final long RANDOM_LONG = 0L;
-    private static boolean loggedOnce = false;
 
-    @Inject(method = "S(Lnet/minecraft/entity/EntityLivingBase;J)Z", at = @At("HEAD"), cancellable = true, remap = false)
-    private void onIsValidTarget(EntityLivingBase entityLivingBase, long zkm, CallbackInfoReturnable<Boolean> cir) {
-        try {
-            ArmorExceptions armorExceptions = ArmorExceptions.getInstance();
-
-            if (armorExceptions == null) {
-                if (!loggedOnce) {
-                    loggedOnce = true;
-                }
-                return;
-            }
-
-            if (!loggedOnce) {
-                loggedOnce = true;
-            }
-
-            if (armorExceptions.shouldExcludeEntity(entityLivingBase)) {
-                cir.setReturnValue(false);
-                cir.cancel();
-            }
-
-        } catch (Exception e) {
-
+    @Inject(method = "B(JLnet/minecraft/entity/EntityLivingBase;)Z", at = @At("HEAD"), cancellable = true, remap = false)
+    private void onIsValidTarget(long zkm, EntityLivingBase entityLivingBase, CallbackInfoReturnable<Boolean> cir) {
+        ArmorExceptions armorExceptions = ArmorExceptions.getInstance();
+        if (armorExceptions != null && armorExceptions.shouldExcludeEntity(entityLivingBase)) {
+            cir.setReturnValue(false);
+            cir.cancel();
         }
     }
 }

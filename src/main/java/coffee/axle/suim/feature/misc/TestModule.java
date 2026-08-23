@@ -2,6 +2,7 @@ package coffee.axle.suim.feature.misc;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.render.AimDotTracker;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.render.TestModuleRenderer;
@@ -33,29 +34,24 @@ public class TestModule extends Feature {
     @Override
     public boolean initialize() {
         try {
-            this.moduleInstance = createModule();
-            creator.injectModule(this.moduleInstance, TestModule.class);
+            moduleInstance = createModule();
+            creator.injectModule(moduleInstance, TestModule.class);
 
-            // Create properties
-            this.evilWeirdBoxTestThing = creator.createBooleanProperty("evil-weird-box-test-thing", false);
-            this.useMixinProperty = creator.createBooleanProperty("use-mixin", false);
-            this.aimDotsProperty = creator.createBooleanProperty("debug-aim-dots", false);
-            creator.registerProperties(this.moduleInstance, this.evilWeirdBoxTestThing, this.useMixinProperty, this.aimDotsProperty);
+            evilWeirdBoxTestThing = creator.createBooleanProperty("evil-weird-box-test-thing", false);
+            useMixinProperty = creator.createBooleanProperty("use-mixin", false);
+            aimDotsProperty = creator.createBooleanProperty("debug-aim-dots", false);
+            creator.registerProperties(moduleInstance, evilWeirdBoxTestThing, useMixinProperty, aimDotsProperty);
 
-            // Reload module command so it appears in .myau list
             manager.reloadModuleCommand();
 
-            // Register this command handler
             ArrayList<String> commandNames = new ArrayList<>();
             commandNames.add("testmodule");
             creator.registerCommand(commandNames, this::handleCommand);
 
-            // Register Forge event bus for rendering and tick updates
             MinecraftForge.EVENT_BUS.register(this);
 
-            // Register enable/disable callbacks
             manager.registerModuleCallbacks(
-                    this.moduleInstance,
+                    moduleInstance,
                     () -> {
                         TestModuleRenderer.setModuleEnabled(true);
                         MyauLogger.info("TestModule enabled!");
@@ -66,11 +62,9 @@ public class TestModule extends Feature {
                         MyauLogger.info("TestModule disabled!");
                     });
 
-            MyauLogger.info("TestModule initialized successfully");
             return true;
         } catch (Exception e) {
             MyauLogger.error("TestModule:init", e);
-            MyauLogger.error("MODULE_FAIL", e);
             return false;
         }
     }
@@ -101,11 +95,8 @@ public class TestModule extends Feature {
         if (event.phase != TickEvent.Phase.START)
             return;
 
-        // Sync module enabled state with renderer
-        boolean isEnabled = manager.isModuleEnabled(this.getName());
+        boolean isEnabled = manager.isModuleEnabled(getName());
         TestModuleRenderer.setModuleEnabled(isEnabled);
-
-        // Sync use-mixin property with renderer
         TestModuleRenderer.setMixinEnabled(getUseMixin());
     }
 
@@ -123,18 +114,16 @@ public class TestModule extends Feature {
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
-        // Only render if NOT using mixin path (purple = direct, green = mixin)
-        // The mixin handles green rendering via TestModuleRenderer.renderMixinBox()
         TestModuleRenderer.renderDirectBox(event.partialTicks);
 
-        if (manager.isModuleEnabled(this.getName()) && getAimDots()) {
+        if (manager.isModuleEnabled(getName()) && getAimDots()) {
             AimDotTracker.renderDots(event.partialTicks);
         }
     }
 
     private boolean getUseMixin() {
         try {
-            return (Boolean) manager.getPropertyValue(this.useMixinProperty);
+            return (Boolean) manager.getPropertyValue(useMixinProperty);
         } catch (Exception e) {
             return false;
         }
@@ -142,7 +131,7 @@ public class TestModule extends Feature {
 
     private boolean getAimDots() {
         try {
-            return (Boolean) manager.getPropertyValue(this.aimDotsProperty);
+            return (Boolean) manager.getPropertyValue(aimDotsProperty);
         } catch (Exception e) {
             return false;
         }
@@ -150,9 +139,9 @@ public class TestModule extends Feature {
 
     private void setUseMixin(boolean value) {
         try {
-            if (this.useMixinProperty != null) {
-                java.lang.reflect.Method setValueMethod = this.useMixinProperty.getClass().getMethod("a", Object.class);
-                setValueMethod.invoke(this.useMixinProperty, value);
+            if (useMixinProperty != null) {
+                java.lang.reflect.Method setValueMethod = useMixinProperty.getClass().getMethod(MyauMappings.METHOD_PROPERTY_SET_VALUE, Object.class);
+                setValueMethod.invoke(useMixinProperty, value);
             }
         } catch (Exception e) {
             MyauLogger.error("TestModule:onEnable", e);
@@ -165,8 +154,8 @@ public class TestModule extends Feature {
             MinecraftForge.EVENT_BUS.unregister(this);
             TestModuleRenderer.setModuleEnabled(false);
             AimDotTracker.clear();
-            if (this.moduleInstance != null) {
-                manager.setModuleEnabled(this.moduleInstance, false);
+            if (moduleInstance != null) {
+                manager.setModuleEnabled(moduleInstance, false);
             }
         } catch (Exception e) {
             MyauLogger.error("TestModule:onDisable", e);

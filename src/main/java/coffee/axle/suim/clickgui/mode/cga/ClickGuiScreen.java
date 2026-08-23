@@ -141,7 +141,6 @@ public class ClickGuiScreen extends SuimScreen {
                     continue;
             }
 
-            // Draw panel content
             panel.draw();
 
             // Category button

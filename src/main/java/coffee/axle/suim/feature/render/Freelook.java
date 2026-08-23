@@ -51,8 +51,6 @@ public class Freelook extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             FreelookHooks.instance = this;
 
             moduleInstance = createModule();
@@ -86,7 +84,6 @@ public class Freelook extends Feature {
                     moduleInstance,
                     () -> onModuleEnabled(),
                     () -> onModuleDisabled());
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception t) {

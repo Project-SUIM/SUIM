@@ -10,15 +10,15 @@ import java.io.FileWriter;
 import java.io.File;
 
 /**
- * Mixin to override FriendCommand (myau.ga) to support multiple usernames
+ * Mixin to override FriendCommand (myau.kn) to support multiple usernames
  */
 @SuppressWarnings("unchecked")
 @Pseudo
-@Mixin(targets = "myau.ga", remap = false)
+@Mixin(targets = "myau.kn", remap = false)
 public class MixinFriendCommand {
 
     @Overwrite
-    public void Z(ArrayList<String> args) {
+    public void k(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
             java.lang.reflect.Field friendManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_FRIEND_MANAGER);
@@ -122,7 +122,7 @@ public class MixinFriendCommand {
                             newArgs.add(args.get(0));
                             newArgs.add(isFriend ? "remove" : "add");
                             newArgs.add(args.get(1));
-                            Z(newArgs);
+                            k(newArgs);
                             return;
                         }
                 }
@@ -137,12 +137,10 @@ public class MixinFriendCommand {
     }
 
     private void saveToFile(File file, ArrayList<String> players) {
-        try {
-            FileWriter writer = new FileWriter(file);
+        try (FileWriter writer = new FileWriter(file)) {
             for (String player : players) {
                 writer.write(player + "\n");
             }
-            writer.close();
         } catch (Exception e) {
             MyauLogger.error("MixinFriendCommand:save", e);
         }

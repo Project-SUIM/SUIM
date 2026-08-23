@@ -123,26 +123,20 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
     public List<String> getMixins() {
         if (mixins != null)
             return mixins;
-        System.out.println("[suim] Trying to discover mixins");
         mixins = new ArrayList<>();
         URL classUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
-        System.out.println("[suim] Found classes at " + classUrl);
         Path file;
         try {
             file = Paths.get(getBaseUrlForClassUrl(classUrl).toURI());
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("[suim] Base directory found at " + file);
         if (Files.isDirectory(file)) {
             walkDir(file);
         } else {
             walkJar(file);
         }
-        System.out.println("[suim] Found mixins (pre-filter): " + mixins);
         mixins.removeIf(name -> IGNORED_MIXINS.contains(name));
-        System.out.println("[suim] Active mixins (post-filter): " + mixins);
-
         return mixins;
     }
 
@@ -153,7 +147,6 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
      *                  default package.
      */
     private void walkDir(Path classRoot) {
-        System.out.println("[suim] Trying to find mixins from directory");
         try (Stream<Path> classes = Files.walk(classRoot.resolve(getMixinBaseDir()))) {
             classes.map(it -> classRoot.relativize(it).toString())
                     .forEach(this::tryAddMixinClass);
@@ -166,7 +159,6 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
      * Read through a JAR file, trying to find all mixins inside.
      */
     private void walkJar(Path file) {
-        System.out.println("[suim] Trying to find mixins from jar file");
         try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(file))) {
             ZipEntry next;
             while ((next = zis.getNextEntry()) != null) {
@@ -195,8 +187,6 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
 
     private static final Set<String> IGNORED_MIXINS = new HashSet<>(Arrays.asList(
             "MixinKillAuraArmorExceptions",
-            "MixinKillAura",
-            "MixinNoSlow",
             "MixinAimAssist",
             "MixinFastPlace"
     ));
@@ -204,11 +194,7 @@ public class AutoDiscoveryMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         String simpleName = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
-        if (IGNORED_MIXINS.contains(simpleName)) {
-            System.out.println("[suim] Skipping ignored mixin: " + mixinClassName);
-            return false;
-        }
-        return true;
+        return !IGNORED_MIXINS.contains(simpleName);
     }
 
     @Override

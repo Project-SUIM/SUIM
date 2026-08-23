@@ -3,7 +3,6 @@ package coffee.axle.suim.feature.combat;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 
-import static coffee.axle.suim.hooks.MyauMappings.*;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
@@ -18,11 +17,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
- * MoreKB — sprint-reset knockback enhancement
+ * MoreKB - sprint-reset knockback enhancement
  * Ported from OpenMyau's MoreKB module
  */
-@SuppressWarnings("unused")
-
 public class MoreKB extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -47,8 +44,6 @@ public class MoreKB extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, MoreKB.class);
 
@@ -74,7 +69,6 @@ public class MoreKB extends Feature {
                     this::onModuleEnabled,
                     this::onModuleDisabled);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {
@@ -137,7 +131,7 @@ public class MoreKB extends Feature {
         if (entity == null)
             return;
 
-        // Intelligent check — skip if target is facing away
+        // Intelligent check - skip if target is facing away
         if (getIntelligent()) {
             float calcYaw = RotationMath.toRotationsFromDelta(
                     mc.thePlayer.posX - entity.posX,

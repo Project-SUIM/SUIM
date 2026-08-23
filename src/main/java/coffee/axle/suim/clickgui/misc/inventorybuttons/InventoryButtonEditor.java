@@ -63,7 +63,7 @@ public class InventoryButtonEditor extends GuiScreen {
                 (float) INV_WIDTH, (float) INV_HEIGHT,
                 0f, INV_WIDTH / 256f, 0f, INV_HEIGHT / 256f, GL11.GL_NEAREST);
 
-        List<InventoryButton> allButtons = InventoryButtonsConfig.INSTANCE.getAllButtons();
+        List<InventoryButton> allButtons = InventoryButtonsConfig.getAllButtons();
         for (InventoryButton button : allButtons) {
             int bx = invX + button.getX();
             int by = invY + button.getY();
@@ -131,7 +131,7 @@ public class InventoryButtonEditor extends GuiScreen {
         if (isHoveringEditor(mouseX, mouseY))
             return;
 
-        List<InventoryButton> allButtons = InventoryButtonsConfig.INSTANCE.getAllButtons();
+        List<InventoryButton> allButtons = InventoryButtonsConfig.getAllButtons();
         for (InventoryButton button : allButtons) {
             if (!button.isEquipment() && button.isHovered(mouseX - invX, mouseY - invY)) {
                 if (editingButton == button) {
@@ -145,7 +145,7 @@ public class InventoryButtonEditor extends GuiScreen {
                     iconTextField.setText(editingButton.getIcon());
                     iconTextField.setFocused(false);
 
-                    InventoryButtonsConfig.INSTANCE.save();
+                    InventoryButtonsConfig.save();
                 }
             }
         }
@@ -172,7 +172,7 @@ public class InventoryButtonEditor extends GuiScreen {
 
     @Override
     public void onGuiClosed() {
-        InventoryButtonsConfig.INSTANCE.save();
+        InventoryButtonsConfig.save();
         super.onGuiClosed();
     }
 

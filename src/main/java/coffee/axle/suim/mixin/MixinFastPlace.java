@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * canPlace is native in 260317 so we intercept at the tick level instead.
  */
 @Pseudo
-@Mixin(targets = "myau.vx", remap = false)
+@Mixin(targets = "myau.JQ", remap = false)
 public class MixinFastPlace {
 /* UNUSED: please see EventBus reference */
 }

@@ -39,7 +39,7 @@ package coffee.axle.suim.hooks;
  * @author axlecoffee
  * @author ksyz (Myau Client)
  * @author maybesomeday and others (Mappings)
- * @version 260313 (2025-03-13)
+ * @version 260313 (2026-03-13)
  */
 public class OUTDATED {
     public static final String CLASS_MAIN = "myau.Zd";

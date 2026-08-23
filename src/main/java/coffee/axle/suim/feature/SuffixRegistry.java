@@ -42,7 +42,7 @@ public final class SuffixRegistry {
      */
     public static void registerStatic(Object moduleInstance, String... suffix) {
         if (moduleInstance != null && suffix != null) {
-            // Capture a snapshot — no allocation per frame
+            // Capture a snapshot - no allocation per frame
             final String[] copy = suffix.clone();
             registry.put(moduleInstance, () -> copy);
         }

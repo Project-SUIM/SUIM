@@ -16,20 +16,6 @@ public class LinearAnimation extends Animation<Number> {
             return reverse ? start : end;
         return startVal + (endVal - startVal) * (getPercent() / 100f);
     }
-
-    /**
-     * Convenience method returning an int result.
-     */
-    public int getInt(int start, int end, boolean reverse) {
-        return get(start, end, reverse).intValue();
-    }
-
-    /**
-     * Convenience method returning a float result.
-     */
-    public float getFloat(float start, float end, boolean reverse) {
-        return get(start, end, reverse).floatValue();
-    }
 }
 
 

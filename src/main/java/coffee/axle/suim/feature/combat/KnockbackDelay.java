@@ -18,9 +18,9 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-@SuppressWarnings({ "unchecked", "unused" })
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class KnockbackDelay extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -31,7 +31,7 @@ public class KnockbackDelay extends Feature {
     private Object inAirProperty;
     private Object onlyGroundProperty;
 
-    private final Queue<BufferedPacket> bufferedPackets = new ConcurrentLinkedQueue<>();
+    private final Deque<BufferedPacket> bufferedPackets = new ArrayDeque<>();
     private boolean active = false;
 
     @Override
@@ -170,7 +170,6 @@ public class KnockbackDelay extends Feature {
     private void processPacket(Packet<?> packet) {
         try {
             Packet raw = (Packet) packet;
-            PacketUtils.skipReceiveEvent.add(raw);
             raw.processPacket(mc.getNetHandler());
         } catch (Exception ex) {
             MyauLogger.error("KnockbackDelay:process", ex);

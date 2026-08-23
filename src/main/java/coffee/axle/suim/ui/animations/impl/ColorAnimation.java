@@ -26,10 +26,6 @@ public class ColorAnimation {
         return anim.isAnimating();
     }
 
-    public int percent() {
-        return anim.getPercent();
-    }
-
     public Color get(Color start, Color end, boolean reverse) {
         int r = anim.get(start.getRed(), end.getRed(), reverse).intValue();
         int g = anim.get(start.getGreen(), end.getGreen(), reverse).intValue();

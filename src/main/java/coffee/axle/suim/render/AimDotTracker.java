@@ -117,10 +117,6 @@ public class AimDotTracker {
     public static void clear() {
         dots.clear();
     }
-
-    public static boolean hasDots() {
-        return !dots.isEmpty();
-    }
 }
 
 

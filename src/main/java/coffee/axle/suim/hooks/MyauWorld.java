@@ -5,7 +5,6 @@ import coffee.axle.suim.util.MyauLogger;
 import java.net.URL;
 import java.security.CodeSource;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,41 +56,6 @@ public class MyauWorld {
         if (moduleClass == null)
             return UNKNOWN;
         return resolvedCache.computeIfAbsent(moduleClass, MyauWorld::resolve);
-    }
-
-    public static Map<String, String> getModuleOrigins(MyauHook hook) {
-        Map<String, String> result = new LinkedHashMap<>();
-        if (hook == null || hook.getModulesMap() == null)
-            return result;
-
-        java.lang.reflect.Method getNameMethod = hook.getModuleGetNameMethod();
-        for (Map.Entry<Class<?>, Object> entry : hook.getModulesMap().entrySet()) {
-            try {
-                String name = (String) getNameMethod.invoke(entry.getValue());
-                result.put(name, getOrigin(entry.getValue()));
-            } catch (Exception e) {
-                MyauLogger.info("Origin lookup failed: " + e.getMessage());
-            }
-        }
-        return result;
-    }
-
-    public static String lookupModule(MyauHook hook, String moduleName) {
-        if (hook == null || moduleName == null)
-            return UNKNOWN;
-
-        java.lang.reflect.Method getNameMethod = hook.getModuleGetNameMethod();
-        for (Map.Entry<Class<?>, Object> entry : hook.getModulesMap().entrySet()) {
-            try {
-                String name = (String) getNameMethod.invoke(entry.getValue());
-                if (moduleName.equalsIgnoreCase(name)) {
-                    return getOrigin(entry.getValue());
-                }
-            } catch (Exception e) {
-                MyauLogger.info("Module lookup failed: " + e.getMessage());
-            }
-        }
-        return UNKNOWN;
     }
 
     public static void clearRegistry() {

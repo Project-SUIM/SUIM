@@ -20,10 +20,8 @@ public class TestCommand extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
             ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("test"));
             creator.registerCommand(commandNames, this::handleCommand);
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception e) {
             MyauLogger.error("FEATURE_FAIL", e);
@@ -37,7 +35,7 @@ public class TestCommand extends Feature {
             manager.sendMessage("  &eYou passed: &f" + arg);
             manager.sendMessage("");
         }
-        manager.sendMessage("§dMyau Injection Template");
+        manager.sendMessage("§dSUIM Injection Template");
         manager.sendMessage("§aMade by @axle.coffee on discord §ehttps://github.com/axlecoffee");
         manager.sendMessage("");
         manager.sendMessage("§6Modules and Origins:");

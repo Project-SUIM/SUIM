@@ -10,15 +10,15 @@ import java.io.FileWriter;
 import java.io.File;
 
 /**
- * Mixin to override TargetCommand (myau.gn) to support multiple usernames
+ * Mixin to override TargetCommand (myau.ke) to support multiple usernames
  */
 @SuppressWarnings("unchecked")
 @Pseudo
-@Mixin(targets = "myau.gn", remap = false)
+@Mixin(targets = "myau.ke", remap = false)
 public class MixinTargetCommand {
 
     @Overwrite
-    public void Z(ArrayList<String> args) {
+    public void k(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
             java.lang.reflect.Field targetManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_TARGET_MANAGER);
@@ -121,12 +121,10 @@ public class MixinTargetCommand {
     }
 
     private void saveToFile(File file, ArrayList<String> players) {
-        try {
-            FileWriter writer = new FileWriter(file);
+        try (FileWriter writer = new FileWriter(file)) {
             for (String player : players) {
                 writer.write(player + "\n");
             }
-            writer.close();
         } catch (Exception e) {
             MyauLogger.error("MixinTargetCommand:save", e);
         }

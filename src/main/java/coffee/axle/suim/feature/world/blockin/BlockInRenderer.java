@@ -17,11 +17,6 @@ public final class BlockInRenderer {
     private BlockInRenderer() {
     }
 
-    /**
-     * Render the blocking progress percentage on screen.
-     *
-     * @param progress 0.0–1.0 completion fraction
-     */
     public static void renderProgress(float progress) {
         if (mc.fontRendererObj == null)
             return;
@@ -50,7 +45,7 @@ public final class BlockInRenderer {
     }
 
     /**
-     * Progress color: red → yellow → green.
+     * Progress color: red -> yellow -> green.
      */
     private static Color getProgressColor(float progress) {
         if (progress <= 0.33f)

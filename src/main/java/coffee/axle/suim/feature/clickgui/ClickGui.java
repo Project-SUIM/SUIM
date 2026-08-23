@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * ClickGUI feature — registers as a Myau module and manages
+ * ClickGUI feature - registers as a Myau module and manages
  * all GUI appearance/behavior settings via Myau properties.
  *
  * Opens/closes via: .t clickgui, .bind clickgui KEY, escape to close.

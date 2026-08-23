@@ -20,7 +20,7 @@ public final class BedBillboardRenderer {
 
         private static final Minecraft mc = Minecraft.getMinecraft();
 
-        public static final double DEFAULT_BILLBOARD_SCALE = 0.01666666753590107D;
+        public static final double DEFAULT_BILLBOARD_SCALE = 1.0 / 60.0;
         public static final int DEFAULT_ITEM_SIZE = 16;
         private static final float ITEM_PADDING = 2.0f;
         private static final double CORNER_RADIUS = 3.0;
@@ -277,16 +277,6 @@ public final class BedBillboardRenderer {
                 t.draw();
 
                 GL11.glDisable(GL11.GL_LINE_SMOOTH);
-        }
-
-        @SuppressWarnings("unused")
-        private static void addRoundedRectVertices(
-                        WorldRenderer wr,
-                        double x, double y, double w, double h,
-                        double r) {
-                addRoundedRectVerticesColored(
-                                wr, x, y, w, h, r,
-                                255, 255, 255, 255);
         }
 
         private static void addRoundedRectVerticesColored(

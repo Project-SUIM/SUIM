@@ -1,6 +1,8 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.events.*;
+import coffee.axle.suim.events.ReceivePacketEvent;
+import coffee.axle.suim.events.SendPacketEvent;
+import coffee.axle.suim.util.BlinkManager;
 import coffee.axle.suim.util.PacketUtils;
 import io.netty.channel.ChannelHandlerContext;
 import net.minecraft.network.NetworkManager;
@@ -10,11 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Network packet event handling mixin
- * 
- * @author maybsomeday (meow) - ported to d'Myau
- */
 @Mixin(value = NetworkManager.class, priority = 2000)
 public class MixinNetworkManager {
 
@@ -22,11 +19,6 @@ public class MixinNetworkManager {
     private void onSendPacket(Packet<?> packetIn, CallbackInfo ci) {
         if (PacketUtils.skipSendEvent.contains(packetIn)) {
             PacketUtils.skipSendEvent.remove(packetIn);
-            NoEventPacketEvent noEventPacketEvent = new NoEventPacketEvent(packetIn);
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(noEventPacketEvent);
-            if (noEventPacketEvent.isCanceled()) {
-                ci.cancel();
-            }
             return;
         }
 
@@ -34,6 +26,13 @@ public class MixinNetworkManager {
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(sendPacketEvent);
 
         if (sendPacketEvent.isCanceled()) {
+            ci.cancel();
+            return;
+        }
+
+        // hold outbound packets while a blink module is active. tryBlink was never
+        // called from anywhere before, so every blink feature was silently a no-op
+        if (BlinkManager.getInstance().tryBlink(packetIn)) {
             ci.cancel();
         }
     }

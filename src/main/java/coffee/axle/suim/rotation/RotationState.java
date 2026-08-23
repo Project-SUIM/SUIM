@@ -42,7 +42,7 @@ public final class RotationState {
     }
 
     /**
-     * Register on the Forge event bus. Safe to call multiple times —
+     * Register on the Forge event bus. Safe to call multiple times -
      * only registers once.
      */
     public void register() {

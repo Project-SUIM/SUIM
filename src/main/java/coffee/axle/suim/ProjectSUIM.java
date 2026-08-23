@@ -95,7 +95,7 @@ public class ProjectSUIM {
 
     @Mod.EventHandler
     public void postInit(FMLLoadCompleteEvent event) {
-        // Font init deferred to first use — creating GL textures during FML load
+        // Font init deferred to first use - creating GL textures during FML load
         // conflicts with the second resource reload and causes native heap corruption.
     }
 

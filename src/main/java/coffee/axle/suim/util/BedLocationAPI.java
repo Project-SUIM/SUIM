@@ -45,7 +45,7 @@ public class BedLocationAPI {
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(5000);
                 conn.setReadTimeout(5000);
-                conn.setRequestProperty("User-Agent", "dMyau/1.0");
+                conn.setRequestProperty("User-Agent", "SUIM/1.0");
 
                 InputStreamReader reader = new InputStreamReader(conn.getInputStream());
                 bedData = new JsonParser().parse(reader).getAsJsonObject();
@@ -62,12 +62,10 @@ public class BedLocationAPI {
             return getDefaultOrder();
 
         try {
-            // Check overrides
             JsonArray overrides = bedData.getAsJsonArray("overrides");
             for (JsonElement override : overrides) {
                 JsonObject obj = override.getAsJsonObject();
 
-                // Check if this override matches the map
                 if (obj.has("maps") && mapName != null) {
                     JsonArray maps = obj.getAsJsonArray("maps");
                     for (JsonElement mapElement : maps) {
@@ -77,7 +75,6 @@ public class BedLocationAPI {
                     }
                 }
 
-                // Check if this override matches the mode
                 if (obj.has("modes") && mode != null) {
                     JsonArray modes = obj.getAsJsonArray("modes");
                     for (JsonElement modeElement : modes) {
@@ -91,7 +88,6 @@ public class BedLocationAPI {
             MyauLogger.error("BedLocationAPI:overrides", e);
         }
 
-        // Return default order
         return getDefaultOrder();
     }
 

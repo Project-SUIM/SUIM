@@ -5,7 +5,7 @@ import net.minecraft.client.Minecraft;
 /**
  * Basic utils
  * 
- * @author maybsomeday (meow) - ported to d'Myau
+ * @author maybsomeday (meow) - ported to SUIM
  */
 public class Utils {
     private static final Minecraft mc = Minecraft.getMinecraft();

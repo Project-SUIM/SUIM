@@ -2,7 +2,6 @@ package coffee.axle.suim.feature;
 
 /**
  * Categories for GUI module panels.
- * Maps to the Kotlin Category enum used by the GUI rendering layer.
  */
 public enum GuiCategory {
     COMBAT,

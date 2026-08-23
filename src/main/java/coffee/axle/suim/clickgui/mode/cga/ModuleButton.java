@@ -82,7 +82,7 @@ public class ModuleButton {
             }
         }
 
-        // Remove keybind settings from the element list — keybind
+        // Remove keybind settings from the element list - keybind
         // is displayed directly on the button via KeybindListenerUtil
         menuElements.removeIf(
                 e -> e.getSetting().getType() == SettingType.KEY_BIND);

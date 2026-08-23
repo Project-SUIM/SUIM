@@ -28,7 +28,6 @@ public class KillAuraDisableOnDeath extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
             killAuraModule = manager.findModule("KillAura");
             if (killAuraModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
@@ -49,7 +48,6 @@ public class KillAuraDisableOnDeath extends Feature {
 
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

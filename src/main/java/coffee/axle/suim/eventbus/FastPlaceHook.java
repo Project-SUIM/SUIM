@@ -13,17 +13,17 @@ import java.lang.reflect.Field;
  * Event-bus replacement for MixinFastPlace.
  *
  * <p>
- * <strong>Why not Mixin?</strong> In Myau 260317, {@code myau.vx} (FastPlace) has SuChen
+ * <strong>Why not Mixin?</strong> In Myau 260729, {@code myau.JQ} (FastPlace) has SuChen
  * anti-leak protection, blocking all bytecode modification.
  * </p>
  *
  * <p>
  * <strong>How it works:</strong><br>
- * 1. Registers a handler on {@code myau.N} (TickEvent PRE) BEFORE FastPlace's handler<br>
+ * 1. Registers a handler on {@code myau.kC} (HitBlockEvent) BEFORE FastPlace's handler<br>
  * 2. If the player is holding obsidian, temporarily disables FastPlace by setting
- *    {@code gj.F} (enabled flag) to {@code false} via reflection<br>
+ *    {@code V.a} (enabled flag) to {@code false} via reflection<br>
  * 3. Registers a second handler AFTER FastPlace to restore the enabled state<br>
- * 4. FastPlace's handler calls {@code e()} (isEnabled) at the start and skips if disabled<br>
+ * 4. FastPlace's handler calls {@code X()} (isEnabled) at the start and skips if disabled<br>
  * </p>
  *
  * @author axlecoffee
@@ -34,7 +34,7 @@ public class FastPlaceHook {
     private static boolean loggedInit = false;
 
     // Reflection caches
-    private static Field enabledField;  // gj.F (boolean)
+    private static Field enabledField;  // V.a (boolean)
     private static boolean reflectionFailed = false;
 
     // FastPlace instance from event bus
@@ -54,14 +54,14 @@ public class FastPlaceHook {
     public static boolean register() {
         FastPlaceHook hook = new FastPlaceHook();
         boolean pre = MyauEventBusHook.registerBefore(
-                MyauMappings.CLASS_TICK_EVENT, // myau.N
+                MyauMappings.CLASS_HIT_BLOCK_EVENT, // myau.kC
                 hook,
                 "onTickPre",
                 Object.class,
                 0
         );
         boolean post = MyauEventBusHook.registerAfter(
-                MyauMappings.CLASS_TICK_EVENT, // myau.N
+                MyauMappings.CLASS_HIT_BLOCK_EVENT, // myau.kC
                 hook,
                 "onTickPost",
                 Object.class,
@@ -71,7 +71,7 @@ public class FastPlaceHook {
     }
 
     /**
-     * PRE handler — runs BEFORE FastPlace's handler.
+     * PRE handler - runs BEFORE FastPlace's handler.
      * Disables FastPlace if the player is holding obsidian.
      */
     public void onTickPre(Object event) {
@@ -90,11 +90,10 @@ public class FastPlaceHook {
             ensureReflection();
             if (reflectionFailed) return;
 
-            // Check if FastPlace is currently enabled
             wasEnabled = enabledField.getBoolean(fp);
             if (!wasEnabled) return;
 
-            // Check if player is holding obsidian
+            // Skip placement while holding obsidian
             if (shouldBlock()) {
                 enabledField.setBoolean(fp, false);
                 didDisable = true;
@@ -105,7 +104,7 @@ public class FastPlaceHook {
     }
 
     /**
-     * POST handler — runs AFTER FastPlace's handler.
+     * POST handler - runs AFTER FastPlace's handler.
      * Restores FastPlace's enabled state if it was temporarily disabled.
      */
     public void onTickPost(Object event) {
@@ -135,7 +134,7 @@ public class FastPlaceHook {
         if (instanceSearchDone) return null;
         instanceSearchDone = true;
         fastPlaceInstance = MyauEventBusHook.findModuleInstance(
-                MyauMappings.CLASS_TICK_EVENT,
+                MyauMappings.CLASS_HIT_BLOCK_EVENT,
                 MyauMappings.CLASS_FAST_PLACE
         );
         if (fastPlaceInstance == null) {

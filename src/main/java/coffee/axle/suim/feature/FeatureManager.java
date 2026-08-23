@@ -31,7 +31,6 @@ public class FeatureManager {
     private final ModulePropertyManager propertyManager;
 
     public FeatureManager() {
-        System.out.println("WE GOT HERE (FeatureManager");
         this.hook = MyauHook.getInstance();
         this.creator = new MyauModuleCreator(hook);
         this.manager = new MyauModuleManager(hook);
@@ -49,16 +48,16 @@ public class FeatureManager {
         registerFeature(new TransRingsTest());
 
         // Commands
-        registerFeature(new DMyauCommand());
+        registerFeature(new SuimCommand());
+        registerFeature(new PacketCaptureCommand());
         registerFeature(new FindCommand());
         registerFeature(new StatusCommand());
         registerFeature(new ClientInfoCommand());
 
-        // Combat (no myau mixin dependency)
+        // Combat
         registerFeature(new AimAssistExtras());
         //registerFeature(new ArmorExceptions());  // needs MixinKillAuraArmorExceptions (disabled)
         registerFeature(new AutoClickerExtras());
-        registerFeature(new HitSelect());
         registerFeature(new KillAuraDisableOnDeath());
         registerFeature(new MoreKB());
         registerFeature(new KnockbackDelay());
@@ -74,8 +73,8 @@ public class FeatureManager {
 
         // World
         registerFeature(new AutoBlockIn());
+        registerFeature(new AutoBedDefense());
         registerFeature(new AutoClutch());
-        //registerFeature(new BedDefender());
         registerFeature(new EagleAutoSwap());
         registerFeature(new FastPlaceExtras());
 
@@ -146,7 +145,7 @@ public class FeatureManager {
             return false;
         }
 
-        // Initialize addons — let them register their features
+        // Initialize addons let them register their features
         initializeAddons();
 
         int successCount = 0;
@@ -165,8 +164,16 @@ public class FeatureManager {
 
         MyauLogger.summary(successCount, features.size());
 
-        // Post-init phase — addons can now interact with initialized modules
+        // Post-init phase - addons can now interact with initialized modules
         postInitAddons();
+
+        // Final command reload - guarantees every injected module (incl. SUIM custom
+        // modules) is present in Myau's ModuleCommand name list after all features ran.
+        try {
+            manager.reloadModuleCommand();
+        } catch (Exception e) {
+            MyauLogger.error("reloadModuleCommand", e);
+        }
 
         return successCount > 0;
     }

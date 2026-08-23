@@ -20,7 +20,6 @@ import java.lang.reflect.Field;
 /**
  * BedESP Color mode: team
  */
-@SuppressWarnings("unused")
 public class BedESPTeamColor extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -44,8 +43,6 @@ public class BedESPTeamColor extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             instance = this;
             BedLocationAPI.fetchData();
 
@@ -78,7 +75,6 @@ public class BedESPTeamColor extends Feature {
 
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception t) {

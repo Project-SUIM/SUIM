@@ -15,8 +15,6 @@ import java.util.Set;
  * Armor Exceptions for KillAura
  * Prevents targeting players wearing specific armor items
  */
-@SuppressWarnings("unused")
-
 public class ArmorExceptions extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -39,8 +37,6 @@ public class ArmorExceptions extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             killAuraModule = manager.findModule("KillAura");
 
             if (killAuraModule == null) {
@@ -57,7 +53,6 @@ public class ArmorExceptions extends Feature {
 
             initialized = true;
             INSTANCE = this;
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

@@ -28,14 +28,11 @@ public class ClientInfoCommand extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("client", "info"));
             creator.registerCommand(commandNames, this::handleCommand);
             registerSetClientNameCommand();
             loadClientName();
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception e) {
             MyauLogger.error("FEATURE_FAIL", e);

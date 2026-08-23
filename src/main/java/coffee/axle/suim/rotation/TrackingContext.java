@@ -19,7 +19,6 @@ public class TrackingContext {
     float prevOutputYaw;
     float prevOutputPitch;
     double lastTargetX;
-    double lastTargetY;
     double lastTargetZ;
 
     public void reset() {
@@ -32,7 +31,6 @@ public class TrackingContext {
         prevOutputYaw = 0;
         prevOutputPitch = 0;
         lastTargetX = 0;
-        lastTargetY = 0;
         lastTargetZ = 0;
         for (int i = 0; i < HISTORY_SIZE; i++) {
             velXHistory[i] = 0;
@@ -104,7 +102,6 @@ public class TrackingContext {
 
     public void storeTargetPosition(double x, double y, double z) {
         lastTargetX = x;
-        lastTargetY = y;
         lastTargetZ = z;
     }
 }

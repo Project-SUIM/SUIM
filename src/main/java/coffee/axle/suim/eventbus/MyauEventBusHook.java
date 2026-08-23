@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Registers custom event handlers with Myau's internal event bus ({@code myau.h}).
+ * Registers custom event handlers with Myau's internal event bus ({@code myau.kr}).
  *
  * <p>
- * <strong>Why this exists:</strong> Myau 260317 has SuChen anti-leak protection
- * on many module classes (including AimAssist {@code myau.g3} and FastPlace {@code myau.vx}).
+ * <strong>Why this exists:</strong> Myau 260729 has SuChen anti-leak protection
+ * on many module classes (including AimAssist {@code myau.G} and FastPlace {@code myau.JQ}).
  * Anti-leak native hash verification in {@code <clinit>} detects ANY bytecode modification,
  * making SpongePowered Mixin injection impossible on those classes.
  * </p>
@@ -28,21 +28,21 @@ import java.util.Map;
  * </p>
  *
  * <p>
- * <strong>Registration method:</strong> Direct map manipulation — we access the internal
- * handler map {@code h.f} and insert our own {@code Hf} (handler wrapper) entries.
- * This bypasses the native {@code h.J(Object)} registration method entirely,
+ * <strong>Registration method:</strong> Direct map manipulation - we access the internal
+ * handler map {@code kr.s} and insert our own {@code kO} (MethodData) entries.
+ * This bypasses the native {@code kr.W(Object)} registration method entirely,
  * avoiding any potential native-code class verification.
  * </p>
  *
  * <p>
- * <strong>Event bus internals (260317):</strong><br>
- * - {@code myau.h} — EventBus class (anti-leak protected)<br>
- * - {@code myau.h.f} — {@code Map<Class<? extends n>, List<Hf>>} — handler map<br>
- * - {@code myau.Hf} — handler wrapper: (Object handler, Method method, int priority) — UNVERIFIED for 260317<br>
- * - {@code myau.g} — {@code @Target(METHOD) @Retention(RUNTIME)} annotation<br>
- * - {@code myau.n} — base Event class<br>
- * - Dispatch: {@code h.C(n event)} iterates list in order, calls {@code method.invoke(handler, event)}<br>
- * - No sorting during dispatch — insertion order determines execution order<br>
+ * <strong>Event bus internals (260729):</strong><br>
+ * - {@code myau.kr} - EventBus class (anti-leak protected)<br>
+ * - {@code myau.kr.s} - {@code Map<Class<? extends Jw>, List<kO>>} - handler map<br>
+ * - {@code myau.kO} - handler wrapper: (Object handler, Method method, int priority)<br>
+ * - {@code myau.k8} - {@code @Target(METHOD) @Retention(RUNTIME)} annotation<br>
+ * - {@code myau.Jw} - base Event class<br>
+ * - Dispatch: {@code kr.T(Jw event)} iterates list in order, calls {@code method.invoke(handler, event)}<br>
+ * - No sorting during dispatch - insertion order determines execution order<br>
  * </p>
  *
  * @author axlecoffee
@@ -55,9 +55,9 @@ public final class MyauEventBusHook {
     private static Object eventBusInstance;
 
     // Reflection caches
-    private static Field eventBusField;      // gJ.g
-    private static Field handlerMapField;    // h.f
-    private static Constructor<?> hfConstructor; // Hf(Object, Method, int)
+    private static Field eventBusField;      // F.C
+    private static Field handlerMapField;    // kr.s
+    private static Constructor<?> hfConstructor; // kO(Object, Method, int)
 
     private MyauEventBusHook() {}
 
@@ -104,7 +104,7 @@ public final class MyauEventBusHook {
      * Registers a handler method on a specific event type.
      * The handler will be appended at the END of the handler list (runs after existing handlers).
      *
-     * @param eventClassName fully qualified event class name (e.g., "myau.b" for TickEventPost)
+     * @param eventClassName fully qualified event class name (e.g., "myau.ky" for TickEventPost)
      * @param handler        the object whose method will be invoked
      * @param methodName     the handler method name on the handler object
      * @param paramType      the parameter type the method accepts (use {@code Object.class}
@@ -135,7 +135,7 @@ public final class MyauEventBusHook {
                                     String methodName, Class<?> paramType,
                                     int priority, boolean insertFirst) {
         if (!initialized) {
-            MyauLogger.log("EventBusHook", "Cannot register — not initialized");
+            MyauLogger.log("EventBusHook", "Cannot register - not initialized");
             return false;
         }
         try {
@@ -175,7 +175,7 @@ public final class MyauEventBusHook {
      * Useful for accessing module fields via reflection (e.g., reading AimAssist properties).
      *
      * @param eventClassName the event class name this module handles
-     * @param moduleClassName the module class name to find (e.g., "myau.g3")
+     * @param moduleClassName the module class name to find (e.g., "myau.G")
      * @return the module instance, or null if not found
      */
     @SuppressWarnings("unchecked")
@@ -188,7 +188,7 @@ public final class MyauEventBusHook {
             List<Object> handlers = handlerMap.get(eventClass);
             if (handlers == null) return null;
 
-            // Hf.h() returns the handler object
+            // kO.s() returns the handler object
             Method hfGetHandler = Class.forName(MyauMappings.CLASS_HANDLER_WRAPPER).getMethod(MyauMappings.METHOD_HANDLER_GET_HANDLER);
             for (Object hf : handlers) {
                 Object handlerObj = hfGetHandler.invoke(hf);

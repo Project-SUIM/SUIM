@@ -7,7 +7,7 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 /**
  * ReceivePacketEvent - Fired when receiving a packet from server
  * 
- * @author maybsomeday (meow) - ported to d'Myau
+ * @author maybsomeday (meow) - ported to SUIM
  */
 @Cancelable
 public class ReceivePacketEvent extends Event {

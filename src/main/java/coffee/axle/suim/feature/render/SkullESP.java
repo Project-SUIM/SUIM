@@ -22,12 +22,6 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * SkullESP
- * 
- * @maybsomeday
- */
-@SuppressWarnings("unused")
 public class SkullESP extends Feature {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
@@ -63,7 +57,6 @@ public class SkullESP extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, getClass());
 
@@ -83,7 +76,6 @@ public class SkullESP extends Feature {
 
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

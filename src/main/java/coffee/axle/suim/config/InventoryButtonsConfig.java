@@ -14,14 +14,9 @@ import java.util.List;
  */
 public final class InventoryButtonsConfig {
 
-    public static final InventoryButtonsConfig INSTANCE = new InventoryButtonsConfig();
-
     private static final File configFile = new File(ProjectSUIM.getConfigPath(), "inventory_buttons.json");
 
     private static final List<InventoryButton> allButtons = new ArrayList<>();
-
-    private InventoryButtonsConfig() {
-    }
 
     public static List<InventoryButton> getAllButtons() {
         return allButtons;

@@ -26,10 +26,8 @@ public class StatusCommand extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
             ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("status"));
             creator.registerCommand(commandNames, this::handleCommand);
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception e) {
             MyauLogger.error("FEATURE_FAIL", e);
@@ -132,7 +130,7 @@ public class StatusCommand extends Feature {
                 manager.sendMessage("&cError fetching data for " + username);
                 MyauLogger.error("StatusCommand:handle", e);
             }
-        }, "dmyau-status").start();
+        }, "suim-status").start();
     }
 
     private void sendMessage(String message) {

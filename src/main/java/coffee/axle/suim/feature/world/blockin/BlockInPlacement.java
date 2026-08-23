@@ -26,7 +26,7 @@ import java.util.*;
  * <p>
  * Handles goal generation (roof, sides, scaffold/below-feet),
  * support-block discovery, face grid scanning, and raytrace
- * validation. Stateless — all results returned via {@link PlaceResult}.
+ * validation. Stateless - all results returned via {@link PlaceResult}.
  */
 public final class BlockInPlacement {
 
@@ -115,7 +115,7 @@ public final class BlockInPlacement {
      * <li>Roof (feetY+2)</li>
      * <li>Sides at head level (feetY+1)</li>
      * <li>Sides at feet level (feetY)</li>
-     * <li>Scaffold goals — blocks below empty side positions</li>
+     * <li>Scaffold goals - blocks below empty side positions</li>
      * <li>BFS frontier expansion (depth 5) from primary goals</li>
      * </ol>
      *
@@ -140,11 +140,11 @@ public final class BlockInPlacement {
                 return roofResult;
         }
 
-        // Step 2+3: Sides — head level first, then feet level
+        // Step 2+3: Sides - head level first, then feet level
         List<BlockPos> sideGoals = buildSideGoals(feetPos, orderMode);
         sideGoals.removeAll(skippedGoals);
 
-        // Step 4: Scaffold goals — one block below each empty side position
+        // Step 4: Scaffold goals - one block below each empty side position
         List<BlockPos> scaffoldGoals = buildScaffoldGoals(sideGoals, feetPos);
 
         // Try primary side goals first
@@ -152,7 +152,7 @@ public final class BlockInPlacement {
         if (sideResult != null)
             return sideResult;
 
-        // Try scaffold goals (below-feet support blocks) — flagged as support
+        // Try scaffold goals (below-feet support blocks) - flagged as support
         PlaceResult scaffoldResult = findBestForGoals(scaffoldGoals, eye, reach, true);
         if (scaffoldResult != null)
             return scaffoldResult;
@@ -188,7 +188,7 @@ public final class BlockInPlacement {
             // RANDOM order
             Collections.shuffle(goals);
         } else {
-            // ENEMY order — sort by distance to nearest enemy (closest first)
+            // ENEMY order - sort by distance to nearest enemy (closest first)
             Vec3 enemyPos = getClosestEnemyPos();
             if (enemyPos != null) {
                 goals.sort(Comparator.comparingDouble(pos -> {
@@ -219,7 +219,6 @@ public final class BlockInPlacement {
             if (!isAir(below))
                 continue;
 
-            // Check if there's a solid block below the scaffold position
             BlockPos twoBelow = below.down();
             if (!isAir(twoBelow)) {
                 scaffold.add(below);
@@ -388,7 +387,7 @@ public final class BlockInPlacement {
                         continue;
                     }
 
-                    // Solid block found — try to place against it
+                    // Solid block found - try to place against it
                     for (BlockPos goal : frontier) {
                         if (!isAir(goal))
                             continue;
@@ -419,7 +418,7 @@ public final class BlockInPlacement {
 
         for (BlockPos goal : goals) {
             // Skip goals where an entity (including the player) occupies
-            // the block — vanilla will reject placement via
+            // the block - vanilla will reject placement via
             // checkNoEntityCollision anyway.
             if (isEntityBlocking(goal))
                 continue;
@@ -428,21 +427,20 @@ public final class BlockInPlacement {
                 BlockPos support = goal.offset(facing);
                 boolean needsSneak = false;
 
-                // Check support validity with sneak-mode awareness
                 if (isAir(support))
                     continue;
                 if (skipInteractableMode == 2) {
-                    // SKIP mode — reject interactable supports entirely
+                    // SKIP mode - reject interactable supports entirely
                     Block block = mc.theWorld.getBlockState(support).getBlock();
                     if (isInteractable(block))
                         continue;
                 } else if (skipInteractableMode == 1) {
-                    // SNEAK mode — allow but flag for sneak
+                    // SNEAK mode - allow but flag for sneak
                     Block block = mc.theWorld.getBlockState(support).getBlock();
                     if (isInteractable(block))
                         needsSneak = true;
                 }
-                // mode 0 (NONE) — no filtering
+                // mode 0 (NONE) - no filtering
 
                 double d2 = dist2PointAABB(eye, support.getX(), support.getY(),
                         support.getZ());

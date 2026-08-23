@@ -1,5 +1,9 @@
 package coffee.axle.suim.util;
 
+import coffee.axle.suim.rotation.RotationMath;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockBed;
+import net.minecraft.block.BlockEnderChest;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -41,30 +45,14 @@ public class ShopDetectionUtils {
     }
 
     public static BlockPos findNearestBed(double range) {
-        if (!Utils.nullCheck()) return null;
-        BlockPos playerPos = mc.thePlayer.getPosition();
-        int r = (int) range;
-        BlockPos closest = null;
-        double closestDist = Double.MAX_VALUE;
-
-        for (int x = -r; x <= r; x++) {
-            for (int y = -r; y <= r; y++) {
-                for (int z = -r; z <= r; z++) {
-                    BlockPos pos = playerPos.add(x, y, z);
-                    if (mc.theWorld.getBlockState(pos).getBlock() instanceof net.minecraft.block.BlockBed) {
-                        double dist = mc.thePlayer.getDistanceSq(pos);
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            closest = pos;
-                        }
-                    }
-                }
-            }
-        }
-        return closest;
+        return findNearestBlock(range, BlockBed.class);
     }
 
     public static BlockPos findNearestEnderChest(double range) {
+        return findNearestBlock(range, BlockEnderChest.class);
+    }
+
+    private static BlockPos findNearestBlock(double range, Class<? extends Block> type) {
         if (!Utils.nullCheck()) return null;
         BlockPos playerPos = mc.thePlayer.getPosition();
         int r = (int) range;
@@ -75,7 +63,7 @@ public class ShopDetectionUtils {
             for (int y = -r; y <= r; y++) {
                 for (int z = -r; z <= r; z++) {
                     BlockPos pos = playerPos.add(x, y, z);
-                    if (mc.theWorld.getBlockState(pos).getBlock() instanceof net.minecraft.block.BlockEnderChest) {
+                    if (type.isInstance(mc.theWorld.getBlockState(pos).getBlock())) {
                         double dist = mc.thePlayer.getDistanceSq(pos);
                         if (dist < closestDist) {
                             closestDist = dist;
@@ -90,12 +78,9 @@ public class ShopDetectionUtils {
 
     public static float[] getRotationsToBlock(BlockPos pos) {
         if (pos == null || !Utils.nullCheck()) return null;
-        double dx = pos.getX() + 0.5 - mc.thePlayer.posX;
-        double dy = pos.getY() + 0.5 - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
-        double dz = pos.getZ() + 0.5 - mc.thePlayer.posZ;
-        double dist = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0f;
-        float pitch = (float) -(Math.atan2(dy, dist) * 180.0 / Math.PI);
-        return new float[]{yaw, pitch};
+        return RotationMath.toRotationsFromDelta(
+                pos.getX() + 0.5 - mc.thePlayer.posX,
+                pos.getY() + 0.5 - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight()),
+                pos.getZ() + 0.5 - mc.thePlayer.posZ);
     }
 }

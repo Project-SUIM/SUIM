@@ -30,7 +30,7 @@ import java.lang.reflect.Field;
 import java.util.Set;
 
 /**
- * AutoBlockIn — automatic block-in/cage builder.
+ * AutoBlockIn - automatic block-in/cage builder.
  * <p>
  * Uses purely Forge events for rotation spoofing (via outgoing packet
  * interception), placement, and rendering. No Myau UpdateEvent dependency.
@@ -106,8 +106,6 @@ public class AutoBlockIn extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, AutoBlockIn.class);
 
@@ -155,7 +153,6 @@ public class AutoBlockIn extends Feature {
             manager.registerModuleCallbacks(moduleInstance,
                     this::onModuleEnabled, this::onModuleDisabled);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {
@@ -183,8 +180,10 @@ public class AutoBlockIn extends Feature {
             }
 
             if (bedNukerModule != null) {
-                bedNukerTargetBedField = findField(bedNukerModule.getClass(), "I");
-                bedNukerBreakingField = findField(bedNukerModule.getClass(), "K");
+                // 260729: BedBreaker target bed = field "p" (BlockPos), breaking state = "F" (boolean)
+                // (F=breaking, t=readyToBreak, G=isBed, J=waitingForStart - jar-verified)
+                bedNukerTargetBedField = findField(bedNukerModule.getClass(), "p");
+                bedNukerBreakingField = findField(bedNukerModule.getClass(), "F");
             }
         } catch (Exception e) {
             MyauLogger.error("AutoBlockIn hookContextModules", e);
@@ -258,39 +257,35 @@ public class AutoBlockIn extends Feature {
             if (getDisableOnMove() && startPos != null) {
                 BlockPos currentPos = mc.thePlayer.getPosition();
                 if (!currentPos.equals(startPos)) {
-                    debugMsg("Player moved — auto-disabling");
+                    debugMsg("Player moved - auto-disabling");
                     manager.setModuleEnabled(moduleInstance, false);
                     return;
                 }
             }
 
-            // Update progress
             Vec3 playerPos = mc.thePlayer.getPositionVector();
             BlockPos feetPos = new BlockPos(
                     playerPos.xCoord, playerPos.yCoord, playerPos.zCoord);
             int filled = BlockInPlacement.countFilledPositions(feetPos);
             progress = (float) filled / BlockInPlacement.TOTAL_POSITIONS;
 
-            // Auto-disable at 100%
             if (filled >= BlockInPlacement.TOTAL_POSITIONS && getAutoDisable()) {
-                MyauLogger.log(getName(), "Cage complete — auto-disabling");
+                MyauLogger.log(getName(), "Cage complete - auto-disabling");
                 manager.setModuleEnabled(moduleInstance, false);
                 return;
             }
 
-            // Select best block slot
             int bestSlot = BlockInScoring.findBestBlockSlot();
             if (bestSlot != -1 && mc.thePlayer.inventory.currentItem != bestSlot) {
                 mc.thePlayer.inventory.currentItem = bestSlot;
             }
 
-            // Verify holding a block
             if (!BlockInScoring.isHoldingBlock()) {
                 currentTarget = null;
                 return;
             }
 
-            // Find placement — re-scan every tick for fresh raytrace data
+            // Find placement - re-scan every tick for fresh raytrace data
             BlockInPlacement.setSkipInteractableMode(getSkipInteractableMode());
             currentTarget = BlockInPlacement.findBestPlacement(getRange(),
                     getOrderMode());
@@ -306,11 +301,10 @@ public class AutoBlockIn extends Feature {
                 }
             }
 
-            // Check if this target's goal was auto-skipped
             BlockPos goalPos = currentTarget.supportBlock.offset(currentTarget.face);
             if (lastFailedGoal != null && lastFailedGoal.equals(goalPos)
                     && consecutiveFailures >= MAX_FAIL_COUNT) {
-                // Skip this goal — tell placement to exclude it
+                // Skip this goal - tell placement to exclude it
                 debugMsg("SKIP " + formatPos(goalPos) + " (failed " + MAX_FAIL_COUNT + "x)");
                 BlockInPlacement.addSkippedGoal(goalPos);
                 lastFailedGoal = null;

@@ -1,6 +1,7 @@
 package coffee.axle.suim.util;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.Packet;
 import net.minecraft.network.handshake.client.C00Handshake;
 import net.minecraft.network.login.client.C00PacketLoginStart;
@@ -22,7 +23,8 @@ public class BlinkManager {
         NONE,
         SHOP_BLINK,
         VELOCITY_BUFFER,
-        GENERIC
+        GENERIC,
+        DISPLACE
     }
 
     private final Queue<Packet<?>> blinkedPackets = new ConcurrentLinkedQueue<>();
@@ -35,11 +37,16 @@ public class BlinkManager {
 
     public boolean tryBlink(Packet<?> packet) {
         if (!blinking) return false;
-        if (packet instanceof C00PacketKeepAlive || packet instanceof C01PacketChatMessage) {
-            return false;
-        }
-        if (blinkedPackets.isEmpty() && packet instanceof C0FPacketConfirmTransaction) {
-            return false;
+        // Breeze's blink (eo) holds EVERY outbound packet while its queue is
+        // active - no keepalive/chat/transaction exemptions. only the other
+        // blink modules keep those safety exemptions.
+        if (blinkModule != BlinkModule.DISPLACE) {
+            if (packet instanceof C00PacketKeepAlive || packet instanceof C01PacketChatMessage) {
+                return false;
+            }
+            if (blinkedPackets.isEmpty() && packet instanceof C0FPacketConfirmTransaction) {
+                return false;
+            }
         }
         blinkedPackets.offer(packet);
         return true;
@@ -61,9 +68,24 @@ public class BlinkManager {
         return true;
     }
 
+    // batch a packet into the blink queue directly (Displace controlled sends).
+    // works regardless of the keepalive/chat exemptions - the caller controls
+    // exactly which packets get batched, like Breeze's eo DELAY release order
+    public void queueDirect(Packet<?> packet) {
+        blinkedPackets.offer(packet);
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void flush() {
-        if (mc.getNetHandler() == null || blinkedPackets.isEmpty()) return;
+        if (blinkedPackets.isEmpty()) return;
+        // play packets written while the connection is in login/handshake state
+        // (hypixel bungee transfers, a blink that spans a server switch) hit the
+        // serializer with no packet id -> "Can't serialize unregistered packet"
+        // kills the channel. drop the queue across a switch instead of flushing.
+        if (mc.getNetHandler() == null || !(mc.getNetHandler() instanceof NetHandlerPlayClient)) {
+            blinkedPackets.clear();
+            return;
+        }
         for (Packet<?> packet : blinkedPackets) {
             PacketUtils.sendPacketNoEvent((Packet) packet);
         }
@@ -73,6 +95,14 @@ public class BlinkManager {
     public void forceStop() {
         blinking = false;
         flush();
+        blinkModule = BlinkModule.NONE;
+    }
+
+    // clear the queue without sending it - Breeze drops the delayed packets
+    // when the module is disabled mid-blink (a(ArrayList): !f() -> clear)
+    public void drop() {
+        blinkedPackets.clear();
+        blinking = false;
         blinkModule = BlinkModule.NONE;
     }
 

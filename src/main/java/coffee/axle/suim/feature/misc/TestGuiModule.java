@@ -7,7 +7,7 @@ import coffee.axle.suim.util.MyauLogger;
 import java.util.ArrayList;
 
 /**
- * GUI test module — verifies the click GUI can render and control
+ * GUI test module - verifies the click GUI can render and control
  * a SUIM-created Myau module with properties.
  */
 public class TestGuiModule extends Feature {
@@ -56,7 +56,6 @@ public class TestGuiModule extends Feature {
 
             manager.reloadModuleCommand();
 
-            MyauLogger.info("TestGuiModule initialized");
             return true;
         } catch (Exception e) {
             MyauLogger.error("TestGuiModule:init", e);

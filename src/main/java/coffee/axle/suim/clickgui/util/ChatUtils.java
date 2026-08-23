@@ -192,14 +192,14 @@ public final class ChatUtils {
      * Print a developer message in chat (disabled; dev settings removed).
      */
     public static void devMessage(Object msg) {
-        // Dev mode has been removed — no-op
+        // Dev mode has been removed - no-op
     }
 
     /**
      * Print a debug message in chat (disabled; debug settings removed).
      */
     public static void debugMessage(Object msg) {
-        // Debug mode has been removed — no-op
+        // Debug mode has been removed - no-op
     }
 
     /**

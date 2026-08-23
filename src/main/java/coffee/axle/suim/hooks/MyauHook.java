@@ -37,7 +37,6 @@ public class MyauHook {
     private Method propertyGetValueMethod;
     private Method propertyGetNameMethod;
 
-    @SuppressWarnings("unused")
     private Method commandRunMethod;
 
     // Reflection caches
@@ -145,11 +144,6 @@ public class MyauHook {
         if (this.eventBus == null) {
             throw new Exception("EventBus field is null");
         }
-    }
-
-    public void clearCaches() {
-        classCache.clear();
-        fieldCache.clear();
     }
 
     public Class<?> getCachedClass(String className) throws ClassNotFoundException {
@@ -317,7 +311,9 @@ public class MyauHook {
         // Event handler method
         mv = cw.visitMethod(ACC_PUBLIC, "onEvent", "(L" + eventInternalName + ";)V", null, null);
         AnnotationVisitor av = mv.visitAnnotation(annotationDesc, true);
-        av.visit("value", priority);
+        // EventTarget element is "y" and typed int in 260729 (was "value"). Must write an
+        // Integer, not the raw byte - otherwise reading int y() throws AnnotationTypeMismatchException.
+        av.visit("y", (int) priority);
         av.visitEnd();
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
@@ -383,10 +379,6 @@ public class MyauHook {
                 MyauLogger.error("CALLBACK_FAIL", e);
             }
         }
-    }
-
-    public Object getModuleManager() {
-        return this.moduleManager;
     }
 
     public Object getCommandManager() {

@@ -45,8 +45,6 @@ public class InvManagerExtras extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             invManagerModule = manager.findModule("InvManager");
             if (invManagerModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
@@ -78,7 +76,6 @@ public class InvManagerExtras extends Feature {
 
             net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

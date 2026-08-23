@@ -67,8 +67,6 @@ public class Bedplates extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, getClass());
 
@@ -116,7 +114,6 @@ public class Bedplates extends Feature {
             manager.reloadModuleCommand();
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
         } catch (Exception t) {
             MyauLogger.error("FEATURE_FAIL", t);

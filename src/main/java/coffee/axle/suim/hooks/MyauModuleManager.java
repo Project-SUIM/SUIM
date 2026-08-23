@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -86,43 +87,16 @@ public class MyauModuleManager {
     }
 
     public void setModuleEnabled(Object module, boolean enabled) throws Exception {
-        // Direct field manipulation — the obfuscated f(SZSI)V uses ZKM o_.a dispatch
-        // which throws ArrayIndexOutOfBoundsException with our junk parameter values.
-        // Setting the 'p' field directly and calling onEnabled/onDisabled callbacks
-        // is reliable: those methods don't use o_.a dispatch in native Myau modules,
-        // and our ASM-generated modules override them to call
-        // triggerOnEnable/triggerOnDisable.
-        Field enabledField = hook.findFieldInHierarchy(module.getClass(), FIELD_MODULE_ENABLED);
-        if (enabledField == null) {
-            throw new Exception("Cannot find enabled field on module " + getModuleName(module));
+        // 260729: Module.setEnabled is v(Z)V - a plain method (the 250910-era native
+        // ZKM-guarded f(SZSI)V is gone). Use Myau's own setter so the enabled field
+        // AND onEnabled/onDisabled callbacks fire correctly (incl. SUIM generated modules).
+        Method setEnabled = hook.findMethodInHierarchy(
+                module.getClass(), METHOD_SET_ENABLED, boolean.class);
+        if (setEnabled == null) {
+            throw new Exception("Cannot find setEnabled on module " + getModuleName(module));
         }
-
-        boolean currentState = enabledField.getBoolean(module);
-        if (currentState == enabled) {
-            return;
-        }
-
-        enabledField.setBoolean(module, enabled);
-
-        try {
-            if (enabled) {
-                Method onEnabled = hook.findMethodInHierarchy(
-                        module.getClass(), METHOD_ON_ENABLE,
-                        short.class, int.class, char.class);
-                if (onEnabled != null) {
-                    onEnabled.invoke(module, (short) 0, 0, (char) 0);
-                }
-            } else {
-                Method onDisabled = hook.findMethodInHierarchy(
-                        module.getClass(), METHOD_ON_DISABLE, long.class);
-                if (onDisabled != null) {
-                    onDisabled.invoke(module, 0L);
-                }
-            }
-        } catch (Exception callbackEx) {
-            MyauLogger.log("setModuleEnabled",
-                    "Callback failed for " + getModuleName(module) + " (field set OK)");
-        }
+        setEnabled.invoke(module, enabled);
+        notifyConfigChanged();
     }
 
     public void toggleModule(Object module) throws Exception {
@@ -130,22 +104,15 @@ public class MyauModuleManager {
     }
 
     /**
-     * Toggles a module through Myau's command handler so the
-     * standard "[Myau] Module (ON/OFF)" notification is displayed.
-     * Falls back to direct toggle if the command path fails.
+     * Toggles a module. In 260729 Myau's ModuleCommand shows the settings on a bare
+     * ".modulename" (it no longer toggles), so we do the direct toggle instead -
+     * setEnabled(v(Z)V) flips the field and fires onEnabled/onDisabled callbacks.
      */
     public void toggleModuleViaCommand(Object module) {
         try {
-            String name = getModuleName(module);
-            ArrayList<String> args = new ArrayList<>();
-            args.add(name);
-            runCommandByName(name, args);
+            toggleModule(module);
         } catch (Exception e) {
-            try {
-                toggleModule(module);
-            } catch (Exception fallback) {
-                MyauLogger.error("toggleModuleViaCommand", fallback);
-            }
+            MyauLogger.error("toggleModuleViaCommand", e);
         }
     }
 
@@ -535,12 +502,28 @@ public class MyauModuleManager {
         names.ensureCapacity(modules.size());
 
         Method getNameMethod = hook.getModuleGetNameMethod();
+        int skipped = 0;
         for (Object module : modules.values()) {
-            String moduleName = (String) getNameMethod.invoke(module);
-            names.add(moduleName);
+            try {
+                Object name = getNameMethod.invoke(module);
+                if (name != null) {
+                    // Myau's dispatch is lowercase-normalized (completion does
+                    // name.toLowerCase().startsWith(prefix), ToggleCommand lowercases
+                    // input). Storing capitalized names breaks routing - "Unknown
+                    // command (killaura)".
+                    names.add(name.toString().toLowerCase(Locale.ROOT));
+                } else {
+                    skipped++;
+                }
+            } catch (Exception e) {
+                skipped++;
+                MyauLogger.log("reloadModuleCommand",
+                        "skip " + module.getClass().getName() + ": " + e);
+            }
         }
 
-        MyauLogger.info("Reloaded ModuleCommand with " + names.size() + " modules");
+        MyauLogger.info("Reloaded ModuleCommand with " + names.size()
+                + " modules" + (skipped > 0 ? " (" + skipped + " skipped)" : ""));
     }
 
     public void saveCurrentConfig() throws Exception {
@@ -574,7 +557,9 @@ public class MyauModuleManager {
                 @SuppressWarnings("unchecked")
                 ArrayList<String> names = (ArrayList<String>) namesField.get(cmd);
                 if (commandNamesContain(names, commandName)) {
-                    runMethod.invoke(cmd, args, System.currentTimeMillis());
+                    // runCommand is k(ArrayList) in 260729 - the old (ArrayList, long) trash
+                    // param is gone, so drop the phantom timestamp arg
+                    runMethod.invoke(cmd, args);
                     return;
                 }
             } catch (Exception ignored) {
@@ -615,8 +600,10 @@ public class MyauModuleManager {
                 Object namesObj = namesField.get(cmd);
                 if (namesObj instanceof ArrayList) {
                     ArrayList<?> names = (ArrayList<?>) namesObj;
-                    if (names.contains("AimAssist")) {
-                        return cmd;
+                    for (Object n : names) {
+                        if (n != null && n.toString().equalsIgnoreCase("AimAssist")) {
+                            return cmd;
+                        }
                     }
                 }
             } catch (Exception ignored) {

@@ -6,7 +6,7 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 /**
  * PreMotionEvent - Fired before player motion is sent to server
  * 
- * @author maybsomeday (meow) - ported to d'Myau
+ * @author maybsomeday (meow) - ported to SUIM
  */
 @Cancelable
 public class PreMotionEvent extends Event {

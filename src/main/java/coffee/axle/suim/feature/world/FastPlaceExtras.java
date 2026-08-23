@@ -129,7 +129,7 @@ public class FastPlaceExtras extends Feature {
             return true;
         if (block instanceof BlockLever)
             return true;
-        return (69 / 420) == 67;
+        return false;
     }
 }
 
