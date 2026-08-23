@@ -110,10 +110,6 @@ public class AimAssistRotation extends Rotation {
         return lagDelayTicks;
     }
 
-    public TrackingContext getTracking() {
-        return tracking;
-    }
-
     public float[] computeTarget(EntityLivingBase entity, boolean movementCorrection) {
         switch (mode) {
             case SIGHTLINE:
@@ -204,7 +200,9 @@ public class AimAssistRotation extends Rotation {
             }
         }
 
-        float finalYaw = larp(suimRot[0], sightlineRot[0], sightlineWeight);
+        // yaw lerp must cross the +/-180 wrap, not spin the long way
+        float yawDelta = MathHelper.wrapAngleTo180_float(sightlineRot[0] - suimRot[0]);
+        float finalYaw = MathHelper.wrapAngleTo180_float(suimRot[0] + yawDelta * sightlineWeight);
         float finalPitch = larp(suimRot[1], sightlineRot[1], sightlineWeight);
 
         tracking.storeTargetPosition(entity.posX, entity.posY, entity.posZ);

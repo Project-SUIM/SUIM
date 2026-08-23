@@ -33,8 +33,6 @@ public class AimAssistExtras extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             propertyGetValue = manager.getPropertyGetValueMethod();
             if (propertyGetValue == null) {
                 MyauLogger.log(getName(), "PROPERTY_METHOD_NULL");
@@ -69,7 +67,6 @@ public class AimAssistExtras extends Feature {
             }
 
             featureActive = true;
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

@@ -23,18 +23,18 @@ import coffee.axle.suim.feature.SuffixRegistry;
  * my fucking god SuChen fuck you like actually fuck your antileak im going to jump
  *
  * <p>
- * <strong>Why not Mixin?</strong> In Myau 260317, {@code myau.g3} (AimAssist) has SuChen's
+ * <strong>Why not Mixin?</strong> In Myau 260729, {@code myau.G} (AimAssist) has SuChen's
  *  shitty anti-leak protection. The native hash check in {@code <clinit>} detects any bytecode
  * modification by the Mixin transformer, causing heap corruption crashes.
  * </p>
  *
  * <p>
  * <strong>How it works:</strong><br>
- * 1. Registers as a handler on Myau's internal event bus for {@code myau.U} (TickEvent POST)<br>
+ * 1. Registers as a handler on Myau's internal event bus for {@code myau.k7} (LivingUpdateEvent)<br>
  * 2. Appended AFTER AimAssist's own handler in the handler list<br>
- * 3. After AimAssist runs and stores rotation deltas via {@code v4.K(FFIZ)V},
+ * 3. After AimAssist runs and stores rotation deltas via {@code kj.W(FFIZ)V},
  *    this handler reads the RM delta fields and overrides them with custom rotation<br>
- * 4. Deltas are consumed by RM's PreTick handler {@code v4.E(V)} the next tick<br>
+ * 4. Deltas are consumed by RotationManager on its next handler dispatch<br>
  * </p>
  *
  * <p>
@@ -54,14 +54,15 @@ public class AimAssistHook {
     private static boolean suffixRegistered = false;
     private static long lastProcessedTick = -1;
 
-    // Reflection caches — RotationManager
+    // Reflection caches - RotationManager
+    private static Field moduleEnabledField;
     private static Field rotationManagerField;
     private static Field yawDeltaField;
     private static Field pitchDeltaField;
     private static Field lastUpdateField;
     private static Field rmPriorityField;
 
-    // Reflection caches — LagManager
+    // Reflection caches - LagManager
     private static Field lagManagerField;
     private static Field lagMgrDelayTicksField;
     private static Field lagMgrIsLaggingField;
@@ -70,6 +71,11 @@ public class AimAssistHook {
     // Cached AimAssist module instance (from event bus handler map)
     private static Object aimAssistInstance;
     private static boolean instanceSearchDone = false;
+
+    // Reflection caches - TeamUtil (myau.kY) bot/team filters
+    private static Method isBotMethod;
+    private static Method isTeamMethod;
+    private static boolean teamUtilFailed = false;
 
     /**
      * Registers this handler on Myau's event bus.
@@ -80,7 +86,7 @@ public class AimAssistHook {
     public static boolean register() {
         AimAssistHook hook = new AimAssistHook();
         return MyauEventBusHook.registerAfter(
-                MyauMappings.CLASS_TICK_EVENT_POST, // myau.U
+                MyauMappings.CLASS_LIVING_UPDATE_EVENT, // myau.k7
                 hook,
                 "onPostTick",
                 Object.class,   // parameter type for dispatch compatibility
@@ -89,12 +95,12 @@ public class AimAssistHook {
     }
 
     /**
-     * Event handler for {@code myau.U} (TickEvent POST).
+     * Event handler for {@code myau.k7} (LivingUpdateEvent).
      * Called by the event bus dispatch via {@code method.invoke(this, event)}.
      *
      * <p>This runs AFTER AimAssist's handler has stored rotation deltas.</p>
      *
-     * @param event the TickEvent POST instance (myau.U) — treated as Object to avoid
+     * @param event the LivingUpdateEvent instance (myau.k7) - treated as Object to avoid
      *              compile-time dependency on Myau event types
      */
     public void onPostTick(Object event) {
@@ -114,42 +120,58 @@ public class AimAssistHook {
                 return;
 
             int modeOrdinal = AimAssistExtras.getAimModeOrdinal();
-            if (modeOrdinal == 0) // DEFAULT — let Myau's native aim-assist stand
+            if (modeOrdinal == 0) // DEFAULT - let Myau's native aim-assist stand
                 return;
 
             if (mc.thePlayer == null || mc.theWorld == null)
                 return;
-
-            // Myau's AimAssist only processes when the player is attacking (LMB held).
-            // The mixin approach inherited this check by running inside HJ.g().
-            // The eventbus approach runs every tick, so we must check explicitly.
-            if (mc.currentScreen != null || !Mouse.isButtonDown(0))
-                return;
-
-            long currentTick = mc.theWorld.getTotalWorldTime();
-            if (currentTick == lastProcessedTick)
-                return;
-            lastProcessedTick = currentTick;
 
             ensureRotationManagerReflection();
             Object rotMgr = getRotationManager();
             if (rotMgr == null)
                 return;
 
-            // Read deltas set by AimAssist → ZU.N
+            Object aaInstance = getAimAssistInstance();
+
+            // Myau gates its own e(k7) on isEnabled and leaves kj.f/I stale after
+            // disable. Honor the module state so custom rotation dies with the toggle.
+            if (!isAimAssistEnabled(aaInstance)) {
+                yawDeltaField.setFloat(rotMgr, 0.0f);
+                pitchDeltaField.setFloat(rotMgr, 0.0f);
+                lastUpdateField.setFloat(rotMgr, 0.0f);
+                return;
+            }
+
+            // Myau's AimAssist only processes while attacking; mirror that gate.
+            // Outside it we must still CLEAR any delta Myau's own handler left
+            // behind this tick, or its rotation leaks through on these paths.
+            if (mc.currentScreen != null || !Mouse.isButtonDown(0)) {
+                clearNativeDeltas(rotMgr);
+                return;
+            }
+
+            long currentTick = mc.theWorld.getTotalWorldTime();
+            if (currentTick == lastProcessedTick) {
+                clearNativeDeltas(rotMgr);
+                return;
+            }
+            lastProcessedTick = currentTick;
+
+            // Read deltas set by AimAssist -> kj.f/I
             float yawDelta = yawDeltaField.getFloat(rotMgr);
             float pitchDelta = pitchDeltaField.getFloat(rotMgr);
 
             // Only override if AimAssist actually set a rotation delta
-            if (Math.abs(yawDelta) < 0.001f && Math.abs(pitchDelta) < 0.001f)
+            if (Math.abs(yawDelta) < 0.001f && Math.abs(pitchDelta) < 0.001f) {
+                clearNativeDeltas(rotMgr);
                 return;
-
-            // Find AimAssist instance for reading properties
-            Object aaInstance = getAimAssistInstance();
+            }
 
             EntityPlayer target = findBestPlayer(aaInstance);
-            if (target == null)
+            if (target == null) {
+                clearNativeDeltas(rotMgr);
                 return;
+            }
 
             // Configure rotation from AimAssistExtras settings
             AimAssistRotation aim = getAimRotation();
@@ -173,7 +195,7 @@ public class AimAssistHook {
             if (result == null)
                 return;
 
-            // Override RM deltas — these will be consumed by ZU.G(V) next tick
+            // Override RM deltas - consumed by RotationManager on its next handler dispatch
             float currentYaw = mc.thePlayer.rotationYaw;
             float currentPitch = mc.thePlayer.rotationPitch;
 
@@ -182,6 +204,9 @@ public class AimAssistHook {
             pitchDeltaField.setFloat(rotMgr,
                     MathHelper.clamp_float(result[1] - currentPitch, -90.0f, 90.0f));
             lastUpdateField.setFloat(rotMgr, 0.0f);
+            // park Myau's own integrator on the current view so it doesn't keep
+            // pulling toward its multipoint target underneath our override
+            resetNativeSmoothing(aaInstance);
 
         } catch (Exception e) {
             MyauLogger.error("AimAssist:Hook tick", e);
@@ -211,6 +236,57 @@ public class AimAssistHook {
         }
     }
 
+    // Kill whatever rotation Myau's own AimAssist handler stored this tick.
+    // Without this, its multipoint target leaks through on every path where we
+    // don't override (no target, not attacking, etc).
+    private static void clearNativeDeltas(Object rotMgr) {
+        try {
+            float y = yawDeltaField.getFloat(rotMgr);
+            float p = pitchDeltaField.getFloat(rotMgr);
+            if (Math.abs(y) >= 0.001f || Math.abs(p) >= 0.001f) {
+                yawDeltaField.setFloat(rotMgr, 0.0f);
+                pitchDeltaField.setFloat(rotMgr, 0.0f);
+                lastUpdateField.setFloat(rotMgr, 0.0f);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    // Reset Myau's internal smoothing state (G.P/S float[2]). Its e(k7)
+    // integrates toward ITS multipoint target every tick even while we override
+    // the output; leaving it running makes the two drivers fight and the aim
+    // overrotates/jitters. Re-seeding P/S to the current view angles keeps its
+    // integrator parked on where the player is actually looking.
+    private static void resetNativeSmoothing(Object aaInstance) {
+        if (aaInstance == null) return;
+        try {
+            for (String fn : new String[]{MyauMappings.FIELD_AIM_ASSIST_SMOOTH_STATE_YAW,
+                                          MyauMappings.FIELD_AIM_ASSIST_SMOOTH_STATE_PITCH}) {
+                Field f = aaInstance.getClass().getDeclaredField(fn);
+                f.setAccessible(true);
+                float[] arr = (float[]) f.get(aaInstance);
+                if (arr == null || arr.length < 2) continue;
+                arr[0] = mc.thePlayer.rotationYaw;
+                arr[1] = mc.thePlayer.rotationPitch;
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static boolean isAimAssistEnabled(Object aaInstance) {
+        if (aaInstance == null) return false;
+        try {
+            if (moduleEnabledField == null) {
+                Class<?> moduleBase = Class.forName(MyauMappings.CLASS_MODULE_BASE);
+                moduleEnabledField = moduleBase.getDeclaredField(MyauMappings.FIELD_MODULE_ENABLED);
+                moduleEnabledField.setAccessible(true);
+            }
+            return moduleEnabledField.getBoolean(aaInstance);
+        } catch (Exception e) {
+            return true; // fail open - don't break rotation if reflection hiccups
+        }
+    }
+
     private static Object getRotationManager() throws Exception {
         return rotationManagerField.get(null);
     }
@@ -220,7 +296,7 @@ public class AimAssistHook {
         if (instanceSearchDone) return null;
         instanceSearchDone = true;
         aimAssistInstance = MyauEventBusHook.findModuleInstance(
-                MyauMappings.CLASS_TICK_EVENT_POST,
+                MyauMappings.CLASS_LIVING_UPDATE_EVENT,
                 MyauMappings.CLASS_AIM_ASSIST
         );
         if (aimAssistInstance == null) {
@@ -270,15 +346,8 @@ public class AimAssistHook {
     private static EntityPlayer findBestPlayer(Object aaInstance) {
         if (mc.theWorld == null || mc.thePlayer == null) return null;
 
-        float range;
-        int fov;
-        try {
-            range = getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_RANGE, 4.5f);
-            fov = getIntProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_FOV, 90);
-        } catch (Exception e) {
-            range = 4.5f;
-            fov = 90;
-        }
+        float range = getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_RANGE, 4.5f);
+        int fov = getIntProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_FOV, 90);
 
         EntityPlayer best = null;
         double closest = range;
@@ -295,6 +364,8 @@ public class AimAssistHook {
             float angle = RotationMath.angleToEntity(player);
             if (angle > (float) fov) continue;
 
+            if (isBotOrTeam(aaInstance, player)) continue;
+
             if (dist < closest) {
                 closest = dist;
                 best = player;
@@ -304,31 +375,62 @@ public class AimAssistHook {
     }
 
     private static float getFloatProp(Object instance, String fieldName, float fallback) {
-        if (instance == null) return fallback;
-        try {
-            Field f = instance.getClass().getDeclaredField(fieldName);
-            f.setAccessible(true);
-            Object prop = f.get(instance);
-            if (prop == null) return fallback;
-            Method getValue = prop.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE);
-            Object val = getValue.invoke(prop);
-            if (val instanceof Number) return ((Number) val).floatValue();
-        } catch (Exception ignored) {}
-        return fallback;
+        Object val = getProp(instance, fieldName);
+        return val instanceof Number ? ((Number) val).floatValue() : fallback;
     }
 
     private static int getIntProp(Object instance, String fieldName, int fallback) {
-        if (instance == null) return fallback;
+        Object val = getProp(instance, fieldName);
+        return val instanceof Number ? ((Number) val).intValue() : fallback;
+    }
+
+    private static boolean getBoolProp(Object instance, String fieldName, boolean fallback) {
+        Object val = getProp(instance, fieldName);
+        return val instanceof Boolean ? (Boolean) val : fallback;
+    }
+
+    private static Object getProp(Object instance, String fieldName) {
+        if (instance == null) return null;
         try {
             Field f = instance.getClass().getDeclaredField(fieldName);
             f.setAccessible(true);
             Object prop = f.get(instance);
-            if (prop == null) return fallback;
-            Method getValue = prop.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE);
-            Object val = getValue.invoke(prop);
-            if (val instanceof Number) return ((Number) val).intValue();
+            if (prop == null) return null;
+            return prop.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE).invoke(prop);
         } catch (Exception ignored) {}
-        return fallback;
+        return null;
+    }
+
+    // Mirrors myau.G.s(): skip Hypixel bots when bot-check is on, same-team players when team filter is on
+    private static boolean isBotOrTeam(Object aaInstance, EntityPlayer player) {
+        if (aaInstance == null) return false;
+        try {
+            if (getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_BOT_CHECKS, false)
+                    && (Boolean) isBotMethod().invoke(null, player)) {
+                return true;
+            }
+            return getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_TEAM, false)
+                    && (Boolean) isTeamMethod().invoke(null, player);
+        } catch (Exception e) {
+            teamUtilFailed = true;
+            return false;
+        }
+    }
+
+    private static Method isBotMethod() throws Exception {
+        if (isBotMethod == null) {
+            isBotMethod = Class.forName(MyauMappings.CLASS_TEAM_UTIL)
+                    .getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_BOT, EntityPlayer.class);
+        }
+        return isBotMethod;
+    }
+
+    private static Method isTeamMethod() throws Exception {
+        if (isTeamMethod == null) {
+            isTeamMethod = Class.forName(MyauMappings.CLASS_TEAM_UTIL)
+                    .getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_TEAM, EntityPlayer.class);
+        }
+        return isTeamMethod;
     }
 
     private void registerSuffix() {

@@ -59,8 +59,6 @@ public class AimAssistShowTarget extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             aimAssistModule = manager.findModule("AimAssist");
             if (aimAssistModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
@@ -94,7 +92,6 @@ public class AimAssistShowTarget extends Feature {
 
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {

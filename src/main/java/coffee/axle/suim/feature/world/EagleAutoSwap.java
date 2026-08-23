@@ -4,6 +4,7 @@ import coffee.axle.suim.feature.Feature;
 
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerControllerMP;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;
@@ -15,7 +16,6 @@ import java.lang.reflect.Method;
 /**
  * Eagle auto-swap
  */
-@SuppressWarnings("unused")
 public class EagleAutoSwap extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
@@ -40,8 +40,6 @@ public class EagleAutoSwap extends Feature {
     @Override
     public boolean initialize() {
         try {
-            MyauLogger.log(getName(), "FEATURE_INIT");
-
             eagleModule = manager.findModule("Eagle");
             if (eagleModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
@@ -80,7 +78,6 @@ public class EagleAutoSwap extends Feature {
 
             MinecraftForge.EVENT_BUS.register(this);
 
-            MyauLogger.log(getName(), "FEATURE_SUCCESS");
             return true;
 
         } catch (Exception e) {
@@ -135,6 +132,7 @@ public class EagleAutoSwap extends Feature {
 
             if (bestSlot != -1 && bestSlot != currentSlot) {
                 mc.thePlayer.inventory.currentItem = bestSlot;
+                syncCurrentPlayItem();
                 swappedToSlot = bestSlot;
                 lastSwapTick = currentTick;
             }
@@ -186,6 +184,35 @@ public class EagleAutoSwap extends Feature {
     private boolean isHoldingBlock() {
         ItemStack heldItem = mc.thePlayer.getHeldItem();
         return heldItem != null && heldItem.getItem() instanceof ItemBlock;
+    }
+
+    // a bare currentItem write never reaches the server; PlayerControllerMP
+    // only pushes the C09 slot packet from syncCurrentPlayItem
+    private static Method syncCurrentPlayItemMethod = findMethod(
+            PlayerControllerMP.class, "syncCurrentPlayItem", "func_78750_j");
+
+    private static Method findMethod(Class<?> clazz, String mcp, String srg) {
+        try {
+            Method m = clazz.getDeclaredMethod(mcp);
+            m.setAccessible(true);
+            return m;
+        } catch (NoSuchMethodException e) {
+            try {
+                Method m = clazz.getDeclaredMethod(srg);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) {
+                return null;
+            }
+        }
+    }
+
+    private static void syncCurrentPlayItem() {
+        try {
+            if (syncCurrentPlayItemMethod != null)
+                syncCurrentPlayItemMethod.invoke(mc.playerController);
+        } catch (Exception ignored) {
+        }
     }
 
     private int findBestBlockInHotbar(int currentSlot) {

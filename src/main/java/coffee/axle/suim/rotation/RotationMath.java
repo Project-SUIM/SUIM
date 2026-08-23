@@ -37,22 +37,6 @@ public final class RotationMath {
         return new float[] { yaw, pitch };
     }
 
-    public static float yawDiff(float from, float to) {
-        return MathHelper.wrapAngleTo180_float(to - from);
-    }
-
-    public static float yawDistance(float a, float b) {
-        return Math.abs(MathHelper.wrapAngleTo180_float(a - b));
-    }
-
-    public static boolean isInFOV(Entity entity, float fovDegrees) {
-        Minecraft mc = Minecraft.getMinecraft();
-        if (mc.thePlayer == null)
-            return false;
-        float angle = angleToEntity(entity);
-        return angle <= fovDegrees;
-    }
-
     public static float angleToEntity(Entity entity) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null)
