@@ -1,7 +1,7 @@
 [
   {
     "modid": "${modid}",
-    "name": "Societe des Utilitaires et Injections d'Myau",
+    "name": "Societe des Utilitaires et Injections pour Myau",
     "description": "Yet another Myau module Injector",
     "version": "${version}",
     "mcversion": "${mcversion}",

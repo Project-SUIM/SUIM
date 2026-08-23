@@ -4,10 +4,10 @@
 
 A feature-rich injection mod for Myau client (1.8.9 Forge). Adds standalone modules, property injections into existing Myau modules, custom commands, and more. all via dreadful reflection and mixins.
 
-[Join the discord](https://discord.gg/4umJGqwftc) for support, configs, and updates.
+[Join the discord](https://discord.gg/4umJGqwftc) for support, configs(???), and updates.
 Or contact @axle.coffee on discord
 
-> You need **PAID Myau** client for this. Only works with Myau-250910 this will **not work with** OpenMyau.
+> You need **PAID Myau** client for this. Targets Myau-260729 this will **not work with** OpenMyau.
 
 ---
 
@@ -16,7 +16,6 @@ Or contact @axle.coffee on discord
 ### Combat
 
 - **MoreKB** Sprint-reset knockback enhancement (Legit, Packet, Double Packet modes + intelligent targeting)
-- **HitSelect** Filters outgoing attack packets for optimal hit timing (Second, Criticals, WTap modes)
 - **MultiPointAiming**  Dynamic multi-point vertical targeting for AimAssist
 - **ArmorExceptions** Prevent KillAura from targeting players wearing specified armor
 - **AutoClicker Extras** Inventory-fill (auto-steal from chests) and require-press options
@@ -50,7 +49,7 @@ Or contact @axle.coffee on discord
 
 ### Commands
 
-- `.dmyau` / `.myau` Help menu listing all d'Myau features by category
+- `.suim` / `.myau` Help menu listing all SUIM features by category
 - `.find` / `.locate`  Search loaded chunks for closest matching block
 - `.status <player>` Fetch Hypixel player online status and recent games
 - `.client` / `.info` Display client info; change watermark name
