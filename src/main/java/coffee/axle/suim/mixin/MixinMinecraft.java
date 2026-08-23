@@ -1,13 +1,10 @@
 package coffee.axle.suim.mixin;
 
-import coffee.axle.suim.events.impl.PreKeyInputEvent;
-import coffee.axle.suim.events.impl.PreMouseInputEvent;
+import coffee.axle.suim.events.ClickEvent;
 import coffee.axle.suim.hooks.FreelookHooks;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraftforge.common.MinecraftForge;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,22 +20,15 @@ public class MixinMinecraft {
         FreelookHooks.modifyThirdPerson(settings, value);
     }
 
-    @Inject(method = { "runTick" }, at = {
-            @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;dispatchKeypresses()V") })
-    public void keyPresses(CallbackInfo ci) {
-        int k = (Keyboard.getEventKey() == 0) ? (Keyboard.getEventCharacter() + 256) : Keyboard.getEventKey();
-        char character = Keyboard.getEventCharacter();
-        if (Keyboard.getEventKeyState()) {
-            MinecraftForge.EVENT_BUS.post(new PreKeyInputEvent(k, character));
-        }
-    }
-
-    @Inject(method = { "runTick" }, at = {
-            @At(value = "INVOKE", target = "Lorg/lwjgl/input/Mouse;getEventButton()I", remap = false) })
-    public void mouseKeyPresses(CallbackInfo ci) {
-        int k = Mouse.getEventButton();
-        if (Mouse.getEventButtonState()) {
-            MinecraftForge.EVENT_BUS.post(new PreMouseInputEvent(k));
+    // input-level click cancel, like Breeze's cX event dispatch at clickMouse
+    // HEAD: a cancelled click never builds the swing/attack packets and never
+    // runs the client-side attack prediction (hit-slowdown, sprint drop, crit)
+    @Inject(method = "clickMouse", at = @At("HEAD"), cancellable = true)
+    private void onClickMouse(CallbackInfo ci) {
+        ClickEvent event = new ClickEvent();
+        MinecraftForge.EVENT_BUS.post(event);
+        if (event.isCanceled()) {
+            ci.cancel();
         }
     }
 }
