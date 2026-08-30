@@ -26,9 +26,6 @@ public class EagleAutoSwap extends Feature {
     private Object pitchCheckProperty;
     private Object blocksOnlyProperty;
 
-    private Method isEnabledMethod;
-    private Method shouldSneakMethod;
-
     private int lastSwapTick = 0;
     private int swappedToSlot = -1;
 
@@ -57,25 +54,6 @@ public class EagleAutoSwap extends Feature {
                 return false;
             }
 
-            for (Method m : eagleModule.getClass().getMethods()) {
-                if (m.getReturnType().equals(boolean.class) &&
-                        m.getParameterCount() == 0 &&
-                        m.getName().length() <= 2) {
-                    isEnabledMethod = m;
-                    break;
-                }
-            }
-
-            for (Method m : eagleModule.getClass().getDeclaredMethods()) {
-                if (m.getReturnType().equals(boolean.class) &&
-                        m.getParameterCount() == 0 &&
-                        m.getName().length() <= 2) {
-                    m.setAccessible(true);
-                    shouldSneakMethod = m;
-                    break;
-                }
-            }
-
             MinecraftForge.EVENT_BUS.register(this);
 
             return true;
@@ -92,7 +70,11 @@ public class EagleAutoSwap extends Feature {
             return;
 
         try {
-            if (!(Boolean) isEnabledMethod.invoke(eagleModule)) {
+            // 260729's module base has TWO public boolean no-arg methods (X =
+            // enabled, x = an unrelated state flag); the old "first boolean
+            // method" heuristic binds x there and the swap dies. Read the
+            // enabled field directly instead.
+            if (!manager.isModuleEnabled(eagleModule)) {
                 swappedToSlot = -1;
                 return;
             }

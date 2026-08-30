@@ -53,10 +53,11 @@ public class AutoClutch extends Feature {
     private long lastClutchEndTime = 0;
     private long clutchStartTime = 0;
     private int prevHurtTime = 0;
-    private boolean hurtLatched = false;
+    private long lastHurtAt = 0;
 
     private static final int FALL_SCAN_DEPTH = 10;
     private static final long CHAIN_WINDOW_MS = 750;
+    private static final long HURT_WINDOW_MS = 1000;
 
     @Override
     public String getName() {
@@ -131,7 +132,7 @@ public class AutoClutch extends Feature {
         lastClutchEndTime = 0;
         clutchStartTime = 0;
         prevHurtTime = 0;
-        hurtLatched = false;
+        lastHurtAt = 0;
     }
 
     private void onModuleDisabled() {
@@ -147,7 +148,7 @@ public class AutoClutch extends Feature {
         lastClutchEndTime = 0;
         clutchStartTime = 0;
         prevHurtTime = 0;
-        hurtLatched = false;
+        lastHurtAt = 0;
     }
 
     @SubscribeEvent
@@ -179,11 +180,9 @@ public class AutoClutch extends Feature {
             updateFireballState();
             handleTurnoff(now, disableDelay);
 
-            // Latch a hurt edge so the fall-check doesn't miss the damage window
-            // (hurtTime counts down 10->0 fast; the knockback launch precedes the descent)
             int curHurtTime = mc.thePlayer.hurtTime;
             if (curHurtTime > prevHurtTime) {
-                hurtLatched = true;
+                lastHurtAt = now;
             }
             prevHurtTime = curHurtTime;
 
@@ -202,14 +201,14 @@ public class AutoClutch extends Feature {
                 if (inChainWindow) {
                     shouldTrigger = true;
                 } else if (minFall == 0) {
-                    // default: clutch on any fall (outer block already guarantees in-air, descending)
-                    shouldTrigger = true;
+                    // 0 = void only
+                    shouldTrigger = dist == -1;
                 } else {
                     shouldTrigger = dist == -1 || dist >= minFall;
                 }
 
                 if (getHurtTimeEnabled()) {
-                    shouldTrigger = shouldTrigger && hurtLatched;
+                    shouldTrigger = shouldTrigger && now - lastHurtAt < HURT_WINDOW_MS;
                 }
 
                 if (shouldTrigger
@@ -231,7 +230,6 @@ public class AutoClutch extends Feature {
             } else if (mc.thePlayer.onGround) {
                 airTimeStart = 0;
                 suppressed = false;
-                hurtLatched = false;
                 if (!falling) {
                     landTimeStart = 0;
                 }

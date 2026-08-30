@@ -73,9 +73,10 @@ public class FeatureManager {
 
         // World
         registerFeature(new AutoBlockIn());
-        registerFeature(new AutoBedDefense());
+        // registerFeature(new AutoBedDefense()); (bans)
         registerFeature(new AutoClutch());
         registerFeature(new EagleAutoSwap());
+        // registerFeature(new EagleRequireSneak()); (doesnt work)
         registerFeature(new FastPlaceExtras());
 
         // Movement
@@ -85,7 +86,7 @@ public class FeatureManager {
 
         // Player
         registerFeature(new InvManagerExtras());
-        registerFeature(new InvWalk());
+        registerFeature(new InvWalk()); // doesn't work on Hypixel anymore
         registerFeature(new ClickOutOfContainers());
 
         // Exploit

@@ -20,9 +20,15 @@ public class Stasis extends Feature {
     private Object moduleInstance;
     private boolean allowNextC03 = false;
     private Object restoreMotionProperty;
+    private Object pulseProperty;
     private double savedMotionX = 0.0;
     private double savedMotionY = 0.0;
     private double savedMotionZ = 0.0;
+
+    // pulse: release the freeze for 4 ticks every 80 so the server keeps seeing
+    // movement and doesn't flag the frozen position
+    private long pulseTick = 0;
+    private boolean pulseActive = false;
 
     @Override
     public String getName() {
@@ -40,14 +46,21 @@ public class Stasis extends Feature {
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, Stasis.class);
             restoreMotionProperty = creator.createBooleanProperty("restore-motion", false); // :ponder:
-            creator.registerProperties(moduleInstance, restoreMotionProperty);
+            pulseProperty = creator.createBooleanProperty("pulse", false); // credits to @dedicatedlite in SUIM discord for this
+            creator.registerProperties(moduleInstance, restoreMotionProperty, pulseProperty);
             manager.reloadModuleCommand();
 
             MinecraftForge.EVENT_BUS.register(this);
             manager.registerModuleCallbacks(moduleInstance,
-                    () -> allowNextC03 = false,
                     () -> {
                         allowNextC03 = false;
+                        pulseTick = 0;
+                        pulseActive = false;
+                    },
+                    () -> {
+                        allowNextC03 = false;
+                        pulseTick = 0;
+                        pulseActive = false;
                         if (properties.getBoolean(restoreMotionProperty, false) && Utils.nullCheck()) {
                             mc.thePlayer.motionX = savedMotionX;
                             mc.thePlayer.motionY = savedMotionY;
@@ -66,7 +79,10 @@ public class Stasis extends Feature {
     public void onPreMotion(PreMotionEvent e) {
         if (!manager.isModuleEnabled(moduleInstance)) return;
         if (!Utils.nullCheck()) return;
+        pulseActive = properties.getBoolean(pulseProperty, false) && pulseTick % 80L < 4L;
+        pulseTick++;
         if (mc.thePlayer.hurtTime != 0) return;
+        if (pulseActive) return;
         savedMotionX = mc.thePlayer.motionX;
         savedMotionY = mc.thePlayer.motionY;
         savedMotionZ = mc.thePlayer.motionZ;
@@ -91,6 +107,7 @@ public class Stasis extends Feature {
             return;
         }
         if (!Utils.nullCheck() || mc.thePlayer.hurtTime != 0) return;
+        if (pulseActive) return;
         if (!(e.getPacket() instanceof C03PacketPlayer.C05PacketPlayerLook)) {
             e.setCanceled(true);
         }
@@ -101,6 +118,10 @@ public class Stasis extends Feature {
         if (!manager.isModuleEnabled(moduleInstance)) return;
         if (e.getPacket() instanceof S08PacketPlayerPosLook) {
             allowNextC03 = true;
+            // a lagback/teleport invalidates the frozen position - restart the
+            // cycle so the next pulse window measures from the corrected spot
+            pulseTick = 0;
+            pulseActive = false;
         }
     }
 }

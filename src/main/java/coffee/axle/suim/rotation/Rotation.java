@@ -46,6 +46,10 @@ public abstract class Rotation {
                 smoothFactor + jitter, 0.0f, 1.0f)));
     }
 
+    // Myau-native step semantics (G.e(k7) + kB.l/kB.G/kB.r): speed CAPS the
+    // per-tick step (never scales it - a multiplier > 1 overshoots every tick),
+    // smoothing scales the capped step, and the result chains onto the
+    // mouse-sensitivity lattice
     protected float[] smoothAndGCD(float targetYaw, float targetPitch,
             float smoothFactor, float hSpeed, float vSpeed) {
         float sYaw = state.getServerYaw();
@@ -54,17 +58,43 @@ public abstract class Rotation {
         float yawDelta = MathHelper.wrapAngleTo180_float(targetYaw - sYaw);
         float pitchDelta = MathHelper.wrapAngleTo180_float(targetPitch - sPitch);
 
-        yawDelta = smoothDelta(yawDelta, smoothFactor);
-        pitchDelta = smoothDelta(pitchDelta, smoothFactor);
+        // G.e's deadzone: sub-0.5 deg errors are left alone
+        if (Math.abs(yawDelta) < 0.5f) yawDelta = 0.0f;
+        if (Math.abs(pitchDelta) < 0.5f) pitchDelta = 0.0f;
 
-        float newYaw = sYaw + yawDelta * Math.min(Math.abs(hSpeed), 10.0f) * 0.15f;
-        float newPitch = sPitch + pitchDelta * Math.min(Math.abs(vSpeed), 10.0f) * 0.15f;
+        yawDelta = capStep(yawDelta, hSpeed * 6.0f * rand(0.75f, 1.0f));
+        pitchDelta = capStep(pitchDelta, vSpeed * 6.0f * rand(0.75f, 1.0f) * 0.5f);
 
-        newYaw = applyGCD(sYaw, newYaw);
-        newPitch = applyGCD(sPitch, newPitch);
+        float scale = 0.5f + 0.5f * (1.0f - MathHelper.clamp_float(
+                smoothFactor + rand(-0.05f, 0.05f), 0.0f, 1.0f));
+        yawDelta *= scale;
+        pitchDelta *= scale;
+
+        float newYaw = gcdChain(sYaw + yawDelta, sYaw);
+        float newPitch = gcdChain(sPitch + pitchDelta, sPitch);
         newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
 
         return new float[] { newYaw, newPitch };
+    }
+
+    private static float rand(float min, float max) {
+        return min + (float) Math.random() * (max - min);
+    }
+
+    // kB.l: clamp |delta| to the cap, keeping sign
+    private static float capStep(float delta, float cap) {
+        if (delta > cap) return cap;
+        if (delta < -cap) return -cap;
+        return delta;
+    }
+
+    // kB.r: quantize to the NEAREST mouse-lattice step, chained from the
+    // previously sent angle (applyGCD's floor variant drifts off-lattice)
+    protected float gcdChain(float smoothed, float prevSent) {
+        float f = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
+        float gcd = f * f * f * 8.0f * 0.15f;
+        float delta = MathHelper.wrapAngleTo180_float(smoothed - prevSent);
+        return prevSent + (float) (Math.round(delta / gcd) * (double) gcd);
     }
 
     // rotate WASD inputs to compensate for a yaw spoof; call after setting rotationYaw
@@ -120,14 +150,19 @@ public abstract class Rotation {
         float yawDelta = MathHelper.wrapAngleTo180_float(targetYaw - sYaw);
         float pitchDelta = MathHelper.wrapAngleTo180_float(targetPitch - sPitch);
 
-        yawDelta = smoothDelta(yawDelta, effectiveSmooth);
-        pitchDelta = smoothDelta(pitchDelta, effectiveSmooth);
+        if (Math.abs(yawDelta) < 0.5f) yawDelta = 0.0f;
+        if (Math.abs(pitchDelta) < 0.5f) pitchDelta = 0.0f;
 
-        float newYaw = sYaw + yawDelta * Math.min(Math.abs(hSpeed), 10.0f) * 0.15f;
-        float newPitch = sPitch + pitchDelta * Math.min(Math.abs(vSpeed), 10.0f) * 0.15f;
+        yawDelta = capStep(yawDelta, hSpeed * 6.0f * rand(0.75f, 1.0f));
+        pitchDelta = capStep(pitchDelta, vSpeed * 6.0f * rand(0.75f, 1.0f) * 0.5f);
 
-        newYaw = applyGCD(sYaw, newYaw);
-        newPitch = applyGCD(sPitch, newPitch);
+        float scale = 0.5f + 0.5f * (1.0f - MathHelper.clamp_float(
+                effectiveSmooth + rand(-0.05f, 0.05f), 0.0f, 1.0f));
+        yawDelta *= scale;
+        pitchDelta *= scale;
+
+        float newYaw = gcdChain(sYaw + yawDelta, sYaw);
+        float newPitch = gcdChain(sPitch + pitchDelta, sPitch);
         newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
 
         return new float[] { newYaw, newPitch };

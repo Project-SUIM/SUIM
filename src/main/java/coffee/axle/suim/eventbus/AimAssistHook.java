@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
-import org.lwjgl.input.Mouse;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -133,45 +132,20 @@ public class AimAssistHook {
 
             Object aaInstance = getAimAssistInstance();
 
-            // Myau gates its own e(k7) on isEnabled and leaves kj.f/I stale after
-            // disable. Honor the module state so custom rotation dies with the toggle.
-            if (!isAimAssistEnabled(aaInstance)) {
-                yawDeltaField.setFloat(rotMgr, 0.0f);
-                pitchDeltaField.setFloat(rotMgr, 0.0f);
-                lastUpdateField.setFloat(rotMgr, 0.0f);
+            if (!isAimAssistEnabled(aaInstance))
                 return;
-            }
-
-            // Myau's AimAssist only processes while attacking; mirror that gate.
-            // Outside it we must still CLEAR any delta Myau's own handler left
-            // behind this tick, or its rotation leaks through on these paths.
-            if (mc.currentScreen != null || !Mouse.isButtonDown(0)) {
-                clearNativeDeltas(rotMgr);
-                return;
-            }
 
             long currentTick = mc.theWorld.getTotalWorldTime();
-            if (currentTick == lastProcessedTick) {
-                clearNativeDeltas(rotMgr);
+            if (currentTick == lastProcessedTick)
                 return;
-            }
             lastProcessedTick = currentTick;
 
-            // Read deltas set by AimAssist -> kj.f/I
-            float yawDelta = yawDeltaField.getFloat(rotMgr);
-            float pitchDelta = pitchDeltaField.getFloat(rotMgr);
-
-            // Only override if AimAssist actually set a rotation delta
-            if (Math.abs(yawDelta) < 0.001f && Math.abs(pitchDelta) < 0.001f) {
-                clearNativeDeltas(rotMgr);
+            if (lastUpdateField.getFloat(rotMgr) != 0.0f)
                 return;
-            }
 
             EntityPlayer target = findBestPlayer(aaInstance);
-            if (target == null) {
-                clearNativeDeltas(rotMgr);
-                return;
-            }
+            if (target == null)
+                return;  // rare: Myau found a target, we didn't - let its delta through
 
             // Configure rotation from AimAssistExtras settings
             AimAssistRotation aim = getAimRotation();
@@ -184,18 +158,16 @@ public class AimAssistHook {
             aim.setPingCompensation(AimAssistExtras.isPingCompEnabled());
             aim.setContractionRange(AimAssistExtras.getContractionMin(), AimAssistExtras.getContractionMax());
 
+            // Myau's own tuning: smoothing %, hSpeed, vSpeed (260729 fields O/L/u).
             float smoothing = getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_SMOOTHING, 50.0f) / 100.0f;
-            float hSpeed = Math.min(
-                    Math.abs(getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_HSPEED, 3.0f)), 10.0f);
-            float vSpeed = Math.min(
-                    Math.abs(getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_VSPEED, 0.0f)), 10.0f);
+            float hSpeed = Math.abs(getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_HSPEED, 3.0f));
+            float vSpeed = Math.abs(getFloatProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_VSPEED, 0.0f));
             aim.setLagDelayTicks(getLagDelayTicks());
 
             float[] result = aim.aimAtEntity(target, smoothing, hSpeed, vSpeed, true);
             if (result == null)
                 return;
 
-            // Override RM deltas - consumed by RotationManager on its next handler dispatch
             float currentYaw = mc.thePlayer.rotationYaw;
             float currentPitch = mc.thePlayer.rotationPitch;
 
@@ -204,16 +176,11 @@ public class AimAssistHook {
             pitchDeltaField.setFloat(rotMgr,
                     MathHelper.clamp_float(result[1] - currentPitch, -90.0f, 90.0f));
             lastUpdateField.setFloat(rotMgr, 0.0f);
-            // park Myau's own integrator on the current view so it doesn't keep
-            // pulling toward its multipoint target underneath our override
-            resetNativeSmoothing(aaInstance);
 
         } catch (Exception e) {
             MyauLogger.error("AimAssist:Hook tick", e);
         }
     }
-
-    // --- Reflection helpers (ported from MixinAimAssist @Unique methods) ---
 
     private static void ensureRotationManagerReflection() throws Exception {
         if (rotationManagerField == null) {
@@ -236,43 +203,6 @@ public class AimAssistHook {
         }
     }
 
-    // Kill whatever rotation Myau's own AimAssist handler stored this tick.
-    // Without this, its multipoint target leaks through on every path where we
-    // don't override (no target, not attacking, etc).
-    private static void clearNativeDeltas(Object rotMgr) {
-        try {
-            float y = yawDeltaField.getFloat(rotMgr);
-            float p = pitchDeltaField.getFloat(rotMgr);
-            if (Math.abs(y) >= 0.001f || Math.abs(p) >= 0.001f) {
-                yawDeltaField.setFloat(rotMgr, 0.0f);
-                pitchDeltaField.setFloat(rotMgr, 0.0f);
-                lastUpdateField.setFloat(rotMgr, 0.0f);
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    // Reset Myau's internal smoothing state (G.P/S float[2]). Its e(k7)
-    // integrates toward ITS multipoint target every tick even while we override
-    // the output; leaving it running makes the two drivers fight and the aim
-    // overrotates/jitters. Re-seeding P/S to the current view angles keeps its
-    // integrator parked on where the player is actually looking.
-    private static void resetNativeSmoothing(Object aaInstance) {
-        if (aaInstance == null) return;
-        try {
-            for (String fn : new String[]{MyauMappings.FIELD_AIM_ASSIST_SMOOTH_STATE_YAW,
-                                          MyauMappings.FIELD_AIM_ASSIST_SMOOTH_STATE_PITCH}) {
-                Field f = aaInstance.getClass().getDeclaredField(fn);
-                f.setAccessible(true);
-                float[] arr = (float[]) f.get(aaInstance);
-                if (arr == null || arr.length < 2) continue;
-                arr[0] = mc.thePlayer.rotationYaw;
-                arr[1] = mc.thePlayer.rotationPitch;
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
     private static boolean isAimAssistEnabled(Object aaInstance) {
         if (aaInstance == null) return false;
         try {
@@ -283,7 +213,7 @@ public class AimAssistHook {
             }
             return moduleEnabledField.getBoolean(aaInstance);
         } catch (Exception e) {
-            return true; // fail open - don't break rotation if reflection hiccups
+            return true; // don't break rotation if reflection dies of death
         }
     }
 

@@ -172,6 +172,9 @@ public class MyauMappings {
     // NEW in 260729 - module tick handlers moved to these events (jar-verified)
     public static final String CLASS_HIT_BLOCK_EVENT = "myau.kC";
     public static final String CLASS_LIVING_UPDATE_EVENT = "myau.k7";
+    // fired after MovementInput.updatePlayerMoveState; Eagle (myau.JC.x) forces
+    // its sneak on this event
+    public static final String CLASS_MOVE_STATE_EVENT = "myau.k2";
 
     // myau.F (Client) - all jar-verified
     public static final String FIELD_MODULE_MANAGER = "W";
@@ -296,10 +299,6 @@ public class MyauMappings {
     public static final String FIELD_AIM_ASSIST_BOT_CHECKS = "k"; // gates kY.w (isBot) in s() - deobf-confirmed; mapping had W
     public static final String FIELD_AIM_ASSIST_TEAM = "s";       // gates kY.Q (isTeam) in s() - bytecode-verified; mapping had x
     public static final String FIELD_AIM_ASSIST_MC = "v";
-    // G.P / G.S: the float[2] smoothing integrators (P[0]=yaw,P[1]=pitch target
-    // state, S[0]/S[1]=current smoothed angles) from decompiling myau.G 260729
-    public static final String FIELD_AIM_ASSIST_SMOOTH_STATE_YAW = "P";
-    public static final String FIELD_AIM_ASSIST_SMOOTH_STATE_PITCH = "S";
     public static final String METHOD_AIM_ASSIST_ON_TICK = "e";           // takes LivingUpdateEvent (k7) in 260729
     public static final String SIG_AIM_ASSIST_ON_TICK = "(Lmyau/k7;)V";   // NOTE: LivingUpdateEvent, not TickEvent POST
     public static final String METHOD_AIM_ASSIST_IS_VALID_TARGET = "t";

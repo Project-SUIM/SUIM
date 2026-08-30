@@ -137,12 +137,7 @@ public class AimAssistRotation extends Rotation {
             return aimAtEntitySuim(entity, raw, smoothFactor, hSpeed, vSpeed);
         }
 
-        float effectiveSmooth = smoothFactor;
-        if (movementCorrection && isPlayerMoving()) {
-            effectiveSmooth *= 1.3f;
-        }
-
-        return smoothAndGCD(raw[0], raw[1], effectiveSmooth, hSpeed, vSpeed);
+        return smoothAndGCD(raw[0], raw[1], smoothFactor, hSpeed, vSpeed);
     }
 
     private float[] calcEvilAxlePissAim(EntityLivingBase entity) {
