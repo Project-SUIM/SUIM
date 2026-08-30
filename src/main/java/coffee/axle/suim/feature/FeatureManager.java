@@ -50,6 +50,7 @@ public class FeatureManager {
         // Commands
         registerFeature(new SuimCommand());
         registerFeature(new PacketCaptureCommand());
+        registerFeature(new ShopperCommand());
         registerFeature(new FindCommand());
         registerFeature(new StatusCommand());
         registerFeature(new ClientInfoCommand());
@@ -94,6 +95,7 @@ public class FeatureManager {
         registerFeature(new ShopBlink());
         registerFeature(new Chester());
         registerFeature(new VelocityBuffer());
+        registerFeature(new Shopper());
 
     }
 
