@@ -1,6 +1,7 @@
 package coffee.axle.suim.eventbus;
 
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.feature.combat.Displace;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -25,13 +26,16 @@ public class EventBusBootstrap {
         if (event.phase != TickEvent.Phase.START) return;
 
         if (!MyauEventBusHook.tryInit()) return;
+        if (Displace.instance == null) return;
 
         boolean aaOk = AimAssistHook.register();
         boolean fpOk = FastPlaceHook.register();
+        boolean dispOk = DisplaceHook.register();
 
         MyauLogger.log("EventBusBootstrap",
                 "Handlers registered - AimAssist: " + (aaOk ? "OK" : "FAIL")
-                        + ", FastPlace: " + (fpOk ? "OK" : "FAIL"));
+                + ", FastPlace: " + (fpOk ? "OK" : "FAIL")
+                + ", Displace: " + (dispOk ? "OK" : "FAIL"));
 
         hooksDone = true;
         MinecraftForge.EVENT_BUS.unregister(this);

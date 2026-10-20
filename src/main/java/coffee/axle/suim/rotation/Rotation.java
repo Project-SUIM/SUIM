@@ -52,11 +52,15 @@ public abstract class Rotation {
     // mouse-sensitivity lattice
     protected float[] smoothAndGCD(float targetYaw, float targetPitch,
             float smoothFactor, float hSpeed, float vSpeed) {
-        float sYaw = state.getServerYaw();
-        float sPitch = state.getServerPitch();
+        return smoothAndGCD(targetYaw, targetPitch, smoothFactor, hSpeed, vSpeed,
+                state.getServerYaw(), state.getServerPitch());
+    }
 
-        float yawDelta = MathHelper.wrapAngleTo180_float(targetYaw - sYaw);
-        float pitchDelta = MathHelper.wrapAngleTo180_float(targetPitch - sPitch);
+    protected float[] smoothAndGCD(float targetYaw, float targetPitch,
+            float smoothFactor, float hSpeed, float vSpeed,
+            float baseYaw, float basePitch) {
+        float yawDelta = MathHelper.wrapAngleTo180_float(targetYaw - baseYaw);
+        float pitchDelta = MathHelper.wrapAngleTo180_float(targetPitch - basePitch);
 
         // G.e's deadzone: sub-0.5 deg errors are left alone
         if (Math.abs(yawDelta) < 0.5f) yawDelta = 0.0f;
@@ -70,8 +74,8 @@ public abstract class Rotation {
         yawDelta *= scale;
         pitchDelta *= scale;
 
-        float newYaw = gcdChain(sYaw + yawDelta, sYaw);
-        float newPitch = gcdChain(sPitch + pitchDelta, sPitch);
+        float newYaw = gcdChain(baseYaw + yawDelta, baseYaw);
+        float newPitch = gcdChain(basePitch + pitchDelta, basePitch);
         newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
 
         return new float[] { newYaw, newPitch };
@@ -88,13 +92,18 @@ public abstract class Rotation {
         return delta;
     }
 
-    // kB.r: quantize to the NEAREST mouse-lattice step, chained from the
-    // previously sent angle (applyGCD's floor variant drifts off-lattice)
-    protected float gcdChain(float smoothed, float prevSent) {
+    protected float gcdChain(float smoothed, float baseAngle) {
         float f = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
         float gcd = f * f * f * 8.0f * 0.15f;
-        float delta = MathHelper.wrapAngleTo180_float(smoothed - prevSent);
-        return prevSent + (float) (Math.round(delta / gcd) * (double) gcd);
+        float delta = MathHelper.wrapAngleTo180_float(smoothed - baseAngle);
+        return baseAngle + (float) (Math.round(delta / gcd) * (double) gcd);
+    }
+
+    public float[] snapToTarget(float targetYaw, float targetPitch) {
+        float yaw = gcdChain(targetYaw, mc.thePlayer.rotationYaw);
+        float pitch = gcdChain(targetPitch, mc.thePlayer.rotationPitch);
+        pitch = MathHelper.clamp_float(pitch, -90f, 90f);
+        return new float[] { yaw, pitch };
     }
 
     // rotate WASD inputs to compensate for a yaw spoof; call after setting rotationYaw
@@ -127,11 +136,17 @@ public abstract class Rotation {
             float baseSmoothFactor, float hSpeed, float vSpeed,
             float trackingConfidence, double targetLateralVel,
             double distance, int lagDelayTicks) {
-        float sYaw = state.getServerYaw();
-        float sPitch = state.getServerPitch();
+        return smoothAndGCDAdaptive(targetYaw, targetPitch, baseSmoothFactor, hSpeed, vSpeed,
+                trackingConfidence, targetLateralVel, distance, lagDelayTicks,
+                state.getServerYaw(), state.getServerPitch());
+    }
 
-        float yawError = Math.abs(MathHelper.wrapAngleTo180_float(targetYaw - sYaw));
-        float pitchError = Math.abs(MathHelper.wrapAngleTo180_float(targetPitch - sPitch));
+    protected float[] smoothAndGCDAdaptive(float targetYaw, float targetPitch,
+            float baseSmoothFactor, float hSpeed, float vSpeed,
+            float trackingConfidence, double targetLateralVel,
+            double distance, int lagDelayTicks, float baseYaw, float basePitch) {
+        float yawError = Math.abs(MathHelper.wrapAngleTo180_float(targetYaw - baseYaw));
+        float pitchError = Math.abs(MathHelper.wrapAngleTo180_float(targetPitch - basePitch));
         float totalError = (float) Math.sqrt(yawError * yawError + pitchError * pitchError);
 
         float errorFactor = 1.0f - MathHelper.clamp_float(totalError / 30.0f, 0.0f, 0.7f);
@@ -147,24 +162,7 @@ public abstract class Rotation {
 
         effectiveSmooth = Math.max(effectiveSmooth, 0.05f);
 
-        float yawDelta = MathHelper.wrapAngleTo180_float(targetYaw - sYaw);
-        float pitchDelta = MathHelper.wrapAngleTo180_float(targetPitch - sPitch);
-
-        if (Math.abs(yawDelta) < 0.5f) yawDelta = 0.0f;
-        if (Math.abs(pitchDelta) < 0.5f) pitchDelta = 0.0f;
-
-        yawDelta = capStep(yawDelta, hSpeed * 6.0f * rand(0.75f, 1.0f));
-        pitchDelta = capStep(pitchDelta, vSpeed * 6.0f * rand(0.75f, 1.0f) * 0.5f);
-
-        float scale = 0.5f + 0.5f * (1.0f - MathHelper.clamp_float(
-                effectiveSmooth + rand(-0.05f, 0.05f), 0.0f, 1.0f));
-        yawDelta *= scale;
-        pitchDelta *= scale;
-
-        float newYaw = gcdChain(sYaw + yawDelta, sYaw);
-        float newPitch = gcdChain(sPitch + pitchDelta, sPitch);
-        newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
-
-        return new float[] { newYaw, newPitch };
+        return smoothAndGCD(targetYaw, targetPitch, effectiveSmooth, hSpeed, vSpeed,
+                baseYaw, basePitch);
     }
 }
