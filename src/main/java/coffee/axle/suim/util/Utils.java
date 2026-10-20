@@ -17,6 +17,14 @@ public class Utils {
     public static long time() {
         return System.currentTimeMillis();
     }
+
+    public static double lerp(double current, double previous, float partialTicks) {
+        return previous + (current - previous) * partialTicks;
+    }
+
+    public static float lerp(float current, float previous, float partialTicks) {
+        return previous + (current - previous) * partialTicks;
+    }
 }
 
 
