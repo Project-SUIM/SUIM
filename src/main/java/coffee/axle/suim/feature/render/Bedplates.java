@@ -6,6 +6,7 @@ import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.feature.render.bedplates.BlockBedScanner;
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.render.BedBillboardRenderer;
+import coffee.axle.suim.util.BedwarsDetector;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 
@@ -43,6 +44,7 @@ public class Bedplates extends Feature {
     private Object itemSizeProperty;
     private Object backgroundModeProperty;
     private Object backgroundColorProperty;
+    private Object bedwarsOnlyProperty;
 
     private final HudUtils hudUtils = HudUtils.getInstance();
 
@@ -98,6 +100,8 @@ public class Bedplates extends Feature {
                             "HUD", "CUSTOM" });
             backgroundColorProperty = creator.createStringProperty(
                     "background-color", "000000");
+            bedwarsOnlyProperty = creator.createBooleanProperty(
+                    "bedwars-only", false);
 
             creator.registerProperties(moduleInstance,
                     yShiftProperty, updateRateProperty,
@@ -106,7 +110,8 @@ public class Bedplates extends Feature {
                     borderThicknessProperty, autoScaleProperty,
                     billboardScaleProperty, itemSizeProperty,
                     backgroundModeProperty,
-                    backgroundColorProperty);
+                    backgroundColorProperty,
+                    bedwarsOnlyProperty);
 
             hudUtils.initialize();
             hookBedESP();
@@ -156,6 +161,9 @@ public class Bedplates extends Feature {
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
+        if (properties.getBoolean(bedwarsOnlyProperty, false)
+                && !BedwarsDetector.inBedWarsGame())
+            return;
 
         long now = System.currentTimeMillis();
         long rate = (long) properties.getFloat(
@@ -173,6 +181,9 @@ public class Bedplates extends Feature {
         if (!manager.isModuleEnabled(moduleInstance))
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
+            return;
+        if (properties.getBoolean(bedwarsOnlyProperty, false)
+                && !BedwarsDetector.inBedWarsGame())
             return;
         if (bedFeet.isEmpty())
             return;
