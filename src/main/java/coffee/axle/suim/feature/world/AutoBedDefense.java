@@ -62,6 +62,7 @@ public class AutoBedDefense extends Feature {
     private boolean sneaked;
     private String lockedDir = "";
     private BlockPos origin;
+    @SuppressWarnings("unused")
     private BlockPos renderTarget;
     private float serverYaw;
     private float serverPitch;

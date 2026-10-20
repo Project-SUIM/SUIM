@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import coffee.axle.suim.events.ReceivePacketEvent;
-import coffee.axle.suim.events.SendPacketEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
@@ -108,27 +107,15 @@ public final class PacketCapture {
     }
 
     @SubscribeEvent
-    public void onSend(SendPacketEvent e) {
-        capture(e.getPacket(), false);
-    }
-
-    @SubscribeEvent
     public void onReceive(ReceivePacketEvent e) {
         capture(e.getPacket(), true);
     }
 
-    private void capture(Packet<?> packet, boolean inbound) {
-        capture(packet, inbound, false);
-    }
-
-    // noEvent sends (spoof replacements, blink flushes) bypass the mixin event, so
-    // record them here or they vanish from the log entirely
     public void recordSent(Packet<?> packet) {
-        if (capturing)
-            capture(packet, false, true);
+        capture(packet, false);
     }
 
-    private void capture(Packet<?> packet, boolean inbound, boolean viaNoEvent) {
+    private void capture(Packet<?> packet, boolean inbound) {
         if (!capturing || packet == null)
             return;
         if (packet instanceof C00PacketKeepAlive || packet instanceof S00PacketKeepAlive)
@@ -146,8 +133,6 @@ public final class PacketCapture {
         o.addProperty("t", System.currentTimeMillis() - startMs);
         o.addProperty("dir", inbound ? "S2C" : "C2S");
         o.addProperty("cls", packet.getClass().getSimpleName());
-        if (viaNoEvent)
-            o.addProperty("noEvent", true);
         if (!inbound && mc.thePlayer != null) {
             // real angles next to the packet's yaw makes spoof desyncs obvious
             o.addProperty("clientYaw", mc.thePlayer.rotationYaw);
@@ -227,6 +212,7 @@ public final class PacketCapture {
         JsonObject root = new JsonObject();
         root.addProperty("started", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(startMs)));
         root.addProperty("durationMs", System.currentTimeMillis() - startMs);
+        root.addProperty("outboundStage", "dispatch");
         if (targetName != null) {
             root.addProperty("target", targetName);
             root.addProperty("targetEntityId", targetEntityId);

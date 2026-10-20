@@ -75,7 +75,7 @@ public class BlinkManager {
         blinkedPackets.offer(packet);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"rawtypes"})
     public void flush() {
         if (blinkedPackets.isEmpty()) return;
         // play packets written while the connection is in login/handshake state

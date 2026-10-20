@@ -16,6 +16,7 @@ import java.util.Set;
  * Prevents targeting players wearing specific armor items
  */
 public class ArmorExceptions extends Feature {
+    @SuppressWarnings("unused")
     private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static ArmorExceptions INSTANCE = null;
