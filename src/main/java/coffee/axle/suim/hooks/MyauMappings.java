@@ -48,10 +48,10 @@ package coffee.axle.suim.hooks;
  * - RotationManager HitBlockEvent handler = a(kC) (mapping "E" was the 317 name);
  *   MoveUtil fixStrafe=S(F)V; LagManager isLagging=z()Z<br>
  * - Value types: T=Value, v=Bool, R=Ranged, g=Int, E=Float, s=Text, x=Mode, I=Color<br>
- * - Client fields (jar-verified): rotationManager=l, lagManager=m, eventBus=C,
+ * - Client fields (): rotationManager=l, lagManager=m, eventBus=C,
  *   moduleManager=W, commandManager=w, valueManager=p, friendManager=r,
  *   targetManager=N, clientName=X<br>
- * - Module (jar-verified): getName=E, isEnabled=X, setEnabled=v(Z)V,
+ * - Module (): getName=E, isEnabled=X, setEnabled=v(Z)V,
  *   onEnabled=Z(), onDisabled=f()<br>
  * - 32 anti-leak protected classes (up from 31 in 260317)<br>
  * - antileak UUID: antiLeak-1a2786b1-7d43-4a96-b4bc-752eb89b1600<br>
@@ -70,7 +70,7 @@ public class MyauMappings {
     public static final String CLASS_HANDLER_WRAPPER = "myau.kO";
     public static final String CLASS_MODULE_COMMAND = "myau.ka";
 
-    public static final String CLASS_EVIL_AUTUMN = "myau.ks"; // please dm foxgirlfrot for information regarding this
+    public static final String CLASS_EVIL_AUTUMN = "myau.a"; // please dm foxgirlfrot for information regarding this
                                                               // class - UNVERIFIED for 260729, may have changed
 
     // Module classes
@@ -79,6 +79,8 @@ public class MyauMappings {
     public static final String CLASS_BED_ESP = "myau.C";
     public static final String CLASS_BED_TRACKER = "myau.Z";
     public static final String CLASS_KILL_AURA = "myau.Jh";
+    public static final String CLASS_AUTO_CLICKER = "myau.w";
+    public static final String CLASS_LEFT_CLICK_EVENT = "myau.J0";
     public static final String CLASS_NO_SLOW = "myau.Jd";
     public static final String CLASS_FAST_PLACE = "myau.JQ";
 
@@ -98,10 +100,10 @@ public class MyauMappings {
 
     // LagManager (myau.p)
     public static final String CLASS_LAG_MANAGER = "myau.p";
-    public static final String FIELD_LAG_MANAGER = "m"; // Client.lagManager field (jar-verified)
+    public static final String FIELD_LAG_MANAGER = "m"; // Client.lagManager field ()
     public static final String FIELD_LAG_MGR_DELAY_TICKS = "F";
     public static final String FIELD_LAG_MGR_IS_LAGGING = "u";
-    public static final String METHOD_LAG_MGR_IS_LAGGING = "z"; // isLagging()Z - jar-verified (mapping labeled it "flushing")
+    public static final String METHOD_LAG_MGR_IS_LAGGING = "z"; // isLagging()Z -  (mapping labeled it "flushing")
 
     // LagRange module (myau.Jl)
     public static final String CLASS_LAG_RANGE = "myau.Jl";
@@ -113,8 +115,8 @@ public class MyauMappings {
     // DelayManager (myau.kF)
     public static final String CLASS_DELAY_MANAGER = "myau.kF";
 
-    // RotationManager (myau.kj) - all jar-verified
-    public static final String FIELD_ROTATION_MANAGER = "l"; // Client.rotationManager field (jar-verified)
+    // RotationManager (myau.kj) - all 
+    public static final String FIELD_ROTATION_MANAGER = "l"; // Client.rotationManager field ()
     public static final String FIELD_ROT_MGR_YAW_DELTA = "f";
     public static final String FIELD_ROT_MGR_PITCH_DELTA = "I";
     public static final String FIELD_ROT_MGR_ROTATED = "N";
@@ -123,7 +125,7 @@ public class MyauMappings {
     public static final String METHOD_ROT_MGR_SET_ROTATION = "W";
     public static final String SIG_ROT_MGR_SET_ROTATION = "(FFIZ)V"; // unchanged
     public static final String METHOD_ROT_MGR_IS_ROTATED = "l";
-    public static final String METHOD_ROT_MGR_ON_TICK = "a"; // HitBlockEvent handler (Lmyau/kC;)V - jar-verified ("E" was the 317 name)
+    public static final String METHOD_ROT_MGR_ON_TICK = "a"; // HitBlockEvent handler (Lmyau/kC;)V -  ("E" was the 317 name)
     public static final String METHOD_ROT_MGR_RESET = "o"; // overloaded with setRotation(J)V - sig: (J)V
 
     // Property / Value classes - constructor sigs unchanged from 260313
@@ -169,14 +171,14 @@ public class MyauMappings {
     public static final String CLASS_WINDOW_CLICK_EVENT = "myau.JU";
     public static final String CLASS_MOVE_INPUT_EVENT = "myau.ko";
     public static final String CLASS_SWAP_ITEM_EVENT = "myau.Jk";
-    // NEW in 260729 - module tick handlers moved to these events (jar-verified)
+    // NEW in 260729 - module tick handlers moved to these events ()
     public static final String CLASS_HIT_BLOCK_EVENT = "myau.kC";
     public static final String CLASS_LIVING_UPDATE_EVENT = "myau.k7";
     // fired after MovementInput.updatePlayerMoveState; Eagle (myau.JC.x) forces
     // its sneak on this event
     public static final String CLASS_MOVE_STATE_EVENT = "myau.k2";
 
-    // myau.F (Client) - all jar-verified
+    // myau.F (Client) - all 
     public static final String FIELD_MODULE_MANAGER = "W";
     public static final String FIELD_COMMAND_MANAGER = "w";
     public static final String FIELD_PROPERTY_MANAGER = "p";
@@ -197,7 +199,7 @@ public class MyauMappings {
     public static final String METHOD_CHAT_SEND = "E";
     public static final String SIG_CHAT_SEND = "(Lnet/minecraft/util/IChatComponent;)V";
 
-    // PlayerFileManager superclass fields (base class: myau.H) - all jar-verified
+    // PlayerFileManager superclass fields (base class: myau.H) - all 
     public static final String FIELD_PLAYER_LIST = "k";
     public static final String FIELD_PLAYER_FILE = "c";
     public static final String METHOD_PLAYER_LIST_CONTAINS = "o";
@@ -206,24 +208,24 @@ public class MyauMappings {
     public static final String METHOD_SEND_PACKET = "D";
 
     // ModuleManager (myau.kw)
-    public static final String METHOD_GET_MODULE = "p"; // native getModule(String) - jar-verified
+    public static final String METHOD_GET_MODULE = "p"; // native getModule(String) - 
     public static final String METHOD_IS_ENABLED = "X";
 
-    // KillAura (myau.Jh) - mixin-specific fields (jar-verified)
+    // KillAura (myau.Jh) - mixin-specific fields ()
     public static final String FIELD_KILL_AURA_AUTOBLOCK = "T";
     public static final String FIELD_KILL_AURA_IS_BLOCKING = "u";
     public static final String FIELD_KILL_AURA_TICK_STATE = "x";
-    public static final String METHOD_KILL_AURA_IS_PLAYER_BLOCKING = "p"; // ()Z - returns isBlocking field (u); jar-verified
+    public static final String METHOD_KILL_AURA_IS_PLAYER_BLOCKING = "p"; // ()Z - returns isBlocking field (u); 
     public static final String SIG_KILL_AURA_IS_PLAYER_BLOCKING = "()Z"; // unchanged
-    public static final String METHOD_KILL_AURA_UNBLOCK = "T";           // native ()V; jar-verified
+    public static final String METHOD_KILL_AURA_UNBLOCK = "T";           // native ()V; 
     public static final String SIG_KILL_AURA_UNBLOCK = "()V";            // unchanged
 
-    // ModuleManager / CommandManager / ValueManager map fields - jar-verified
+    // ModuleManager / CommandManager / ValueManager map fields - 
     public static final String FIELD_MODULES_MAP = "t";
     public static final String FIELD_COMMANDS_LIST = "A";
     public static final String FIELD_PROPERTY_MAP = "r";
 
-    // Module (myau.V) - jar-verified
+    // Module (myau.V) - 
     public static final String FIELD_MODULE_NAME = "r";
     public static final String FIELD_MODULE_ENABLED = "a";
     public static final String FIELD_MODULE_KEYBIND = "y";
@@ -242,18 +244,18 @@ public class MyauMappings {
     public static final String FIELD_HUD_COLOR_BRIGHTNESS = "e";
     public static final String FIELD_HUD_SCALE = "W";
 
-    // BedESP (myau.C) - jar-verified
+    // BedESP (myau.C) - 
     public static final String FIELD_BED_ESP_BEDS = "p";
     public static final String FIELD_BED_ESP_COLOR = "z";
     public static final String FIELD_BED_ESP_MODE = "P";
     public static final String METHOD_BED_ESP_ON_RENDER_3D = "j"; // sig: (Lmyau/k9;)V - RENDER_3D is myau.k9
 
-    // RotationUtil (myau.kB) - jar-verified
+    // RotationUtil (myau.kB) - 
     public static final String CLASS_ROTATION_UTIL = "myau.kB";
     public static final String METHOD_GET_ROTATIONS_TO_BOX = "B";
     public static final String METHOD_GET_ROTATIONS = "a";
 
-    // RotationState (myau.K) - jar-verified
+    // RotationState (myau.K) - 
     public static final String CLASS_ROTATION_STATE = "myau.K";
     public static final String FIELD_ROTATION_STATE_PITCH = "n";
     public static final String FIELD_ROTATION_STATE_YAW_HEAD = "b";
@@ -266,7 +268,7 @@ public class MyauMappings {
     // MoveUtil (myau.kz)
     public static final String CLASS_MOVE_UTIL = "myau.kz";
     public static final String METHOD_MOVE_UTIL_IS_FORWARD_PRESSED = "H";
-    public static final String METHOD_MOVE_UTIL_FIX_STRAFE = "S"; // (F)V - jar-verified (mapping "I" was s()I)
+    public static final String METHOD_MOVE_UTIL_FIX_STRAFE = "S"; // (F)V -  (mapping "I" was s()I)
 
     // NEW in 260729
     public static final String CLASS_HIT_SELECT = "myau.Jo";          // new module
@@ -275,7 +277,7 @@ public class MyauMappings {
     public static final String CLASS_AUTO_COMPLETE_UTIL = "myau.f";    // chat auto-completion
     public static final String CLASS_ANGLE_UTIL = "myau.z";            // static angle/math utils
 
-    // FastPlace (myau.JQ) - jar-verified: onTick takes HitBlockEvent (kC)
+    // FastPlace (myau.JQ) - : onTick takes HitBlockEvent (kC)
     public static final String METHOD_FAST_PLACE_CAN_PLACE = "C";      // native - sig: (J)Z
     public static final String SIG_FAST_PLACE_CAN_PLACE = "(J)Z";      // unchanged
     public static final String METHOD_FAST_PLACE_ON_TICK = "e";
@@ -288,7 +290,7 @@ public class MyauMappings {
     // SwapItemEvent (myau.Jk)
     public static final String METHOD_SWAP_ITEM_SET_SLOT = "G";
 
-    // AimAssist (myau.G) - all jar-verified; onTick takes LivingUpdateEvent (k7)
+    // AimAssist (myau.G) - all ; onTick takes LivingUpdateEvent (k7)
     public static final String FIELD_AIM_ASSIST_WEAPON_ONLY = "h";
     public static final String FIELD_AIM_ASSIST_ALLOW_TOOLS = "f";
     public static final String FIELD_AIM_ASSIST_RANGE = "l";
@@ -310,7 +312,7 @@ public class MyauMappings {
     public static final String METHOD_TEAM_UTIL_IS_BOT = "w";  // (EntityPlayer)Z - Hypixel NPC detection (UUID v2, ping, name marker)
     public static final String METHOD_TEAM_UTIL_IS_TEAM = "Q"; // (EntityPlayer)Z - scoreboard team check
 
-    // KillAura (myau.Jh) - fields + methods jar-verified (interactAttack = best guess)
+    // KillAura (myau.Jh) - fields + methods  (interactAttack = best guess)
     public static final String FIELD_KILL_AURA_TARGET = "c";
     public static final String FIELD_KILL_AURA_ATTACK_RANGE = "j";
     public static final String FIELD_KILL_AURA_SWING_RANGE = "Q";
@@ -328,16 +330,16 @@ public class MyauMappings {
     public static final String FIELD_KILL_AURA_BOT_CHECK = "m";
     public static final String FIELD_KILL_AURA_WEAPONS_ONLY = "TI";
     public static final String FIELD_KILL_AURA_ALLOW_TOOLS = "e";
-    public static final String METHOD_KILL_AURA_ON_UPDATE = "U";      // jar-verified: takes UpdateEvent (kQ)
-    public static final String METHOD_KILL_AURA_ON_TICK = "E";         // jar-verified: takes TickEvent (JS)
+    public static final String METHOD_KILL_AURA_ON_UPDATE = "U";      // : takes UpdateEvent (kQ)
+    public static final String METHOD_KILL_AURA_ON_TICK = "E";         // : takes TickEvent (JS)
     public static final String METHOD_KILL_AURA_PERFORM_ATTACK = "f";  // native - sig changed: (JFF)Z (was (FJF)Z - param reorder)
     public static final String METHOD_KILL_AURA_INTERACT_ATTACK = "j"; // native (FJF)V - best guess, flagged
-    public static final String METHOD_KILL_AURA_GET_TARGET = "n";      // jar-verified: getTarget()
+    public static final String METHOD_KILL_AURA_GET_TARGET = "n";      // : getTarget()
     public static final String METHOD_KILL_AURA_IS_VALID_TARGET = "B";
     public static final String SIG_KILL_AURA_IS_VALID_TARGET = "(JLnet/minecraft/entity/EntityLivingBase;)Z"; // param order (long, EntityLivingBase)
     public static final String METHOD_KILL_AURA_IS_PLAYER_TARGET = "v"; // (EntityLivingBase,J)Z - EntityPlayer-only check
 
-    // BedBreaker (myau.D) - bed-nuker target + state fields (jar-verified 260729)
+    // BedBreaker (myau.D) - bed-nuker target + state fields ( 260729)
     public static final String CLASS_BED_BREAKER = "myau.D";
     public static final String FIELD_BED_BREAKER_TARGET_BED = "p";        // BlockPos current target
     public static final String FIELD_BED_BREAKER_BREAKING = "F";          // boolean - actively breaking
@@ -345,7 +347,7 @@ public class MyauMappings {
     public static final String FIELD_BED_BREAKER_IS_BED = "G";            // boolean - current target is a bed
     public static final String FIELD_BED_BREAKER_WAITING_FOR_START = "J"; // boolean - waiting for start
 
-    // Value base (myau.T) - jar-verified
+    // Value base (myau.T) - 
     public static final String FIELD_VALUE_CURRENT = "Q";
     public static final String FIELD_VALUE_NAME = "W";
     public static final String FIELD_VALUE_OWNER = "m";
@@ -367,12 +369,12 @@ public class MyauMappings {
     // EventCancellable (myau.J4)
     public static final String FIELD_EVENT_CANCELLED = "j";
 
-    // PacketEvent receive (myau.Jt) - packet field jar-verified
+    // PacketEvent receive (myau.Jt) - packet field 
     public static final String FIELD_PACKET_EVENT_PACKET = "I";
-    // PacketEvent send (myau.Ju) - packet field jar-verified
+    // PacketEvent send (myau.Ju) - packet field 
     public static final String FIELD_PACKET_EVENT_SEND_PACKET = "K";
 
-    // WindowClickEvent (myau.JU) - slot=2nd, button=3rd, mode=4th field; verified
+    // WindowClickEvent (myau.JU) - slot=2nd, button=3rd, mode=4th field; 
     public static final String FIELD_WINDOW_CLICK_MODE = "M";
     public static final String FIELD_WINDOW_CLICK_BUTTON = "U";
     public static final String FIELD_WINDOW_CLICK_SLOT = "A";
@@ -380,17 +382,17 @@ public class MyauMappings {
     // ModeValue (myau.x)
     public static final String FIELD_ENUM_VALUES_ARRAY = "P";
 
-    // Module methods (myau.V) - jar-verified: isEnabled=X(), setEnabled=v(Z)V
+    // Module methods (myau.V) - isEnabled=X(), setEnabled=v(Z)V
     public static final String METHOD_GET_NAME = "E";
     public static final String METHOD_ON_ENABLE = "Z";
     public static final String METHOD_ON_DISABLE = "f"; // was "G" in 260317
     public static final String METHOD_SET_ENABLED = "v"; // isEnabled(Z)V - was "G" in 260317
 
-    // Value methods (myau.T) - jar-verified
+    // Value methods (myau.T) - 
     public static final String METHOD_PROPERTY_GET_NAME = "M";
     public static final String METHOD_PROPERTY_GET_VALUE = "S";
     public static final String METHOD_PROPERTY_SET_OWNER = "X";
-    public static final String METHOD_PROPERTY_SET_VALUE = "f"; // setValue(Object)Z - jar-verified
+    public static final String METHOD_PROPERTY_SET_VALUE = "f"; // setValue(Object)Z
 
     // Command (myau.kd)
     public static final String METHOD_COMMAND_RUN = "k";
@@ -411,11 +413,11 @@ public class MyauMappings {
     public static final String SIG_MOVE_UTIL_IS_FORWARD_PRESSED = "()Z";           // unchanged
     public static final String SIG_MOVE_UTIL_FIX_STRAFE = "(F)V";                  // unchanged
 
-    // RotationUtil method signatures - jar-verified
+    // RotationUtil method signatures - 
     public static final String SIG_GET_ROTATIONS_TO_BOX = "(Lnet/minecraft/util/AxisAlignedBB;)[F"; // unchanged
     public static final String TARGET_GET_ROTATIONS_TO_BOX = "Lmyau/kB;B(Lnet/minecraft/util/AxisAlignedBB;)[F";
 
-    // UpdateEvent (myau.kQ) - rotation methods - jar-verified
+    // UpdateEvent (myau.kQ) - rotation methods - 
     public static final String METHOD_UPDATE_EVENT_SET_ROTATION = "q";
     public static final String SIG_UPDATE_EVENT_SET_ROTATION = "(FFI)V"; // unchanged
     public static final String TARGET_UPDATE_EVENT_SET_ROTATION = "Lmyau/kQ;q(FFI)V";
