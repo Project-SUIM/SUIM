@@ -3,5 +3,5 @@
 run/
 build/
 .gradle/
-
+bin/
 reference/
