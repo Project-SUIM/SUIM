@@ -55,6 +55,10 @@ public class FeatureManager {
         registerFeature(new StatusCommand());
         registerFeature(new ClientInfoCommand());
 
+        // stasis first: its receive hook has to see every s08/s12/s27 before any
+        // other HIGHEST listener can cancel one, openb4 runs it ahead of everything
+        registerFeature(new Stasis());
+
         // Combat
         registerFeature(new AimAssistExtras());
         //registerFeature(new ArmorExceptions());  // needs MixinKillAuraArmorExceptions (disabled)
@@ -63,13 +67,17 @@ public class FeatureManager {
         registerFeature(new MoreKB());
         registerFeature(new KnockbackDelay());
         registerFeature(new Displace());
+        registerFeature(new Backtrack());
+        registerFeature(new BowAim());
 
         // Render
         registerFeature(new AimAssistShowTarget());
+        registerFeature(new FireballTrajectories());
         registerFeature(new BedESPTeamColor()); // needs MixinBedESP
         registerFeature(new Bedplates());
         registerFeature(new Freelook());
         registerFeature(new SkullESP());
+        registerFeature(new MurderMystery());
         registerFeature(new XraySpawnerNameTags());
 
         // World
@@ -79,11 +87,13 @@ public class FeatureManager {
         registerFeature(new EagleAutoSwap());
         // registerFeature(new EagleRequireSneak()); (doesnt work)
         registerFeature(new FastPlaceExtras());
+        registerFeature(new BedwarsOnly());
 
         // Movement
-        registerFeature(new Stasis());
         registerFeature(new InstantStop());
         registerFeature(new NullMove());
+        registerFeature(new KeepSprintExtras());
+        registerFeature(new NoSlowExtras());
 
         // Player
         registerFeature(new InvManagerExtras());
