@@ -28,6 +28,7 @@ public class MoreKB extends Feature {
     private Object intelligentProperty;
     private Object onlyGroundProperty;
 
+    @SuppressWarnings("unused")
     private boolean shouldSprintReset;
     private EntityLivingBase target;
 

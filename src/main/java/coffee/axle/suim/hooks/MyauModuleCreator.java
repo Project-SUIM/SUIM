@@ -162,6 +162,13 @@ public class MyauModuleCreator {
         return ctor.newInstance(name, defaultValue, values);
     }
 
+    public Object createColorProperty(String name, int defaultValue) throws Exception {
+        Class<?> propClass = hook.getCachedClass(CLASS_COLOR_PROPERTY);
+        Constructor<?> ctor = propClass.getDeclaredConstructor(String.class, Integer.class);
+        ctor.setAccessible(true);
+        return ctor.newInstance(name, defaultValue);
+    }
+
     public boolean injectProperty(Object module, Object property) {
         return injectPropertyAfter(module, property, null);
     }

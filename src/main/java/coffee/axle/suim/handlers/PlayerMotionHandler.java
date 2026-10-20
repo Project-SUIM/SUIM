@@ -1,7 +1,6 @@
 package coffee.axle.suim.handlers;
 
 import coffee.axle.suim.events.PreMotionEvent;
-import coffee.axle.suim.events.PostMotionEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -22,14 +21,8 @@ public class PlayerMotionHandler {
                         mc.thePlayer.rotationPitch,
                         mc.thePlayer.onGround);
                 MinecraftForge.EVENT_BUS.post(preEvent);
-
-                // apply rotation features set (Displace, AutoBedDefense) so the
-                // motion packet carries it; position/onGround left to vanilla
                 mc.thePlayer.rotationYaw = preEvent.getYaw();
                 mc.thePlayer.rotationPitch = preEvent.getPitch();
-
-            } else if (event.phase == TickEvent.Phase.END) {
-                MinecraftForge.EVENT_BUS.post(new PostMotionEvent());
             }
         }
     }

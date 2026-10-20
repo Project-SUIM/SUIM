@@ -4,6 +4,7 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
@@ -35,10 +36,14 @@ public class SkullESP extends Feature {
     private final java.util.List<Vec3> skullList = new CopyOnWriteArrayList<>();
     private final Color skullColor = new Color(255, 0, 255);
 
+    @SuppressWarnings("unused")
     private static final int SKELETON = 0;
+    @SuppressWarnings("unused")
     private static final int WITHER_SKELETON = 1;
+    @SuppressWarnings("unused")
     private static final int ZOMBIE = 2;
     private static final int PLAYER = 3;
+    @SuppressWarnings("unused")
     private static final int CREEPER = 4;
 
     private int tickCounter = 0;
@@ -136,9 +141,9 @@ public class SkullESP extends Feature {
 
         float partialTicks = event.partialTicks;
 
-        double viewX = lerpDouble(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
-        double viewY = lerpDouble(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
-        double viewZ = lerpDouble(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
+        double viewX = Utils.lerp(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
+        double viewY = Utils.lerp(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
+        double viewZ = Utils.lerp(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
 
         GlStateManager.pushMatrix();
         GlStateManager.translate(-viewX, -viewY, -viewZ);
@@ -198,20 +203,20 @@ public class SkullESP extends Feature {
         if (mc.gameSettings.thirdPersonView == 0) {
             position = new Vec3(0.0, 0.0, 1.0)
                     .rotatePitch((float) -Math
-                            .toRadians(lerpFloat(viewEntity.rotationPitch, viewEntity.prevRotationPitch, partialTicks)))
+                            .toRadians(Utils.lerp(viewEntity.rotationPitch, viewEntity.prevRotationPitch, partialTicks)))
                     .rotateYaw((float) -Math
-                            .toRadians(lerpFloat(viewEntity.rotationYaw, viewEntity.prevRotationYaw, partialTicks)));
+                            .toRadians(Utils.lerp(viewEntity.rotationYaw, viewEntity.prevRotationYaw, partialTicks)));
         } else {
             position = new Vec3(0.0, 0.0, 0.0)
                     .rotatePitch((float) -Math
-                            .toRadians(lerpFloat(mc.thePlayer.cameraPitch, mc.thePlayer.prevCameraPitch, partialTicks)))
+                            .toRadians(Utils.lerp(mc.thePlayer.cameraPitch, mc.thePlayer.prevCameraPitch, partialTicks)))
                     .rotateYaw((float) -Math
-                            .toRadians(lerpFloat(mc.thePlayer.cameraYaw, mc.thePlayer.prevCameraYaw, partialTicks)));
+                            .toRadians(Utils.lerp(mc.thePlayer.cameraYaw, mc.thePlayer.prevCameraYaw, partialTicks)));
         }
 
-        double playerX = lerpDouble(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
-        double playerY = lerpDouble(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
-        double playerZ = lerpDouble(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
+        double playerX = Utils.lerp(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
+        double playerY = Utils.lerp(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
+        double playerZ = Utils.lerp(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
 
         return new Vec3(
                 position.xCoord + playerX,
@@ -287,14 +292,6 @@ public class SkullESP extends Feature {
             } catch (Exception ignored) {
             }
         }
-    }
-
-    private double lerpDouble(double current, double previous, float partialTicks) {
-        return previous + (current - previous) * partialTicks;
-    }
-
-    private float lerpFloat(float current, float previous, float partialTicks) {
-        return previous + (current - previous) * partialTicks;
     }
 
     @Override

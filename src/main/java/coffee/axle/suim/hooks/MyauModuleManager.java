@@ -230,7 +230,10 @@ public class MyauModuleManager {
     }
 
     /**
-     * Gets all Myau property objects from a module by scanning its declared fields.
+     * Gets all Myau property objects from a module by scanning its declared fields,
+     * then appends anything injected into the property manager map (myau.F.p -> r)
+     * that isn't already there. Injected properties aren't fields on the module
+     * class, so the field scan alone never sees them.
      */
     public List<Object> getAllProperties(Object module) {
         List<Object> props = new ArrayList<>();
@@ -247,10 +250,36 @@ public class MyauModuleManager {
                     }
                 }
             }
+            for (Object prop : injectedProperties(module)) {
+                if (!props.contains(prop)) {
+                    props.add(prop);
+                }
+            }
         } catch (Exception e) {
             MyauLogger.error("Manager:getAllProperties", e);
         }
         return props;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> injectedProperties(Object module) {
+        List<Object> injected = new ArrayList<>();
+        try {
+            Class<?> mainClass = hook.getCachedClass(CLASS_MAIN);
+            Field pmField = hook.getCachedField(mainClass, FIELD_PROPERTY_MANAGER);
+            Object pm = pmField.get(null);
+            if (pm == null) return injected;
+            Field mapField = hook.getCachedField(pm.getClass(), FIELD_PROPERTY_MAP);
+            LinkedHashMap<Class<?>, ArrayList<Object>> map =
+                    (LinkedHashMap<Class<?>, ArrayList<Object>>) mapField.get(pm);
+            ArrayList<Object> list = map.get(module.getClass());
+            if (list != null) {
+                injected.addAll(list);
+            }
+        } catch (Exception e) {
+            MyauLogger.error("Manager:injectedProperties", e);
+        }
+        return injected;
     }
 
     /**

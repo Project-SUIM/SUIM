@@ -7,10 +7,20 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 public class PrePlayerInputEvent extends Event {
     private float forward;
     private float strafe;
+    private boolean jump;
 
-    public PrePlayerInputEvent(float forward, float strafe) {
+    public PrePlayerInputEvent(float forward, float strafe, boolean jump) {
         this.forward = forward;
         this.strafe = strafe;
+        this.jump = jump;
+    }
+    // "isjump" aha
+    public boolean isJump() {
+        return jump;
+    }
+
+    public void setJump(boolean jump) {
+        this.jump = jump;
     }
 
     public float getForward() {

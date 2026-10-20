@@ -5,11 +5,14 @@ import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.rotation.AimAssistRotation;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.rotation.RotationState;
+import net.minecraft.entity.EntityLivingBase;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
+import net.minecraft.world.World;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -17,33 +20,7 @@ import java.util.Locale;
 
 import coffee.axle.suim.feature.SuffixRegistry;
 
-/**
- * Event-bus replacement for MixinAimAssist.
- * my fucking god SuChen fuck you like actually fuck your antileak im going to jump
- *
- * <p>
- * <strong>Why not Mixin?</strong> In Myau 260729, {@code myau.G} (AimAssist) has SuChen's
- *  shitty anti-leak protection. The native hash check in {@code <clinit>} detects any bytecode
- * modification by the Mixin transformer, causing heap corruption crashes.
- * </p>
- *
- * <p>
- * <strong>How it works:</strong><br>
- * 1. Registers as a handler on Myau's internal event bus for {@code myau.k7} (LivingUpdateEvent)<br>
- * 2. Appended AFTER AimAssist's own handler in the handler list<br>
- * 3. After AimAssist runs and stores rotation deltas via {@code kj.W(FFIZ)V},
- *    this handler reads the RM delta fields and overrides them with custom rotation<br>
- * 4. Deltas are consumed by RotationManager on its next handler dispatch<br>
- * </p>
- *
- * <p>
- * <strong>Timing advantage over Mixin:</strong> The mixin injected before {@code v4.K} and
- * set delta fields which were immediately overwritten by {@code v4.K}. The event-bus handler
- * runs AFTER {@code v4.K} has stored deltas, so overrides persist until consumed.
- * </p>
- *
- * @author axlecoffee
- */
+// event-bus registration leaves hash-checked AimAssist bytecode untouched
 public class AimAssistHook {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
@@ -52,16 +29,27 @@ public class AimAssistHook {
     private static boolean loggedInit = false;
     private static boolean suffixRegistered = false;
     private static long lastProcessedTick = -1;
+    private static World aimWorld;
+    private static EntityLivingBase lastAimingTarget;
+    private static EntityLivingBase outputTarget;
+    private static EntityLivingBase pendingSnapTarget;
+    private static long snapRequestTick = -1;
 
-    // Reflection caches - RotationManager
+    private static Method nativeTargetMethod;
+    private static long nativeTargetKey;
+    private static Method nativeBoxRotationsMethod;
+    private static Field nativeOutputField;
+    private static Field nativeIntegratedField;
+
     private static Field moduleEnabledField;
     private static Field rotationManagerField;
     private static Field yawDeltaField;
     private static Field pitchDeltaField;
     private static Field lastUpdateField;
     private static Field rmPriorityField;
+    private static Method rmSetRotationMethod;
+    private static boolean rmSetRotationFailed = false;
 
-    // Reflection caches - LagManager
     private static Field lagManagerField;
     private static Field lagMgrDelayTicksField;
     private static Field lagMgrIsLaggingField;
@@ -74,6 +62,7 @@ public class AimAssistHook {
     // Reflection caches - TeamUtil (myau.kY) bot/team filters
     private static Method isBotMethod;
     private static Method isTeamMethod;
+    @SuppressWarnings("unused")
     private static boolean teamUtilFailed = false;
 
     /**
@@ -93,15 +82,6 @@ public class AimAssistHook {
         );
     }
 
-    /**
-     * Event handler for {@code myau.k7} (LivingUpdateEvent).
-     * Called by the event bus dispatch via {@code method.invoke(this, event)}.
-     *
-     * <p>This runs AFTER AimAssist's handler has stored rotation deltas.</p>
-     *
-     * @param event the LivingUpdateEvent instance (myau.k7) - treated as Object to avoid
-     *              compile-time dependency on Myau event types
-     */
     public void onPostTick(Object event) {
         try {
             if (!loggedInit) {
@@ -115,39 +95,69 @@ public class AimAssistHook {
                 registerSuffix();
             }
 
-            if (!AimAssistExtras.isActive())
+            updateWorld();
+            if (mc.thePlayer == null || mc.theWorld == null) {
+                lastAimingTarget = null;
+                pendingSnapTarget = null;
                 return;
+            }
 
-            int modeOrdinal = AimAssistExtras.getAimModeOrdinal();
-            if (modeOrdinal == 0) // DEFAULT - let Myau's native aim-assist stand
+            Object aaInstance = getAimAssistInstance();
+            if (!isAimAssistEnabled(aaInstance)) {
+                lastAimingTarget = null;
+                pendingSnapTarget = null;
                 return;
-
-            if (mc.thePlayer == null || mc.theWorld == null)
-                return;
+            }
 
             ensureRotationManagerReflection();
             Object rotMgr = getRotationManager();
-            if (rotMgr == null)
+            if (rotMgr == null || lastUpdateField.getFloat(rotMgr) != 0.0f
+                    || rmPriorityField.getInt(rotMgr) != 0) {
+                lastAimingTarget = null;
+                pendingSnapTarget = null;
                 return;
-
-            Object aaInstance = getAimAssistInstance();
-
-            if (!isAimAssistEnabled(aaInstance))
-                return;
+            }
 
             long currentTick = mc.theWorld.getTotalWorldTime();
             if (currentTick == lastProcessedTick)
                 return;
             lastProcessedTick = currentTick;
+            lastAimingTarget = null;
 
-            if (lastUpdateField.getFloat(rotMgr) != 0.0f)
+            EntityLivingBase requested = pendingSnapTarget;
+            pendingSnapTarget = null;
+            if (currentTick < snapRequestTick || currentTick - snapRequestTick > 1)
+                requested = null;
+
+            int modeOrdinal = AimAssistExtras.isActive() ? AimAssistExtras.getAimModeOrdinal() : 0;
+            EntityLivingBase target;
+            if (modeOrdinal == 0) {
+                if (nativeTargetMethod == null) {
+                    Class<?> aaClass = Class.forName(MyauMappings.CLASS_AIM_ASSIST);
+                    Field key = aaClass.getDeclaredField("c");
+                    key.setAccessible(true);
+                    nativeTargetKey = key.getLong(null) ^ 0x03b549d59f77L;
+                    nativeTargetMethod = aaClass.getDeclaredMethod("B", long.class);
+                    nativeTargetMethod.setAccessible(true);
+                }
+                target = (EntityLivingBase) nativeTargetMethod.invoke(aaInstance, nativeTargetKey);
+            } else {
+                target = findBestPlayer(aaInstance);
+            }
+            if (target == null)
                 return;
 
-            EntityPlayer target = findBestPlayer(aaInstance);
-            if (target == null)
-                return;  // rare: Myau found a target, we didn't - let its delta through
+            outputTarget = target;
+            if (modeOrdinal == 0)
+                lastAimingTarget = target;
+            if (requested == target) {
+                if (snapTo(target) != null)
+                    lastAimingTarget = target;
+                return;
+            }
+            if (modeOrdinal == 0)
+                return;
 
-            // Configure rotation from AimAssistExtras settings
             AimAssistRotation aim = getAimRotation();
             aim.setMode(modeOrdinal);
 
@@ -176,10 +186,55 @@ public class AimAssistHook {
             pitchDeltaField.setFloat(rotMgr,
                     MathHelper.clamp_float(result[1] - currentPitch, -90.0f, 90.0f));
             lastUpdateField.setFloat(rotMgr, 0.0f);
+            lastAimingTarget = target;
 
         } catch (Exception e) {
+            lastAimingTarget = null;
+            pendingSnapTarget = null;
             MyauLogger.error("AimAssist:Hook tick", e);
+        } finally {
+            outputTarget = null;
         }
+    }
+
+    public static boolean isAimingAt(Entity entity) {
+        updateWorld();
+        if (mc.thePlayer == null || mc.theWorld == null || !isAimAssistEnabled(getAimAssistInstance())) {
+            lastAimingTarget = null;
+            pendingSnapTarget = null;
+            return false;
+        }
+        return entity != null && entity == lastAimingTarget && entity.worldObj == aimWorld
+            && lastProcessedTick == mc.theWorld.getTotalWorldTime();
+    }
+
+    // aim assist's live target, for other modules (backtrack scan)
+    public static EntityLivingBase currentTarget() {
+        return outputTarget;
+    }
+
+    public static void requestSnap(EntityLivingBase target) {
+        updateWorld();
+        pendingSnapTarget = null;
+        if (mc.thePlayer == null || mc.theWorld == null || !isAimAssistEnabled(getAimAssistInstance())) {
+            lastAimingTarget = null;
+            return;
+        }
+        if (target == null || target.worldObj != aimWorld)
+            return;
+        pendingSnapTarget = target;
+        snapRequestTick = mc.theWorld.getTotalWorldTime();
+    }
+
+    private static void updateWorld() {
+        if (aimWorld == mc.theWorld)
+            return;
+        aimWorld = mc.theWorld;
+        lastProcessedTick = -1;
+        lastAimingTarget = null;
+        outputTarget = null;
+        pendingSnapTarget = null;
+        snapRequestTick = -1;
     }
 
     private static void ensureRotationManagerReflection() throws Exception {
@@ -201,6 +256,86 @@ public class AimAssistHook {
             lastUpdateField = rmClass.getDeclaredField(MyauMappings.FIELD_ROT_MGR_LAST_UPDATE);
             lastUpdateField.setAccessible(true);
         }
+        if (rmPriorityField == null) {
+            rmPriorityField = rmClass.getDeclaredField(MyauMappings.FIELD_ROT_MGR_PRIORITY);
+            rmPriorityField.setAccessible(true);
+        }
+        if (rmSetRotationMethod == null && !rmSetRotationFailed) {
+            try {
+                rmSetRotationMethod = rmClass.getDeclaredMethod(
+                        MyauMappings.METHOD_ROT_MGR_SET_ROTATION,
+                        float.class, float.class, int.class, boolean.class);
+                rmSetRotationMethod.setAccessible(true);
+            } catch (Exception e) {
+                rmSetRotationFailed = true;
+                MyauLogger.error("AimAssist:Hook rot", e);
+            }
+        }
+    }
+
+    public static float[] snapTo(EntityLivingBase target) {
+        try {
+            updateWorld();
+            if (mc.thePlayer == null || mc.theWorld == null || target == null
+                    || target != outputTarget || target.worldObj != aimWorld)
+                return null;
+            ensureRotationManagerReflection();
+            if (rmSetRotationMethod == null)
+                return null;
+            Object rotMgr = getRotationManager();
+            if (rotMgr == null || lastUpdateField.getFloat(rotMgr) != 0.0f
+                    || rmPriorityField.getInt(rotMgr) != 0)
+                return null;
+            Object aaInstance = getAimAssistInstance();
+            if (!isAimAssistEnabled(aaInstance))
+                return null;
+
+            Class<?> aaClass = Class.forName(MyauMappings.CLASS_AIM_ASSIST);
+            if (nativeOutputField == null) {
+                nativeOutputField = aaClass.getDeclaredField("P");
+                nativeOutputField.setAccessible(true);
+            }
+            if (nativeIntegratedField == null) {
+                nativeIntegratedField = aaClass.getDeclaredField("S");
+                nativeIntegratedField.setAccessible(true);
+            }
+            float[] output = (float[]) nativeOutputField.get(aaInstance);
+            float[] integrated = (float[]) nativeIntegratedField.get(aaInstance);
+
+            AimAssistRotation aim = getAimRotation();
+            aim.setMode(AimAssistExtras.isActive() ? AimAssistExtras.getAimModeOrdinal() : 0);
+            float hitboxBounds = AimAssistExtras.getHitboxBounds();
+            aim.setHitboxBounds(1.0f - hitboxBounds, hitboxBounds);
+            aim.setHeadBias(AimAssistExtras.getHeadBias());
+            aim.setExtrapolationEnabled(AimAssistExtras.isExtrapolationEnabled());
+            aim.setPingCompensation(AimAssistExtras.isPingCompEnabled());
+            aim.setContractionRange(AimAssistExtras.getContractionMin(), AimAssistExtras.getContractionMax());
+            aim.setLagDelayTicks(getLagDelayTicks());
+
+            float[] raw;
+            if (aim.isDefaultMode()) {
+                if (nativeBoxRotationsMethod == null) {
+                    nativeBoxRotationsMethod = Class.forName(MyauMappings.CLASS_ROTATION_UTIL).getMethod(
+                            MyauMappings.METHOD_GET_ROTATIONS_TO_BOX, AxisAlignedBB.class);
+                }
+                float border = target.getCollisionBorderSize();
+                raw = (float[]) nativeBoxRotationsMethod.invoke(null,
+                        target.getEntityBoundingBox().expand(border, border, border));
+            } else {
+                raw = aim.computeTarget(target, true);
+            }
+            if (raw == null)
+                return null;
+            float[] snapped = aim.snapToTarget(raw[0], raw[1]);
+            // myau class (260719) kj.W subtracts the camera angles itself
+            rmSetRotationMethod.invoke(rotMgr, snapped[0], snapped[1], 0, false);
+            output[0] = integrated[0] = snapped[0];
+            output[1] = integrated[1] = snapped[1];
+            return snapped;
+        } catch (Exception e) {
+            MyauLogger.error("AimAssist:Hook snap", e);
+            return null;
+        }
     }
 
     private static boolean isAimAssistEnabled(Object aaInstance) {
@@ -213,7 +348,8 @@ public class AimAssistHook {
             }
             return moduleEnabledField.getBoolean(aaInstance);
         } catch (Exception e) {
-            return true; // don't break rotation if reflection dies of death
+            MyauLogger.error("AimAssist:Hook enabled", e);
+            return false;
         }
     }
 
@@ -331,7 +467,7 @@ public class AimAssistHook {
         return null;
     }
 
-    // Mirrors myau.G.s(): skip Hypixel bots when bot-check is on, same-team players when team filter is on
+    // myau.G.s() skip Hypixel bots when bot-check is on, same-team players when team filter is on
     private static boolean isBotOrTeam(Object aaInstance, EntityPlayer player) {
         if (aaInstance == null) return false;
         try {

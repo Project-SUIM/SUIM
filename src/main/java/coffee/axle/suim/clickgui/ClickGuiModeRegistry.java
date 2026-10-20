@@ -1,5 +1,6 @@
 package coffee.axle.suim.clickgui;
 
+import coffee.axle.suim.clickgui.mode.b3.B3ClickGuiMode;
 import coffee.axle.suim.clickgui.mode.cga.CgaClickGuiMode;
 import coffee.axle.suim.clickgui.mode.flopper.FlopperClickGuiMode;
 
@@ -18,6 +19,8 @@ public final class ClickGuiModeRegistry {
         if (defaultsRegistered) {
             return;
         }
+        // B3 first so it is index 0, the default clickgui mode
+        register(new B3ClickGuiMode());
         register(new CgaClickGuiMode());
         register(new FlopperClickGuiMode());
         defaultsRegistered = true;

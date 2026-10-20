@@ -35,6 +35,7 @@ public final class MyauModuleCategoryMapper {
         map("WTap", GuiCategory.COMBAT);
         map("TargetHUD", GuiCategory.COMBAT);
         map("TargetStrafe", GuiCategory.COMBAT);
+        map("HitSelect", GuiCategory.COMBAT);
 
         // Render
         map("ESP", GuiCategory.RENDER);
@@ -103,7 +104,7 @@ public final class MyauModuleCategoryMapper {
         // Misc
         map("AutoGG", GuiCategory.MISC);
         map("AntiDebuff", GuiCategory.MISC);
-        map("AntiObbyTrap", GuiCategory.MISC);
+        map("AntiObbyTrap", GuiCategory.WORLD);
         map("AntiObfuscate", GuiCategory.MISC);
         map("AutoText", GuiCategory.MISC);
         map("MCF", GuiCategory.MISC);

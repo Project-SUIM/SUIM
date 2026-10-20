@@ -1,7 +1,10 @@
 package coffee.axle.suim.mixin;
 
+import coffee.axle.suim.events.PostMotionEvent;
 import coffee.axle.suim.feature.exploit.Freeze;
+import coffee.axle.suim.feature.movement.Stasis;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraftforge.common.MinecraftForge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,6 +18,18 @@ public class MixinEntityPlayerSP {
         if (Freeze.shouldCancelUpdate()) {
             ci.cancel();
         }
+    }
+
+    // PlayerTick.END runs inside super.onUpdate(), before the walking packet
+    @Inject(method = "onUpdateWalkingPlayer", at = @At("RETURN"), require = 1)
+    private void suim$afterWalkingUpdate(CallbackInfo ci) {
+        MinecraftForge.EVENT_BUS.post(new PostMotionEvent());
+    }
+
+    // openb4 fires stasis.afterplayerupdate from this same tail point
+    @Inject(method = "onUpdate", at = @At("RETURN"))
+    private void suim$afterUpdate(CallbackInfo ci) {
+        Stasis.afterPlayerUpdate((EntityPlayerSP) (Object) this);
     }
 
 // hateful horrible code

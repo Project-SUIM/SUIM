@@ -199,7 +199,8 @@ public class ClickGui extends Feature {
     private void closeGuiScreen() {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.currentScreen instanceof coffee.axle.suim.clickgui.mode.cga.ClickGuiScreen
-                || mc.currentScreen instanceof PanelClickGuiScreen) {
+                || mc.currentScreen instanceof PanelClickGuiScreen
+                || mc.currentScreen instanceof coffee.axle.suim.clickgui.mode.b3.B3ClickGuiScreen) {
             mc.displayGuiScreen(null);
         }
     }

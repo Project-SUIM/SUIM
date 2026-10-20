@@ -6,13 +6,13 @@ import coffee.axle.suim.util.BlinkManager;
 import coffee.axle.suim.util.PacketUtils;
 import io.netty.channel.ChannelHandlerContext;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
 
 @Mixin(value = NetworkManager.class, priority = 2000)
 public class MixinNetworkManager {
