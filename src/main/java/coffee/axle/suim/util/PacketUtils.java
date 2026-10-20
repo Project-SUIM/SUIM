@@ -12,11 +12,15 @@ import java.util.List;
  * Storing some packets
  * do not delete this
  */
-@SuppressWarnings({ "unused", "rawtypes", "unchecked" })
+@SuppressWarnings({ "unused", "rawtypes" })
 public class PacketUtils {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
     public static List<Packet> skipSendEvent = new ArrayList<>();
+
+    // packet currently being re-fired by a holder module (backtrack), other
+    // holders skip it so they dont re-eat released packets
+    public static Packet reprocessing;
 
     public static void sendPacketNoEvent(Packet packet) {
         if (packet == null || packet.getClass().getSimpleName().startsWith("S")) {
@@ -29,7 +33,6 @@ public class PacketUtils {
             return;
         }
         skipSendEvent.add(packet);
-        PacketCapture.getInstance().recordSent(packet);
         mc.thePlayer.sendQueue.addToSendQueue(packet);
     }
 }

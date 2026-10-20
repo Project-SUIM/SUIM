@@ -7,8 +7,6 @@ import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
@@ -32,7 +30,8 @@ public class KnockbackDelay extends Feature {
     private Object onlyGroundProperty;
 
     private final Deque<BufferedPacket> bufferedPackets = new ArrayDeque<>();
-    private boolean active = false;
+    // raven's antiknockback delayUntil equivalent, backtrack gates its start on it
+    public static boolean active = false;
 
     @Override
     public String getName() {
@@ -84,6 +83,8 @@ public class KnockbackDelay extends Feature {
     public void onReceivePacket(ReceivePacketEvent e) {
         if (!manager.isModuleEnabled(moduleInstance)) return;
         if (!Utils.nullCheck()) return;
+        // released by another holder (backtrack), let it through
+        if (e.getPacket() == PacketUtils.reprocessing) return;
 
         if (e.getPacket() instanceof S08PacketPlayerPosLook) {
             flushAll();
@@ -125,6 +126,7 @@ public class KnockbackDelay extends Feature {
 
         int maxDelay = properties.getInt(maxDelayProperty, 200);
         long now = System.currentTimeMillis();
+        @SuppressWarnings("unused")
         boolean flushed = false;
 
         while (!bufferedPackets.isEmpty()) {
@@ -166,7 +168,7 @@ public class KnockbackDelay extends Feature {
         return true;
     }
 
-    @SuppressWarnings({"rawtypes"})
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void processPacket(Packet<?> packet) {
         try {
             Packet raw = (Packet) packet;

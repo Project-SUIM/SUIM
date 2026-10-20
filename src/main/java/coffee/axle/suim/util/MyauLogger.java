@@ -1,9 +1,13 @@
 package coffee.axle.suim.util;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.HashMap;
 import java.util.Map;
 
 public class MyauLogger {
+    private static final Logger LOGGER = LogManager.getLogger("SUIM");
     private static String PREFIX = "[suim]";
     private static final Map<String, String> ERROR_TO_MSG = new HashMap<>();
 
@@ -47,51 +51,50 @@ public class MyauLogger {
     public static void log(String code, Object... args) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " " + code);
+            LOGGER.info(PREFIX + " " + code);
         } else {
             if (args.length > 0) {
                 msg = String.format(msg, args);
             }
-            System.out.println(PREFIX + " " + msg);
+            LOGGER.info(PREFIX + " " + msg);
         }
     }
 
     public static void log(String component, String code, Object... args) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " [" + component + "] " + code);
+            LOGGER.info(PREFIX + " [" + component + "] " + code);
         } else {
             if (args.length > 0) {
                 msg = String.format(msg, args);
             }
-            System.out.println(PREFIX + " [" + component + "] " + msg);
+            LOGGER.info(PREFIX + " [" + component + "] " + msg);
         }
     }
 
     public static void logMore(String code, String details) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            System.out.println(PREFIX + " " + code);
+            LOGGER.info(PREFIX + " " + code);
         } else {
-            System.out.println(PREFIX + " " + msg + " (" + details + ")");
+            LOGGER.info(PREFIX + " " + msg + " (" + details + ")");
         }
     }
 
     public static void error(String code, Exception e) {
         log(code);
-        System.out.println(PREFIX + " EXC: " + e.getMessage());
-        e.printStackTrace();
+        LOGGER.error(PREFIX + " EXC: " + e.getMessage(), e);
     }
 
     public static void info(String message) {
-        System.out.println(PREFIX + " " + message);
+        LOGGER.info(PREFIX + " " + message);
     }
 
     public static void status(String component, boolean success) {
         if (success) {
-            System.out.println(PREFIX + " [" + component + "] OK");
+            LOGGER.info(PREFIX + " [" + component + "] OK");
         } else {
-            System.out.println(PREFIX + " [" + component + "] err");
+            LOGGER.warn(PREFIX + " [" + component + "] err");
         }
     }
 

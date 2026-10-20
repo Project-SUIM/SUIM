@@ -27,12 +27,14 @@ public class BedESPTeamColor extends Feature {
     private Object bedESPModule;
     private Object colorProperty;
     private Field currentValueField;
+    @SuppressWarnings("unused")
     private Field bedsField;
     private String currentMap = null;
     private String currentMode = null;
     private String[] currentBedOrder = null;
 
     private boolean awaitingLocraw = false;
+    @SuppressWarnings("unused")
     private String lastMap = null;
 
     @Override
