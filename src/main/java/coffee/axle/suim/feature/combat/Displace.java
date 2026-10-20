@@ -1,137 +1,109 @@
 package coffee.axle.suim.feature.combat;
 
-import coffee.axle.suim.events.ClickEvent;
+import coffee.axle.suim.events.PostMotionEvent;
+import coffee.axle.suim.events.PreMotionEvent;
 import coffee.axle.suim.events.PrePlayerInputEvent;
-import coffee.axle.suim.events.ReceivePacketEvent;
 import coffee.axle.suim.events.SendPacketEvent;
+import coffee.axle.suim.eventbus.DisplaceHook;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.BlinkManager;
+import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
-import net.minecraft.block.state.IBlockState;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.PlayerControllerMP;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemAxe;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemSword;
 import net.minecraft.network.Packet;
-import net.minecraft.network.play.client.C02PacketUseEntity;
 import net.minecraft.network.play.client.C03PacketPlayer;
-import net.minecraft.network.play.client.C0APacketAnimation;
-import net.minecraft.network.play.server.S14PacketEntity;
-import net.minecraft.network.play.server.S18PacketEntityTeleport;
-import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
+import net.minecraft.util.BlockPos;
+import net.minecraft.block.state.IBlockState;
+import net.minecraftforge.client.event.MouseEvent;
+import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.lwjgl.opengl.GL11;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 
-// Breeze KnockbackManipulator port. cancel click -> swap KB weapon -> flick C03 ->
-// refire click on restore tick. optional blink holds the batch.
+
 public class Displace extends Feature {
-
     private static final Minecraft mc = Minecraft.getMinecraft();
+    // hurt time is 3 btw
 
-    // MCP name first, SRG fallback
-    private static final Field leftClickCounterField = findField(
-            Minecraft.class, "leftClickCounter", "field_71429_W");
-    private static final Method syncItemMethod = findMethod(
-            PlayerControllerMP.class, "syncCurrentPlayItem", "func_78750_j");
-    private static final Method clickMouseMethod = findMethod(
-            Minecraft.class, "clickMouse", "func_147116_af");
+    private static final int MODE_LEFT = 0;
+    private static final int MODE_RANDOM = 2;
+    private static final int MODE_VOID = 3;
+    private static final int MODE_SUIM = 4;
 
-    private static Field findField(Class<?> clazz, String mcp, String srg) {
-        try {
-            Field f = clazz.getDeclaredField(mcp);
-            f.setAccessible(true);
-            return f;
-        } catch (NoSuchFieldException e) {
-            try {
-                Field f = clazz.getDeclaredField(srg);
-                f.setAccessible(true);
-                return f;
-            } catch (NoSuchFieldException ignored) {
-                return null;
-            }
-        }
-    }
+    // suim scan: 24 rays every 15 deg, steps of 0.25 out to 4 blocks
+    private static final int SUIM_RAYS = 24;
+    private static final double SUIM_STEP = 0.25;
+    private static final double SUIM_MAX_DIST = 4.0;
+    // wall = solid block anywhere in the 2-tall column at the step position
+    // void = no solid block in the 10 blocks below the step position
+    private static final int SUIM_VOID_DEPTH = 10;
 
-    private static Method findMethod(Class<?> clazz, String mcp, String srg) {
-        try {
-            Method m = clazz.getDeclaredMethod(mcp);
-            m.setAccessible(true);
-            return m;
-        } catch (NoSuchMethodException e) {
-            try {
-                Method m = clazz.getDeclaredMethod(srg);
-                m.setAccessible(true);
-                return m;
-            } catch (NoSuchMethodException ignored) {
-                return null;
-            }
-        }
-    }
+    private static final int RENDER_NONE = 0;
+    private static final int RENDER_ARROW = 1;
 
-    private static final long BOT_CACHE_TTL = 1000L;
-    private static final boolean ATTACK_FRIENDS = false;
-    private static final boolean ATTACK_INVISIBLES = false;
-    private static final boolean BOT_CHECK_ENABLED = false;
+    public static Displace instance;
 
     private Object moduleInstance;
-    private Object weaponOnlyProperty;
-    private Object chanceProperty;
-    private Object yawMinProperty;
-    private Object yawMaxProperty;
-    private Object blinkProperty;
-    private Object smartModeProperty;
-    private Object silentSwapProperty;
-    private Object hitSelectProperty;
-    private Object knockbackOnlyProperty;
-   // private Object killauraProperty;
-    private Object sprintOnlyProperty;
+    private Object debuggityProperty;
+    private Object modeProperty;
+    private Object angleProperty;
+    private Object cooldownProperty;
+    private Object hideRotationsProperty;
+    private Object onlyKnockbackItemsProperty;
+    private Object overrideAttacksProperty;
+    private Object playersOnlyProperty;
+    private Object renderProperty;
+    private Object renderColorProperty;
+    private Object arrowSizeProperty;
+    private Object manualProperty;
+    public Object autoClickerProperty;
+    public Object killAuraProperty;
+    private Method applyMovementState;
 
     private final Random random = new Random();
 
-    private boolean flickActive = false;
-    private boolean pendingFlick = false;
-    private float offset = 0.0f;
-    private int prevSlot = -1;
-    private volatile long curTick = 0L;
-    private long armTick = -1L;
-    private long flickTick = -1L;
-    private float flickOffset = 0.0f;
-    // mouse sensitivity GCD - rotations snap to this lattice
-    private static final float ROTATION_GCD = 0.2f * 0.2f * 0.2f * 8.0f * 0.15f;
-    private float lastSentYaw = Float.NaN;
-    private float lastSentPitch = Float.NaN;
+    // fields incase u needa know #beintheknow #didyouconsent
+    public boolean rotate;
+    public boolean queued;
+    public boolean holding;
+    public long lastAt;
+    private boolean fromAimAssist;
+    private int holdTicks;
+    @SuppressWarnings("unused")
+    private boolean fromAutoClicker;
 
-    // guard: lets re-fired click packets pass through handlers untouched
-    private boolean refiringClick = false;
-    private boolean sprintKeyForced = false;
-    private boolean sprintKeyWasPressed = false;
-    // killaura's target, captured from the canceled C02 - no reflection needed
-    private EntityPlayer pendingTarget;
+    private float flickOffset;
+    private float flickYaw, flickPitch;
+    private boolean flicking;
+    private boolean awaitingRestore;
+    private int side = -1;
+    private int lastSide = -1;
+    private EntityLivingBase lastTarget;
 
-    private final Map<Integer, Long> seenMoving = new HashMap<>();
-    private final Map<Integer, Long> seenTeleport = new HashMap<>();
-    private final ArrayList<Integer> confirmedPlayers = new ArrayList<>();
-    private final ArrayList<Integer> confirmedBots = new ArrayList<>();
-    private long lastBotCleanup = 0L;
+    private int blinkTicks;
+    private boolean arrow;
+    private long arrowAt;
+    private double arrowX, arrowY, arrowZ;
+    private String arrowChar = ">";
 
     @Override
     public String getName() {
@@ -146,30 +118,44 @@ public class Displace extends Feature {
     @Override
     public boolean initialize() {
         try {
+            applyMovementState = manager.getCachedClass(MyauMappings.CLASS_ROTATION_STATE).getMethod(
+                    MyauMappings.METHOD_ROTATION_STATE_APPLY,
+                    boolean.class, float.class, float.class, float.class, int.class);
+            instance = this;
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, Displace.class);
 
-            weaponOnlyProperty = creator.createBooleanProperty("weapon-only", true);
-            chanceProperty = creator.createIntegerProperty("chance", 100, 0, 100);
-            yawMinProperty = creator.createIntegerProperty("yaw-min", 90, 0, 180);
-            yawMaxProperty = creator.createIntegerProperty("yaw-max", 90, 0, 180);
-            blinkProperty = creator.createBooleanProperty("blink", false);
-            smartModeProperty = creator.createBooleanProperty("smart-mode", true);
-            silentSwapProperty = creator.createBooleanProperty("silent-swap", false);
-            hitSelectProperty = creator.createBooleanProperty("hit-select", false);
-            knockbackOnlyProperty = creator.createBooleanProperty("knockback-only", false);
-            // works but rots broken and mitigates to hell and back so disabled until i have time to debug Myau's KA
-            // killauraProperty = creator.createBooleanProperty("killaura", false);
-            sprintOnlyProperty = creator.createBooleanProperty("sprint-only", true);
-
-            creator.registerProperties(moduleInstance, weaponOnlyProperty, chanceProperty,
-                    yawMinProperty, yawMaxProperty, blinkProperty, smartModeProperty,
-                    silentSwapProperty, hitSelectProperty, knockbackOnlyProperty, /* killauraProperty, */ sprintOnlyProperty);
+            modeProperty = creator.createEnumProperty("mode", MODE_LEFT,
+                    new String[] { "LEFT", "RIGHT", "RANDOM", "VOID", "SUIM" });
+            angleProperty = creator.createFloatProperty("angle", 100.0f, 10.0f, 180.0f);
+            cooldownProperty = creator.createFloatProperty("cooldown", 0.5f, 0.2f, 8.0f);
+            hideRotationsProperty = creator.createBooleanProperty("hide-rotations", false);
+            onlyKnockbackItemsProperty = creator.createBooleanProperty("only-knockback-items", true);
+            overrideAttacksProperty = creator.createBooleanProperty("override-attacks", true);
+            playersOnlyProperty = creator.createBooleanProperty("players-only", false);
+            // todo: LINE and BOX modes
+            renderProperty = creator.createEnumProperty("render", RENDER_ARROW,
+                    new String[] { "NONE", "ARROW" });
+            renderColorProperty = creator.createColorProperty("render-color",
+                    HudUtils.getInstance().getHudColor().getRGB());
+            arrowSizeProperty = creator.createFloatProperty("arrow-size", 1.0f, 0.5f, 3.0f);
+            manualProperty = creator.createBooleanProperty("manual", true);
+            autoClickerProperty = creator.createBooleanProperty("auto-clicker", true);
+            killAuraProperty = creator.createBooleanProperty("killaura", true);
+            // its like verity but for debugging ....im so fucking brainrotted kms,,,
+            debuggityProperty = creator.createBooleanProperty("debuggity", false);
+            creator.registerProperties(moduleInstance,
+                    modeProperty, angleProperty, cooldownProperty,
+                    hideRotationsProperty, onlyKnockbackItemsProperty,
+                    overrideAttacksProperty, playersOnlyProperty,
+                    renderProperty, renderColorProperty, arrowSizeProperty,
+                    manualProperty, autoClickerProperty, killAuraProperty, debuggityProperty);
             manager.reloadModuleCommand();
 
             MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-
+            manager.registerModuleCallbacks(moduleInstance, () -> {
+            }, this::onDisable);
+            RotationState.getInstance().register();
             return true;
         } catch (Exception e) {
             MyauLogger.error("Displace:init", e);
@@ -177,635 +163,401 @@ public class Displace extends Feature {
         }
     }
 
-    private void onEnable() {
-        reset();
+    private int mode() {
+        return properties.getInt(modeProperty, MODE_LEFT);
     }
 
-    private void onDisable() {
-        reset();
+    private int renderMode() {
+        return properties.getInt(renderProperty, RENDER_ARROW);
     }
 
-    private void reset() {
-        flickActive = false;
-        pendingFlick = false;
-        curTick = 0L;
-        armTick = -1L;
-        flickTick = -1L;
-        flickOffset = 0.0f;
-        offset = 0.0f;
-        prevSlot = -1;
-        lastSentYaw = Float.NaN;
-        lastSentPitch = Float.NaN;
-        refiringClick = false;
-        sprintKeyForced = false;
-        sprintKeyWasPressed = false;
-        pendingTarget = null;
-        if (BlinkManager.getInstance().isBlinking(BlinkManager.BlinkModule.DISPLACE)) {
-            BlinkManager.getInstance().drop();
+    @SubscribeEvent
+    public void onMouse(MouseEvent e) {
+        if (e.button != 0 || !e.buttonstate || !Utils.nullCheck()) {
+            return;
+        }
+        if (!manager.isModuleEnabled(moduleInstance)) {
+            return;
+        }
+
+        if (DisplaceHook.isACActive()) {
+            return;
+        }
+        if (!properties.getBoolean(manualProperty, true)) {
+            return;
+        }
+        Entity entity = null;
+        boolean aim = false;
+
+        if (mc.objectMouseOver != null
+                && mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY) {
+            entity = mc.objectMouseOver.entityHit;
+        }
+        if (entity == null) {
+            return;
+        }
+        if (canDisplace(entity, true, true)) {
+            e.setCanceled(true);
+            trigger(aim ? 1 : 0);
+        } else if (properties.getBoolean(overrideAttacksProperty, true)
+                && canDisplace(entity, false, false)) {
+            e.setCanceled(true);
         }
     }
 
-    private boolean blinkOn() {
-        return properties.getBoolean(blinkProperty, false);
-    }
-
-    private boolean smartMode() {
-        return properties.getBoolean(smartModeProperty, true);
-    }
-
-    private float yawRange() {
-        int min = properties.getInt(yawMinProperty, 70);
-        int max = properties.getInt(yawMaxProperty, 90);
-        if (max < min)
-            max = min;
-        return min + random.nextFloat() * (max - min);
-    }
-
-    // tick-advanced from PrePlayerInputEvent (main thread, before movement packet)
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public void onPreInput(PrePlayerInputEvent e) {
-        if (sprintKeyForced) {
-            KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), sprintKeyWasPressed);
-            sprintKeyForced = false;
+    @SubscribeEvent
+    public void onPreMotion(PreMotionEvent e) {
+        flicking = false;
+        if (!manager.isModuleEnabled(moduleInstance) || !Utils.nullCheck()) {
+            return;
         }
-        curTick++;
-        armAim();
-        // restore weapon on attack-key release, outside the flick cycle
-        if (prevSlot != -1 && !mc.gameSettings.keyBindAttack.isKeyDown()
-                && !pendingFlick && !flickActive) {
-            restoreWpn();
+        if (blinkTicks > 0 && --blinkTicks == 0) {
+            stopBlink();
         }
-        // flick tick: re-project movement input onto flick yaw frame
-        if (pendingFlick && curTick >= armTick) {
-            flickOffset = flickDir();
-            double d = Math.toRadians(-flickOffset);
-            float c = (float) Math.round(Math.cos(d));
-            float s = (float) Math.round(Math.sin(d));
-            float forward = e.getForward();
-            float strafe = e.getStrafe();
-            float sf = Math.signum(strafe * c - forward * s);
-            float fw = Math.signum(strafe * s + forward * c);
-            // re-apply sneak/use-item scale erased by our signum overwrite
-            if (mc.gameSettings.keyBindSneak.isKeyDown()) {
-                sf *= 0.3f;
-                fw *= 0.3f;
+        if (holdTicks > 0) {
+            holding = --holdTicks > 0;
+        }
+        if (rotate) {
+            startBlink();
+            boolean wasDown = mc.gameSettings.keyBindAttack.isKeyDown();
+            clickAttack();
+            KeyBinding.setKeyBindState(mc.gameSettings.keyBindAttack.getKeyCode(), wasDown);
+            fromAutoClicker = false;
+            flickOffset = offset();
+            flickYaw = mc.thePlayer.rotationYaw + flickOffset;
+            flickPitch = mc.thePlayer.rotationPitch;
+            try {
+                applyMovementState.invoke(null, true, flickYaw, flickPitch, flickYaw, -1);
+                flicking = true;
+            } catch (Exception ex) {
+                MyauLogger.error("Displace:movement", ex);
             }
-            if (mc.thePlayer.isUsingItem()) {
-                sf *= 0.2f;
-                fw *= 0.2f;
-            }
-            e.setStrafe(sf);
-            e.setForward(fw);
-        }
-        // restore tick: refire clickMouse for fresh attack packets
-        if (flickActive && curTick >= flickTick + 1) {
-            refiringClick = true;
-            refire();
-            refiringClick = false;
-        }
-        // force sprint held on restore tick so toggle-sprint recovers immediately
-        if (flickActive && !mc.thePlayer.isSprinting()) {
-            sprintKeyWasPressed = mc.gameSettings.keyBindSprint.isKeyDown();
-            KeyBinding.setKeyBindState(mc.gameSettings.keyBindSprint.getKeyCode(), true);
-            sprintKeyForced = true;
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGH)
+    @SubscribeEvent
+    public void onPostMotion(PostMotionEvent e) {
+        rotate = false;
+        queued = false;
+    }
+
+    @SubscribeEvent
     public void onSendPacket(SendPacketEvent e) {
         if (!manager.isModuleEnabled(moduleInstance))
             return;
-        if (e.isCanceled() || mc.thePlayer == null || mc.theWorld == null)
+        if (!Utils.nullCheck())
             return;
         Packet<?> packet = e.getPacket();
-        if (packet instanceof C0APacketAnimation) {
-            onSwing(e);
-        } else if (packet instanceof C02PacketUseEntity) {
-            onUse(e);
-        } else if (packet instanceof C03PacketPlayer) {
-            onMove(e);
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public void onReceivePacket(ReceivePacketEvent e) {
-        if (mc.theWorld == null)
+        if (!(packet instanceof C03PacketPlayer))
             return;
-        Packet<?> packet = e.getPacket();
-        if (packet instanceof S14PacketEntity) {
-            Entity entity = ((S14PacketEntity) packet).getEntity(mc.theWorld);
-            if (entity instanceof EntityPlayer) {
-                seenMoving.put(entity.getEntityId(), System.currentTimeMillis());
+        C03PacketPlayer c03 = (C03PacketPlayer) packet;
+
+        DisplaceHook.watchOut(packet);
+
+        if (rotate) {
+            if (fromAimAssist) {
+                fromAimAssist = false;
             }
-        } else if (packet instanceof S18PacketEntityTeleport) {
-            Entity entity = mc.theWorld.getEntityByID(((S18PacketEntityTeleport) packet).getEntityId());
-            if (entity instanceof EntityPlayer) {
-                seenTeleport.put(entity.getEntityId(), System.currentTimeMillis());
-            }
-        }
-    }
-
-    //  swing/attack packets never run at the click.
-    // attack is rebuilt by refired clickMouse on restore tick.
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public void onClick(ClickEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance))
-            return;
-        if (refiringClick)
-            return;
-        if (pendingFlick || flickActive || curTick == flickTick) {
+            rotate = false;
+            awaitingRestore = true;
             e.setCanceled(true);
-            return;
-        }
-        if (!passConds())
-            return;
-        if (!checkTarget())
-            return;
-        if (leftClicks() > 0)
-            return;
-        e.setCanceled(true);
-        if (hitBlocked()) {
-            return;
-        }
-        silentSwap();
-        pendingFlick = true;
-        armTick = curTick;
-    }
-
-    // killaura swings: no targetCheck / leftClickCounter, just conditions + hitSelect
-    private void onSwing(SendPacketEvent e) {
-        if (!killauraOn())
-            return;
-        if (refiringClick)
-            return;
-        if (pendingFlick || flickActive || curTick == flickTick) {
-            e.setCanceled(true);
-            return;
-        }
-        if (!passConds())
-            return;
-        e.setCanceled(true);
-        if (hitBlocked()) {
-            return;
-        }
-        armTick = curTick;
-    }
-
-    private void onUse(SendPacketEvent e) {
-        C02PacketUseEntity use = (C02PacketUseEntity) e.getPacket();
-        if (use.getAction() != C02PacketUseEntity.Action.ATTACK)
-            return;
-        if (!killauraOn())
-            return;
-        if (refiringClick)
-            return;
-        if (pendingFlick || flickActive || curTick == flickTick) {
-            e.setCanceled(true);
-            return;
-        }
-        // capture killaura's target so conditions/smart-scan/refire aim at it
-        EntityPlayer kt = useTarget(use);
-        if (kt != null)
-            pendingTarget = kt;
-        // C02 for a C0A we armed this tick (killaura with a swing)
-        if (armTick == curTick) {
-            e.setCanceled(true);
-            silentSwap();
-            pendingFlick = true;
-            armTick = curTick;
-            return;
-        }
-        // standalone attack (killaura without swing)
-        if (!passConds())
-            return;
-        if (hitBlocked()) {
-            e.setCanceled(true);
-            return;
-        }
-        e.setCanceled(true);
-        silentSwap();
-        pendingFlick = true;
-        armTick = curTick;
-    }
-
-    private void onMove(SendPacketEvent e) {
-        C03PacketPlayer packet = (C03PacketPlayer) e.getPacket();
-        // flick C03: cancel original, send flicked yaw, start blink batch
-        if (pendingFlick && curTick >= armTick) {
-            e.setCanceled(true);
-            Packet<?> flick = flickPacket(packet);
-            startBlink();
-            emit(flick);
-            pendingFlick = false;
-            flickActive = true;
-            flickTick = curTick;
-            return;
-        }
-        // restore C03: snap real yaw back, flush blink batch
-        if (flickActive && curTick >= flickTick + 1) {
-            flickActive = false;
-            e.setCanceled(true);
-            emit(restorePacket(packet));
-            if (batching()) {
-                stopBlink();
+            emit(copyRot(c03, flickYaw, flickPitch));
+            RotationState.getInstance().setServerAngles(flickYaw, flickPitch);
+            mc.thePlayer.rotationYawHead = flickYaw;
+            if (properties.getBoolean(debuggityProperty, false)) {
+                MyauLogger.log("DISPLACE", String.format("flick yaw=%.1f offset=%.1f packet=%s",
+                        flickYaw, flickOffset, c03.getClass().getSimpleName()));
             }
             return;
         }
-        if (packet.getRotating()) {
-            // chain onto mouse lattice inside flick window; idle C03s pass through
-            if (pendingFlick || flickActive) {
-                Packet<?> chained = chainRot(packet);
-                if (chained != packet) {
-                    e.setCanceled(true);
-                    emit(chained);
-                }
-            } else {
-                lastSentYaw = packet.getYaw();
-                lastSentPitch = packet.getPitch();
-            }
+
+        if (c03.getRotating()) {
+            awaitingRestore = false;
             return;
+        }
+
+        if (awaitingRestore) {
+            if (properties.getBoolean(debuggityProperty, false)) {
+                MyauLogger.log("DISPLACE", "RESTORE");
+            }
+            e.setCanceled(true);
+            emit(copyRot(c03, mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch));
+            RotationState.getInstance().setServerAngles(mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch);
+            awaitingRestore = false;
         }
     }
 
-
-    private boolean passConds() {
-        if (mc.currentScreen != null)
-            return false;
-        if (properties.getBoolean(sprintOnlyProperty, true) && !mc.thePlayer.isSprinting())
-            return false;
-        if (properties.getBoolean(weaponOnlyProperty, true) && !holdingWpn())
-            return false;
-        if (properties.getBoolean(knockbackOnlyProperty, false) && !holdingKb())
-            return false;
-        if (!passChance())
-            return false;
-        return smartOffset();
-    }
-
-    private boolean passChance() {
-        return properties.getInt(chanceProperty, 80) / 100.0 >= random.nextDouble();
-    }
-
-    // SmartMode void scan: computes offset direction toward/away from void
-    private boolean smartOffset() {
-        if (!smartMode())
-            return true;
-        EntityPlayer tgt = target();
-        if (tgt == null)
-            return false;
-        double tx = tgt.posX;
-        double tz = tgt.posZ;
-        int ty = (int) Math.floor(tgt.posY);
-        float playerYaw = mc.thePlayer.rotationYaw;
-        if (blockInColumn(new BlockPos((int) Math.floor(tx), ty, (int) Math.floor(tz)))) {
-            // target over void: push away from nearest solid ground
-            float yawDelta = 0.0f;
-            double bestDist = Double.MAX_VALUE;
-            boolean found = false;
-            for (int i = 0; i < 18; ++i) {
-                float f3 = i * 20.0f;
-                double rad = Math.toRadians(f3);
-                double d5 = -Math.sin(rad);
-                double d6 = Math.cos(rad);
-                for (double d7 = 0.5; d7 <= 4.0; d7 += 0.3) {
-                    int nx = (int) Math.floor(tx + d5 * d7);
-                    int nz = (int) Math.floor(tz + d6 * d7);
-                    if (!hasNearbyBlock(nx, ty, nz) || !(d7 < bestDist))
-                        continue;
-                    bestDist = d7;
-                    found = true;
-                    yawDelta = MathHelper.wrapAngleTo180_float(f3 - playerYaw);
-                    break;
-                }
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onPreInput(PrePlayerInputEvent e) {
+        if (!manager.isModuleEnabled(moduleInstance) || !flicking)
+            return;
+        if (!Utils.nullCheck())
+            return;
+        float forward = e.getForward();
+        float strafe = e.getStrafe();
+        if (forward == 0.0f && strafe == 0.0f)
+            return;
+        float target = MathHelper.wrapAngleTo180_float(moveYaw(mc.thePlayer.rotationYaw, forward, strafe));
+        float best = -1.0f;
+        float bestForward = 0.0f, bestStrafe = 0.0f;
+        for (float f = -1.0f; f <= 1.0f; f += 1.0f) {
+            for (float s = -1.0f; s <= 1.0f; s += 1.0f) {
+                if (f == 0.0f && s == 0.0f) continue;
+                float yaw = MathHelper.wrapAngleTo180_float(moveYaw(flickYaw, f, s));
+                float diff = Math.abs(MathHelper.wrapAngleTo180_float(target - yaw));
+                if (best != -1.0f && !(diff < best)) continue;
+                best = diff;
+                bestForward = f;
+                bestStrafe = s;
             }
-            if (!found) {
-                offset = 0.0f;
+        }
+        float speed = Math.max(Math.abs(forward), Math.abs(strafe));
+        e.setForward(bestForward * speed);
+        e.setStrafe(bestStrafe * speed);
+    }
+
+    private static float moveYaw(float yaw, float forward, float strafe) {
+        float scale = 1.0f;
+        if (forward < 0.0f) {
+            yaw += 180.0f;
+            scale = -0.5f;
+        } else if (forward > 0.0f) {
+            scale = 0.5f;
+        }
+        if (strafe > 0.0f) yaw -= 90.0f * scale;
+        else if (strafe < 0.0f) yaw += 90.0f * scale;
+        return yaw;
+    }
+
+    @SubscribeEvent
+    public void onJoin(EntityJoinWorldEvent e) {
+        if (e.entity == mc.thePlayer) {
+            onDisable();
+        }
+    }
+
+    private void onDisable() {
+        DisplaceHook.reset();
+        if (blinkTicks > 0) {
+            blinkTicks = 0;
+            stopBlink();
+        }
+        holding = false;
+        arrow = false;
+        rotate = false;
+        flicking = false;
+        awaitingRestore = false;
+        fromAimAssist = false;
+        fromAutoClicker = false;
+        queued = false;
+        holdTicks = 0;
+        lastSide = -1;
+        side = -1;
+    }
+
+    public void trigger(int source) {
+        if (source == 0) {
+            rotate = true;
+        } else if (source == 1) {
+            fromAimAssist = true;
+            rotate = true;
+        } else if (source == 2) {
+            queued = true;
+        } else if (source == 3) {
+            fromAutoClicker = true;
+            rotate = true;
+        }
+        lastAt = System.currentTimeMillis();
+        if (properties.getBoolean(debuggityProperty, false)) {
+            MyauLogger.log("DISPLACE", String.format("trigger source=%d", source));
+        }
+    }
+
+    public void rearm() {
+        holdTicks = 3;
+    }
+
+    public void clear() {
+        lastAt = 0L;
+    }
+
+    public boolean isEnabled() {
+        return manager.isModuleEnabled(moduleInstance);
+    }
+
+    public boolean hookOn(Object setting) {
+        return properties.getBoolean(setting, true);
+    }
+
+    public float offsetForHook() {
+        return offset();
+    }
+
+    public boolean canDisplace(Entity entity, boolean checkHurtTime, boolean checkCooldown) {
+        if (!(entity instanceof EntityLivingBase)) {
+            return false;
+        }
+        if (checkHurtTime && ((EntityLivingBase) entity).hurtTime > 3) {
+            return false;
+        }
+        if (properties.getBoolean(playersOnlyProperty, false) && !(entity instanceof EntityPlayer)) {
+            return false;
+        }
+        int n = EnchantmentHelper.getKnockbackModifier(mc.thePlayer);
+        if (!mc.thePlayer.isSprinting() && n == 0) {
+            return false;
+        }
+        if (properties.getBoolean(onlyKnockbackItemsProperty, true) && n == 0) {
+            return false;
+        }
+        if (checkCooldown && Math.abs(System.currentTimeMillis() - lastAt)
+                < properties.getFloat(cooldownProperty, 0.5f) * 1000.0 - 20.0) {
+            return false;
+        }
+        if (mode() == MODE_VOID) {
+            side = lastSide = hellishVoidCheckNotRefractoringThisTemp(entity, lastSide);
+            if (side == -1) {
                 return false;
             }
-            offset = (yawDelta > 0.0f ? -1.0f : 1.0f) * yawRange();
-            return true;
         }
-        // target on ground: push toward nearest void lane
-        float yawDelta = 0.0f;
-        double bestDist = Double.MAX_VALUE;
-        boolean found = false;
-        for (int i = 0; i < 18; ++i) {
-            float f6 = i * 20.0f;
-            double rad = Math.toRadians(f6);
-            double d12 = -Math.sin(rad);
-            double d13 = Math.cos(rad);
-            float f7 = MathHelper.wrapAngleTo180_float(f6 - playerYaw);
-            float abs = Math.abs(f7);
-            if (abs < 30.0f || abs > 150.0f)
-                continue;
-            double d14 = Double.MAX_VALUE;
-            boolean walled = false;
-            for (double d15 = 0.5; d15 <= 4.0; d15 += 0.5) {
-                int nx = (int) Math.floor(tx + d12 * d15);
-                int nz = (int) Math.floor(tz + d13 * d15);
-                for (int j = 0; j <= 1; ++j) {
-                    BlockPos bp = new BlockPos(nx, ty + j, nz);
-                    IBlockState st = mc.theWorld.getBlockState(bp);
-                    if (st.getBlock().getCollisionBoundingBox(mc.theWorld, bp, st) == null)
-                        continue;
-                    walled = true;
-                    break;
+        lastTarget = (EntityLivingBase) entity;
+        return true;
+    }
+
+    private float offset() {
+        float f = properties.getFloat(angleProperty, 100.0f);
+        int mode = mode();
+        if (mode == MODE_SUIM) {
+            f = suimOffset();
+            if (f != 0.0f) {
+                f += random.nextFloat() * 10.0f - 5.0f;
+                if (renderMode() != RENDER_NONE && lastTarget != null) {
+                    setArrow(lastTarget, f);
                 }
-                if (walled)
-                    break;
-                if (!blockInColumn(new BlockPos(nx, ty, nz)))
-                    continue;
-                d14 = d15;
-                break;
             }
-            if (walled || d14 > 4.0 || found && !(d14 < bestDist))
-                continue;
-            yawDelta = f7;
-            bestDist = d14;
-            found = true;
+            return f;
         }
-        if (!found)
-            return false;
-        offset = (yawDelta > 0.0f ? 1.0f : -1.0f) * yawRange();
-        return true;
-    }
-
-    private boolean killauraOn() {
-        return false; // disabled see reason above 
-        // return properties.getBoolean(killauraProperty, false);
-    }
-
-    // flick offset: smart mode uses scanned direction, otherwise random sign
-    private float flickDir() {
-        if (!smartMode())
-            return random.nextBoolean() ? yawRange() : -yawRange();
-        return offset;
-    }
-
-    private boolean hasNearbyBlock(int x, int y, int z) {
-        for (int i = -2; i <= 3; ++i) {
-            BlockPos bp = new BlockPos(x, y + i, z);
-            if (bp.getY() < 0)
-                continue;
-            IBlockState st = mc.theWorld.getBlockState(bp);
-            if (st.getBlock().getCollisionBoundingBox(mc.theWorld, bp, st) == null)
-                continue;
-            return true;
+        if (side != -1) {
+            if (side == 0) {
+                f = -f;
+            }
+            side = -1;
+        } else if (mode == MODE_LEFT || mode == MODE_RANDOM && random.nextBoolean()) {
+            f = -f;
         }
-        return false;
-    }
-
-    // column below pos free of solid blocks for 10 blocks
-    private boolean blockInColumn(BlockPos pos) {
-        for (int i = 0; i < 10; ++i) {
-            BlockPos bp = pos.add(0, -i, 0);
-            if (bp.getY() < 1)
-                return true;
-            IBlockState st = mc.theWorld.getBlockState(bp);
-            if (st.getBlock().getCollisionBoundingBox(mc.theWorld, bp, st) == null)
-                continue;
-            return false;
+        f += random.nextFloat() * 10.0f - 5.0f;
+        if (renderMode() != RENDER_NONE && lastTarget != null) {
+            setArrow(lastTarget, f);
         }
-        return true;
+        return f;
     }
 
-    private boolean checkTarget() {
-        EntityPlayer t = target();
-        if (t == null)
-            return false;
-        return canAttack(t);
-    }
-
-    private EntityPlayer target() {
-        // killaura target beats the crosshair - the attack being displaced is theirs
-        if (pendingTarget != null)
-            return pendingTarget;
-        if (mc.objectMouseOver == null || !(mc.objectMouseOver.entityHit instanceof EntityPlayer))
-            return null;
-        return (EntityPlayer) mc.objectMouseOver.entityHit;
-    }
-
-    private boolean hitBlocked() {
-        EntityPlayer t = target();
-        return properties.getBoolean(hitSelectProperty, false) && t != null && t.hurtTime > 8;
-    }
-
-    private boolean canAttack(EntityPlayer player) {
-        cleanBots();
-        if (player == null || player.isDead || mc.thePlayer == player)
-            return false;
-        Relationship r = rel(player);
-        if (r == Relationship.TEAM)
-            return false;
-        if (r == Relationship.FRIEND && !ATTACK_FRIENDS)
-            return false;
-        if (!BOT_CHECK_ENABLED)
-            return true;
-        Integer id = player.getEntityId();
-        if (!seenMoving.containsKey(id) && seenTeleport.containsKey(id))
-            return false;
-        boolean suspect = player.isInvisible() && !ATTACK_INVISIBLES
-                || player.ticksExisted > 105
-                || !moving(player);
-        if (!suspect) {
-            if (!confirmedPlayers.contains(id))
-                confirmedPlayers.add(id);
-            return true;
+    // suim mode: 24 rays, find the best void direction by fall depth and distance.
+    // returns 0 when no valid direction exists (caller treats as no-displace)
+    private float suimOffset() {
+        if (lastTarget == null || mc.theWorld == null || mc.thePlayer == null) {
+            return 0.0f;
         }
-        return confirmedPlayers.contains(id) || player.ticksExisted > 105 && confirmedBots.contains(id);
-    }
+        Entity t = lastTarget;
+        int baseY = (int) Math.floor(t.posY);
+        double px = t.posX;
+        double pz = t.posZ;
 
-    private boolean moving(EntityPlayer player) {
-        return player.prevPosX != player.posX || player.prevPosY != player.posY || player.prevPosZ != player.posZ;
-    }
+        float bestYaw = 0.0f;
+        double bestScore = -1.0;
 
-    private void cleanBots() {
-        long now = System.currentTimeMillis();
-        if (now <= lastBotCleanup + BOT_CACHE_TTL)
-            return;
-        lastBotCleanup = now;
-        long cutoff = now - BOT_CACHE_TTL;
-        seenMoving.entrySet().removeIf(en -> en.getValue() < cutoff);
-        seenTeleport.entrySet().removeIf(en -> en.getValue() < cutoff);
-    }
+        for (int i = 0; i < SUIM_RAYS; i++) {
+            float rayYaw = i * (360.0f / SUIM_RAYS);
+            double rad = Math.toRadians(rayYaw);
+            double dx = -Math.sin(rad);
+            double dz = Math.cos(rad);
 
-    // friend list check only (team mode defaults to NONE)
-    private Relationship rel(EntityPlayer player) {
-        if (friend(player.getName()))
-            return Relationship.FRIEND;
-        return Relationship.ENEMY;
-    }
+            for (double dist = SUIM_STEP; dist <= SUIM_MAX_DIST; dist += SUIM_STEP) {
+                int bx = (int) Math.floor(px + dx * dist);
+                int bz = (int) Math.floor(pz + dz * dist);
 
-    private boolean friend(String name) {
-        try {
-            Class<?> mainClass = Class.forName(MyauMappings.CLASS_MAIN);
-            Field friendField = mainClass.getDeclaredField(MyauMappings.FIELD_FRIEND_MANAGER);
-            friendField.setAccessible(true);
-            Object friendManager = friendField.get(null);
-            Field playersField = friendManager.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_PLAYER_LIST);
-            playersField.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            ArrayList<String> friends = (ArrayList<String>) playersField.get(friendManager);
-            return friends.contains(name);
-        } catch (Exception ex) {
-            return false;
+                // wall check: solid block in the 2-tall column blocks this ray
+                if (hasCollision(bx, baseY, bz) || hasCollision(bx, baseY + 1, bz)) {
+                    break; // this ray is blocked, try next direction
+                }
+
+                // void check: how many blocks of air below
+                int depth = voidDepth(bx, baseY, bz);
+                if (depth >= SUIM_VOID_DEPTH) {
+                    // score: deeper void wins, closer void wins
+                    double score = (double) depth / (dist * dist);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        float yawDelta = MathHelper.wrapAngleTo180_float(rayYaw - mc.thePlayer.rotationYaw);
+                        // clamp the flick to the configured angle, keeping the sign
+                        float maxAngle = properties.getFloat(angleProperty, 100.0f);
+                        if (Math.abs(yawDelta) > maxAngle) {
+                            yawDelta = Math.signum(yawDelta) * maxAngle;
+                        }
+                        bestYaw = yawDelta;
+                    }
+                    break; // found void on this ray, no need to look further
+                }
+            }
         }
+        return bestYaw;
     }
 
-    // silent swap to hotbar item with most knockback
-    private void silentSwap() {
-        if (!properties.getBoolean(silentSwapProperty, true) || !smartMode())
-            return;
-        int slot = -1;
-        float best = 0.0f;
-        for (int i = 0; i < 9; ++i) {
-            ItemStack stack = mc.thePlayer.inventory.getStackInSlot(i);
-            int kb;
-            if (stack == null || !((float) (kb = EnchantmentHelper
-                    .getEnchantmentLevel(Enchantment.knockback.effectId, stack)) > best)
-                    && mc.thePlayer.inventory.currentItem != i)
-                continue;
-            best = kb;
-            slot = i;
+    private boolean hasCollision(int x, int y, int z) {
+        BlockPos pos = new BlockPos(x, y, z);
+        IBlockState state = mc.theWorld.getBlockState(pos);
+        return state.getBlock().getCollisionBoundingBox(mc.theWorld, pos, state) != null;
+    }
+
+    private int voidDepth(int x, int y, int z) {
+        for (int d = 0; d < SUIM_VOID_DEPTH; d++) {
+            if (y - d < 1) {
+                return SUIM_VOID_DEPTH; // hit bedrock floor, treat as full void
+            }
+            if (hasCollision(x, y - d, z)) {
+                return d;
+            }
         }
-        if (slot == -1 && slot != mc.thePlayer.inventory.currentItem)
-            return;
-        prevSlot = mc.thePlayer.inventory.currentItem;
-        mc.thePlayer.inventory.currentItem = slot;
-        syncItem();
+        return SUIM_VOID_DEPTH;
     }
 
-    private void restoreWpn() {
-        if (prevSlot == -1)
-            return;
-        mc.thePlayer.inventory.currentItem = prevSlot;
-        syncItem();
-        prevSlot = -1;
-    }
-
-    private static int leftClicks() {
-        try {
-            return leftClickCounterField == null ? 0 : leftClickCounterField.getInt(mc);
-        } catch (Exception ex) {
-            return 0;
+    public void startBlink() {
+        if (properties.getBoolean(hideRotationsProperty, false)) {
+            blinkTicks = 2;
+            BlinkManager.getInstance().setBlinkState(true, BlinkManager.BlinkModule.DISPLACE);
         }
-    }
-
-    private static void syncItem() {
-        try {
-            if (syncItemMethod != null)
-                syncItemMethod.invoke(mc.playerController);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private boolean holdingWpn() {
-        ItemStack stack = mc.thePlayer.getHeldItem();
-        if (stack == null)
-            return false;
-        return stack.getItem() instanceof ItemSword
-                || stack.getItem() instanceof ItemAxe
-                || stack.getItem() == Items.stick;
-    }
-
-    private boolean holdingKb() {
-        ItemStack stack = mc.thePlayer.getHeldItem();
-        if (stack == null)
-            return false;
-        boolean hasKnockback = EnchantmentHelper.getEnchantmentLevel(Enchantment.knockback.effectId, stack) > 0;
-        // js incase hypixel decides to do weird things to kb stick :3
-        boolean isEnchantedStick = stack.getItem() == Items.stick && EnchantmentHelper.getEnchantments(stack).size() > 0;
-        return hasKnockback || isEnchantedStick;
-    }
-
-    private boolean batching() {
-        return blinkOn() && BlinkManager.getInstance().isBlinking(BlinkManager.BlinkModule.DISPLACE);
-    }
-
-    private void startBlink() {
-        if (!blinkOn())
-            return;
-        BlinkManager.getInstance().setBlinkState(true, BlinkManager.BlinkModule.DISPLACE);
     }
 
     private void stopBlink() {
         BlinkManager.getInstance().setBlinkState(false, BlinkManager.BlinkModule.DISPLACE);
     }
 
+    private void clickAttack() {
+        int code = mc.gameSettings.keyBindAttack.getKeyCode();
+        KeyBinding.setKeyBindState(code, true);
+        KeyBinding.onTick(code);
+        KeyBinding.setKeyBindState(code, false);
+    }
+
     private void emit(Packet<?> packet) {
         if (packet == null)
             return;
-        if (batching()) {
+        if (BlinkManager.getInstance().isBlinking(BlinkManager.BlinkModule.DISPLACE)) {
             BlinkManager.getInstance().queueDirect(packet);
         } else {
             PacketUtils.sendPacketNoEvent(packet);
         }
     }
 
-    // refresh mouseover then refire clickMouse for fresh attack packets;
-    // killaura attacks go straight to their captured target instead
-    private void refire() {
-        try {
-            EntityPlayer t = pendingTarget;
-            pendingTarget = null;
-            if (t != null && !t.isDead && mc.theWorld.getEntityByID(t.getEntityId()) == t) {
-                mc.thePlayer.swingItem();
-                mc.playerController.attackEntity(mc.thePlayer, t);
-                return;
-            }
-            mc.entityRenderer.getMouseOver(1.0f);
-            if (clickMouseMethod != null)
-                clickMouseMethod.invoke(mc);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private EntityPlayer useTarget(C02PacketUseEntity use) {
-        Entity ent = use.getEntityFromWorld(mc.theWorld);
-        return ent instanceof EntityPlayer ? (EntityPlayer) ent : null;
-    }
-
-    private void armAim() {
-        manager.findModule("AimAssist");
-    }
-
-    private static float quantRot(float target, float prev) {
-        double d = (target - prev) / ROTATION_GCD;
-        return (float) (prev + Math.rint(d) * (double) ROTATION_GCD);
-    }
-
-    private Packet<?> chainRot(C03PacketPlayer orig) {
-        float yaw = orig.getYaw();
-        float pitch = orig.getPitch();
-        if (Float.isNaN(lastSentYaw)) {
-            lastSentYaw = yaw;
-            lastSentPitch = pitch;
-            return orig;
-        }
-        yaw = quantRot(yaw, lastSentYaw);
-        pitch = quantRot(pitch, lastSentPitch);
-        if (yaw == orig.getYaw() && pitch == orig.getPitch()) {
-            lastSentYaw = yaw;
-            lastSentPitch = pitch;
-            return orig;
-        }
-        lastSentYaw = yaw;
-        lastSentPitch = pitch;
-        return copyRot(orig, yaw, pitch);
-    }
-
     private static Packet<?> copyRot(C03PacketPlayer orig, float yaw, float pitch) {
         if (orig instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
-            C03PacketPlayer.C06PacketPlayerPosLook pos =
-                    (C03PacketPlayer.C06PacketPlayerPosLook) orig;
+            C03PacketPlayer.C06PacketPlayerPosLook pos = (C03PacketPlayer.C06PacketPlayerPosLook) orig;
             return new C03PacketPlayer.C06PacketPlayerPosLook(
                     pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
                     yaw, pitch, orig.isOnGround());
         }
         if (orig instanceof C03PacketPlayer.C04PacketPlayerPosition) {
-            C03PacketPlayer.C04PacketPlayerPosition pos =
-                    (C03PacketPlayer.C04PacketPlayerPosition) orig;
+            C03PacketPlayer.C04PacketPlayerPosition pos = (C03PacketPlayer.C04PacketPlayerPosition) orig;
             return new C03PacketPlayer.C06PacketPlayerPosLook(
                     pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
                     yaw, pitch, orig.isOnGround());
@@ -813,33 +565,127 @@ public class Displace extends Feature {
         return new C03PacketPlayer.C05PacketPlayerLook(yaw, pitch, orig.isOnGround());
     }
 
-    // flick C03: compose flick on intercepted rotation (AimAssist's server aim)
-    private Packet<?> flickPacket(C03PacketPlayer orig) {
-        float baseYaw = orig.getRotating() ? orig.getYaw() : mc.thePlayer.rotationYaw;
-        float basePitch = orig.getRotating() ? orig.getPitch() : mc.thePlayer.rotationPitch;
-        return rotPacket(orig, baseYaw + flickOffset, basePitch);
-    }
-
-    // restore C03: snap real yaw back into the packet
-    private Packet<?> restorePacket(C03PacketPlayer orig) {
-        float baseYaw = orig.getRotating() ? orig.getYaw() : mc.thePlayer.rotationYaw;
-        float basePitch = orig.getRotating() ? orig.getPitch() : mc.thePlayer.rotationPitch;
-        return rotPacket(orig, baseYaw, basePitch);
-    }
-
-    private Packet<?> rotPacket(C03PacketPlayer orig, float yaw, float pitch) {
-        if (!Float.isNaN(lastSentYaw)) {
-            yaw = quantRot(yaw, lastSentYaw);
-            pitch = quantRot(pitch, lastSentPitch);
+    private int hellishVoidCheckNotRefractoringThisTemp(Entity entity, int previous) {
+        double dx = entity.posX - mc.thePlayer.posX;
+        double dz = entity.posZ - mc.thePlayer.posZ;
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) {
+            return -1;
         }
-        lastSentYaw = yaw;
-        lastSentPitch = pitch;
-        return copyRot(orig, yaw, pitch);
+        dx /= len;
+        dz /= len;
+        double px = -dz;
+        double pz = dx;
+        double y = entity.posY;
+        int minusSide = 0;
+        int plusSide = 0;
+        int behind = 0;
+        for (int n4 : new int[] { 1, 2, 3, 4, 6, 8 }) {
+            int weight = n4 < 6 ? 2 : 1;
+            double bx = entity.posX + dx * (double) n4;
+            double bz = entity.posZ + dz * (double) n4;
+            for (int i = -1; i <= 1; ++i) {
+                double x = bx + px * (double) i;
+                double z = bz + pz * (double) i;
+                if (mc.theWorld.rayTraceBlocks(new Vec3(x, y, z), new Vec3(x, y - 6.0, z), true) != null)
+                    continue;
+                behind += weight;
+            }
+            double mx = entity.posX - px * (double) n4;
+            double mz = entity.posZ - pz * (double) n4;
+            for (int i = -1; i <= 1; ++i) {
+                double x = mx + dx * (double) i;
+                double z = mz + dz * (double) i;
+                if (mc.theWorld.rayTraceBlocks(new Vec3(x, y, z), new Vec3(x, y - 6.0, z), true) != null)
+                    continue;
+                minusSide += weight;
+            }
+            double qx = entity.posX + px * (double) n4;
+            double qz = entity.posZ + pz * (double) n4;
+            for (int i = -1; i <= 1; ++i) {
+                double x = qx + dx * (double) i;
+                double z = qz + dz * (double) i;
+                if (mc.theWorld.rayTraceBlocks(new Vec3(x, y, z), new Vec3(x, y - 6.0, z), true) != null)
+                    continue;
+                plusSide += weight;
+            }
+        }
+        if (minusSide == 0 && plusSide == 0) {
+            return -1;
+        }
+        if (behind >= minusSide && behind >= plusSide) {
+            return -1;
+        }
+        if (minusSide == plusSide && previous != -1) {
+            return previous;
+        }
+        return minusSide > plusSide ? 0 : 1;
     }
 
-    private enum Relationship {
-        FRIEND,
-        TEAM,
-        ENEMY
+    private void setArrow(EntityLivingBase entity, float f) {
+        double d = Math.toRadians(mc.thePlayer.rotationYaw + f);
+        double dirX = -Math.sin(d);
+        double dirZ = Math.cos(d);
+        arrowX = entity.posX + dirX * 0.8;
+        arrowY = entity.posY + 1.2;
+        arrowZ = entity.posZ + dirZ * 0.8;
+        arrowChar = f >= 0 ? ">" : "<";
+        arrowAt = System.currentTimeMillis();
+        arrow = true;
+        if (properties.getBoolean(debuggityProperty, false)) {
+            MyauLogger.log("DISPLACE", String.format("arrow set char=%s mode=%d pos=%.1f,%.1f,%.1f",
+                    arrowChar, renderMode(), arrowX, arrowY, arrowZ));
+        }
+    }
+
+    @SubscribeEvent
+    public void onRenderWorld(RenderWorldLastEvent e) {
+        if (!arrow || renderMode() == RENDER_NONE) {
+            return;
+        }
+        if (!Utils.nullCheck()) {
+            return;
+        }
+        long l = System.currentTimeMillis() - arrowAt;
+        if (l > 600L) {
+            arrow = false;
+            return;
+        }
+
+        double x = arrowX - mc.getRenderManager().viewerPosX;
+        double y = arrowY - mc.getRenderManager().viewerPosY;
+        double z = arrowZ - mc.getRenderManager().viewerPosZ;
+
+        int color = properties.getInt(renderColorProperty, 0xFF50C8DC);
+        float size = properties.getFloat(arrowSizeProperty, 1.0f);
+
+        // simple lerp fadeout over the last 150ms
+        float alpha = 1.0f;
+        if (l > 450L) {
+            alpha = 1.0f - (l - 450L) / 150.0f;
+            int a = (int) (255 * alpha) << 24;
+            color = a | (color & 0xFFFFFF);
+        }
+
+        GlStateManager.pushMatrix();
+        GlStateManager.enableBlend();
+        GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager.disableDepth();
+        GlStateManager.depthMask(false);
+
+        GlStateManager.translate(x, y, z);
+        GlStateManager.rotate(180.0f - mc.getRenderManager().playerViewY, 0.0f, 1.0f, 0.0f);
+        float scale = size * 0.05f;
+        GlStateManager.scale(-scale, -scale, scale);
+        GlStateManager.disableLighting();
+        GlStateManager.enableTexture2D();
+        int textWidth = mc.fontRendererObj.getStringWidth(arrowChar);
+        mc.fontRendererObj.drawString(arrowChar, -textWidth / 2,
+                -mc.fontRendererObj.FONT_HEIGHT / 2, color);
+
+        GlStateManager.depthMask(true);
+        GlStateManager.enableDepth();
+        GlStateManager.disableBlend();
+        GlStateManager.popMatrix();
     }
 }
