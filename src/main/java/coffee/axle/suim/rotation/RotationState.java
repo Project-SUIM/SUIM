@@ -1,17 +1,13 @@
 package coffee.axle.suim.rotation;
 
-import coffee.axle.suim.events.SendPacketEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetworkPlayerInfo;
-import net.minecraft.network.play.client.C03PacketPlayer;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 /**
  * Singleton server-side rotation tracker.
  * <p>
- * Intercepts outgoing C03/C05/C06 packets to maintain an accurate
+ * Observes dispatched C03/C05/C06 packets to maintain an accurate
  * picture of what yaw/pitch the server believes the player has.
  * Also snapshots client-side angles before any feature spoofs them.
  * <p>
@@ -49,24 +45,6 @@ public final class RotationState {
         if (!initialized) {
             MinecraftForge.EVENT_BUS.register(this);
             initialized = true;
-        }
-    }
-
-    /**
-     * Track server-side rotation from outgoing packets.
-     * Uses HIGHEST priority so we see the packet before any feature
-     * can cancel or modify it.
-     */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onSendPacket(SendPacketEvent event) {
-        if (!(event.getPacket() instanceof C03PacketPlayer))
-            return;
-        C03PacketPlayer packet = (C03PacketPlayer) event.getPacket();
-
-        if (packet instanceof C03PacketPlayer.C05PacketPlayerLook
-                || packet instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
-            serverYaw = packet.getYaw();
-            serverPitch = packet.getPitch();
         }
     }
 

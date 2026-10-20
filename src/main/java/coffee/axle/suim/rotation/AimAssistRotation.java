@@ -129,6 +129,7 @@ public class AimAssistRotation extends Rotation {
     public float[] aimAtEntity(EntityLivingBase entity,
             float smoothFactor, float hSpeed, float vSpeed,
             boolean movementCorrection) {
+        // onPostTick sees the restored camera, not the spoofed wire angles
         float[] raw = computeTarget(entity, movementCorrection);
         if (raw == null)
             return null;
@@ -137,9 +138,11 @@ public class AimAssistRotation extends Rotation {
             return aimAtEntitySuim(entity, raw, smoothFactor, hSpeed, vSpeed);
         }
 
-        return smoothAndGCD(raw[0], raw[1], smoothFactor, hSpeed, vSpeed);
+        return smoothAndGCD(raw[0], raw[1], smoothFactor, hSpeed, vSpeed,
+                mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch);
     }
 
+    @SuppressWarnings("unused")
     private float[] calcEvilAxlePissAim(EntityLivingBase entity) {
         int entityId = entity.getEntityId();
         if (entityId != tracking.targetEntityId) {
@@ -153,7 +156,7 @@ public class AimAssistRotation extends Rotation {
 
         double distance = RotationMath.distanceToBox(expandedBB);
         float angularVelocity = tracking.computeAngularVelocity(
-                state.getServerYaw(), state.getServerPitch());
+                mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch);
         double targetSpeed = tracking.computeTargetSpeed(entity.posX, entity.posZ);
         float contraction = RotationMath.computeDynamicContraction(distance, angularVelocity, targetSpeed);
         contraction = MathHelper.clamp_float(contraction, contractionMin, contractionMax);
@@ -212,9 +215,9 @@ public class AimAssistRotation extends Rotation {
         double velZ = entity.posZ - entity.prevPosZ;
         double targetLateralVel = Math.sqrt(velX * velX + velZ * velZ);
 
-        float[] result = smoothAndGCDAdaptive(
-                raw[0], raw[1], smoothFactor, hSpeed, vSpeed,
-                tracking.trackingConfidence, targetLateralVel, distance, lagDelayTicks);
+        float[] result = smoothAndGCDAdaptive(raw[0], raw[1], smoothFactor, hSpeed, vSpeed,
+            tracking.trackingConfidence, targetLateralVel, distance, lagDelayTicks,
+            mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch);
 
         float tolerance = 3.0f;
         boolean onTarget = withinTolerance(result[0], result[1], raw[0], raw[1], tolerance);
@@ -249,10 +252,8 @@ public class AimAssistRotation extends Rotation {
     }
 
     private float computeAngularOffset(float[] targetRot) {
-        float sYaw = state.getServerYaw();
-        float sPitch = state.getServerPitch();
-        float dy = MathHelper.wrapAngleTo180_float(targetRot[0] - sYaw);
-        float dp = MathHelper.wrapAngleTo180_float(targetRot[1] - sPitch);
+        float dy = MathHelper.wrapAngleTo180_float(targetRot[0] - mc.thePlayer.rotationYaw);
+        float dp = MathHelper.wrapAngleTo180_float(targetRot[1] - mc.thePlayer.rotationPitch);
         return (float) Math.sqrt(dy * dy + dp * dp);
     }
 

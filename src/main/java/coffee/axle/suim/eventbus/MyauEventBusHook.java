@@ -112,7 +112,6 @@ public final class MyauEventBusHook {
      * @param priority       handler priority (0 = default, 100 = RotationManager priority)
      * @return {@code true} if registration succeeded
      */
-    @SuppressWarnings("unchecked")
     public static boolean registerAfter(String eventClassName, Object handler,
                                         String methodName, Class<?> paramType, int priority) {
         return register(eventClassName, handler, methodName, paramType, priority, false);
@@ -124,7 +123,6 @@ public final class MyauEventBusHook {
      *
      * @see #registerAfter
      */
-    @SuppressWarnings("unchecked")
     public static boolean registerBefore(String eventClassName, Object handler,
                                          String methodName, Class<?> paramType, int priority) {
         return register(eventClassName, handler, methodName, paramType, priority, true);

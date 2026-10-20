@@ -14,7 +14,7 @@ public abstract class MixinMovementInput extends MovementInput {
 
     @Inject(method = "updatePlayerMoveState", at = @At("RETURN"))
     private void onPostUpdatePlayerMoveState(CallbackInfo ci) {
-        PrePlayerInputEvent event = new PrePlayerInputEvent(this.moveForward, this.moveStrafe);
+        PrePlayerInputEvent event = new PrePlayerInputEvent(this.moveForward, this.moveStrafe, this.jump);
         MinecraftForge.EVENT_BUS.post(event);
         if (event.isCanceled()) {
             this.moveForward = 0.0f;
@@ -22,6 +22,7 @@ public abstract class MixinMovementInput extends MovementInput {
         } else {
             this.moveForward = event.getForward();
             this.moveStrafe = event.getStrafe();
+            this.jump = event.isJump();
         }
     }
 }
