@@ -78,30 +78,50 @@ public final class RotationMath {
     }
 
     public static float computeVerticalMultipoint(double targetY) {
+        return compVerticalMultipointNoMotion(targetY, 0.0);
+    }
+
+    /**
+     * Computes a vertical aim for multipoint, no notion
+     * @param targetY
+     * @param targetMotionY
+     */
+    public static float compVerticalMultipointNoMotion(double targetY, double targetMotionY) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null)
             return 0.5f;
         float yDiff = (float) (targetY - mc.thePlayer.posY);
+        float base;
         if (yDiff > 0.5f)
-            return 1.0f;
-        if (yDiff < -0.5f)
-            return 0.0f;
-        return 0.5f;
+            base = 1.0f;
+        else if (yDiff < -0.5f)
+            base = 0.0f;
+        else
+            base = 0.5f;
+        if (targetMotionY > 0.1)
+            base = Math.max(0.0f, base - 0.25f);
+        else if (targetMotionY < -0.1)
+            base = Math.min(1.0f, base + 0.25f);
+        return MathHelper.clamp_float(base, 0.0f, 1.0f);
     }
 
-    public static float[] toRotationsBoxDynamic(AxisAlignedBB boundingBox,
-            float hitboxBoundsMin, float hitboxBoundsMax,
-            float verticalMultipoint) {
+    // aim at the box center at a given vertical fraction, 0 is the bottom
+    public static float[] toRotationsBox(AxisAlignedBB box, float verticalFraction) {
         Minecraft mc = Minecraft.getMinecraft();
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        double boxHeight = boundingBox.maxY - boundingBox.minY;
-        double clampedVMP = MathHelper.clamp_double(verticalMultipoint,
-                hitboxBoundsMin, hitboxBoundsMax);
-        double targetY = boundingBox.maxY - (boxHeight * clampedVMP);
-        double dx = (boundingBox.minX + boundingBox.maxX) / 2.0 - eye.xCoord;
-        double dy = targetY - eye.yCoord;
-        double dz = (boundingBox.minZ + boundingBox.maxZ) / 2.0 - eye.zCoord;
-        return toRotationsFromDelta(dx, dy, dz);
+        double height = box.maxY - box.minY;
+        double targetY = box.maxY - height * MathHelper.clamp_double(verticalFraction, 0.0, 1.0);
+        return toRotationsFromDelta(
+                (box.minX + box.maxX) / 2.0 - eye.xCoord,
+                targetY - eye.yCoord,
+                (box.minZ + box.maxZ) / 2.0 - eye.zCoord);
+    }
+
+    // same as toRotationsBox but the fraction is clamped to the hitbox bounds
+    public static float[] toRotationsBoxBounded(AxisAlignedBB box, float verticalFraction,
+            float boundsMin, float boundsMax) {
+        return toRotationsBox(box,
+                (float) MathHelper.clamp_double(verticalFraction, boundsMin, boundsMax));
     }
 
     public static float[] toRotationsClosestPoint(AxisAlignedBB boundingBox,
@@ -109,24 +129,10 @@ public final class RotationMath {
         Minecraft mc = Minecraft.getMinecraft();
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
         AxisAlignedBB contracted = boundingBox.contract(shrinkValue, shrinkValue, shrinkValue);
-
-        double cx = MathHelper.clamp_double(eye.xCoord, contracted.minX, contracted.maxX);
-        double cy = MathHelper.clamp_double(eye.yCoord, contracted.minY, contracted.maxY);
-        double cz = MathHelper.clamp_double(eye.zCoord, contracted.minZ, contracted.maxZ);
-
-        return toRotationsFromDelta(cx - eye.xCoord, cy - eye.yCoord, cz - eye.zCoord);
-    }
-
-    public static float[] toRotationsFixedPoint(AxisAlignedBB boundingBox,
-            float verticalFraction) {
-        Minecraft mc = Minecraft.getMinecraft();
-        Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        double boxHeight = boundingBox.maxY - boundingBox.minY;
-        double targetY = boundingBox.maxY - (boxHeight * MathHelper.clamp_double(verticalFraction, 0.0, 1.0));
-        double dx = (boundingBox.minX + boundingBox.maxX) / 2.0 - eye.xCoord;
-        double dy = targetY - eye.yCoord;
-        double dz = (boundingBox.minZ + boundingBox.maxZ) / 2.0 - eye.zCoord;
-        return toRotationsFromDelta(dx, dy, dz);
+        return toRotationsFromDelta(
+                MathHelper.clamp_double(eye.xCoord, contracted.minX, contracted.maxX) - eye.xCoord,
+                MathHelper.clamp_double(eye.yCoord, contracted.minY, contracted.maxY) - eye.yCoord,
+                MathHelper.clamp_double(eye.zCoord, contracted.minZ, contracted.maxZ) - eye.zCoord);
     }
 
     public static float computeDynamicContraction(double distance, float angularVelocity, double targetSpeed) {
@@ -137,8 +143,13 @@ public final class RotationMath {
         float result = base + distFactor - angVelFactor - speedFactor;
         return MathHelper.clamp_float(result, 0.02f, 0.25f);
     }
-
-    public static float computeVerticalMultipointMotionAware(double targetY, double targetMotionY) {
+    /**
+     * Computes a vertical aiming factor for multipoint targets, includes motion
+     * @param targetY The vertical position of the target
+     * @param targetMotionY The vertical motion of the target
+     * @return A vertical aiming factor between 0.0 and 1.0
+     */
+    public static float compVerticalMultipoint(double targetY, double targetMotionY) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null)
             return 0.5f;
@@ -168,20 +179,11 @@ public final class RotationMath {
         return bb.offset(ox, oy, oz);
     }
 
+    // verticalMultipoint biased toward the head, then clamped like the plain version
     public static float[] toRotationsSuim(AxisAlignedBB boundingBox,
             float hitboxBoundsMin, float hitboxBoundsMax,
             float verticalMultipoint, float headBias) {
-        Minecraft mc = Minecraft.getMinecraft();
-        Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        double boxHeight = boundingBox.maxY - boundingBox.minY;
-
-        float biasedVMP = verticalMultipoint * (1.0f - headBias);
-        double clampedVMP = MathHelper.clamp_double(biasedVMP, hitboxBoundsMin, hitboxBoundsMax);
-        double targetY = boundingBox.maxY - (boxHeight * clampedVMP);
-
-        double dx = (boundingBox.minX + boundingBox.maxX) / 2.0 - eye.xCoord;
-        double dy = targetY - eye.yCoord;
-        double dz = (boundingBox.minZ + boundingBox.maxZ) / 2.0 - eye.zCoord;
-        return toRotationsFromDelta(dx, dy, dz);
+        return toRotationsBoxBounded(boundingBox,
+                verticalMultipoint * (1.0f - headBias), hitboxBoundsMin, hitboxBoundsMax);
     }
 }

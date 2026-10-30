@@ -135,7 +135,7 @@ public class AimAssistRotation extends Rotation {
             return null;
 
         if (mode == AimMode.SUIM) {
-            return aimAtEntitySuim(entity, raw, smoothFactor, hSpeed, vSpeed);
+            return suimAimAt(entity, raw, smoothFactor, hSpeed, vSpeed);
         }
 
         return smoothAndGCD(raw[0], raw[1], smoothFactor, hSpeed, vSpeed,
@@ -179,15 +179,15 @@ public class AimAssistRotation extends Rotation {
             workingBB = RotationMath.extrapolateBB(contractedBB, velX, velY, velZ, ticksAhead, confidence);
         }
 
-        float vertMultipoint = RotationMath.computeVerticalMultipointMotionAware(entity.posY, entity.motionY);
+        float vertMultipoint = RotationMath.compVerticalMultipointNoMotion(entity.posY, entity.motionY);
 
-        float[] vsplitRot = RotationMath.toRotationsBoxDynamic(
-                workingBB, hitboxBoundsMin, hitboxBoundsMax, vertMultipoint);
+        float[] vsplitRot = RotationMath.toRotationsBoxBounded(
+                workingBB, vertMultipoint, hitboxBoundsMin, hitboxBoundsMax);
         float[] sightlineRot = RotationMath.toRotationsClosestPoint(workingBB, 0.0);
         float[] suimRot = RotationMath.toRotationsSuim(
                 workingBB, hitboxBoundsMin, hitboxBoundsMax, vertMultipoint, headBias);
 
-        float angularOffset = computeAngularOffset(suimRot);
+        float angularOffset = angularoffset(suimRot);
         float sightlineWeight = calcSkiddedClosestSightlineWeight(distance, angularOffset, tracking.trackingConfidence);
 
         if (!tracking.firstHitLanded) {
@@ -208,7 +208,7 @@ public class AimAssistRotation extends Rotation {
         return new float[] { finalYaw, finalPitch };
     }
 
-    private float[] aimAtEntitySuim(EntityLivingBase entity, float[] raw,
+    private float[] suimAimAt(EntityLivingBase entity, float[] raw,
             float smoothFactor, float hSpeed, float vSpeed) {
         double distance = mc.thePlayer.getDistanceToEntity(entity);
         double velX = entity.posX - entity.prevPosX;
@@ -251,7 +251,7 @@ public class AimAssistRotation extends Rotation {
         return (distWeight + offsetWeight + confWeight) / 3.0f;
     }
 
-    private float computeAngularOffset(float[] targetRot) {
+    private float angularoffset(float[] targetRot) {
         float dy = MathHelper.wrapAngleTo180_float(targetRot[0] - mc.thePlayer.rotationYaw);
         float dp = MathHelper.wrapAngleTo180_float(targetRot[1] - mc.thePlayer.rotationPitch);
         return (float) Math.sqrt(dy * dy + dp * dp);
@@ -276,15 +276,15 @@ public class AimAssistRotation extends Rotation {
         float border = entity.getCollisionBorderSize();
         AxisAlignedBB expandedBox = bb.expand(border, border, border);
         float verticalMultipoint = RotationMath.computeVerticalMultipoint(entity.posY);
-        return RotationMath.toRotationsBoxDynamic(
-                expandedBox, hitboxBoundsMin, hitboxBoundsMax, verticalMultipoint);
+        return RotationMath.toRotationsBoxBounded(
+                expandedBox, verticalMultipoint, hitboxBoundsMin, hitboxBoundsMax);
     }
 
     private float[] calcEvilAxlePenisCalculationRotationHitRotationCalculation(EntityLivingBase entity) {
         AxisAlignedBB bb = entity.getEntityBoundingBox();
         float border = entity.getCollisionBorderSize();
         AxisAlignedBB expandedBox = bb.expand(border, border, border);
-        return RotationMath.toRotationsFixedPoint(expandedBox, 0.75f);
+        return RotationMath.toRotationsBox(expandedBox, 0.75f);
     }
 
     private boolean isPlayerMoving() {
