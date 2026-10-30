@@ -10,11 +10,24 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * Base class for all SUIM features.
- * Provides shared access to module creation, management, and property access.
- *
+ * Base class for all SUIM features also known as "modules" depending on the client
  * Features that create standalone Myau modules should override
  * {@link #getGuiCategory()} to appear in the click GUI.
+ * example:
+ * <pre>{@code
+ * public class MyFeature extends Feature {
+ *     @Override
+ *     public String getName() {
+ *         return "MyFeature";
+ *     }
+ *
+ *     @Override
+ *     public boolean initialize() {
+ *         // Initialization logic here
+ *         return true;
+ *     }
+ * }
+ * }</pre>
  */
 public abstract class Feature {
     protected MyauModuleCreator creator;
