@@ -5,19 +5,18 @@ import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.feature.render.bedplates.BlockBedScanner;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.render.BedBillboardRenderer;
-import coffee.axle.suim.util.BedwarsDetector;
+import coffee.axle.suim.util.HypixelUtils;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -26,25 +25,39 @@ import java.awt.Color;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class Bedplates extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
-    private Object moduleInstance;
 
-    private Object yShiftProperty;
-    private Object updateRateProperty;
-    private Object rangeProperty;
-    private Object layersProperty;
-    private Object firstBedOnlyProperty;
-    private Object borderModeProperty;
-    private Object borderThicknessProperty;
-    private Object autoScaleProperty;
-    private Object billboardScaleProperty;
-    private Object itemSizeProperty;
-    private Object backgroundModeProperty;
-    private Object backgroundColorProperty;
-    private Object bedwarsOnlyProperty;
+    public enum Border {
+        NONE, HUD
+    }
+
+    public enum AutoScale {
+        LINEAR, SUBLINEAR
+    }
+
+    public enum Background {
+        NONE, DEFAULT, HUD, CUSTOM
+    }
+
+    @Setting(name = "y-offset", min = -5f, max = 10f) private float yShift = 2f;
+    @Setting(name = "update-rate", min = 250f, max = 5000f) private float updateRate = 1000f;
+    @Setting(min = 0f, max = 1000f) private float range = 0f;
+    @Setting(min = 1f, max = 10f) private float layers = 5f;
+    @Setting(name = "border-thickness", min = 0.5f, max = 5f) private float borderThickness = 1.5f;
+    @Setting(name = "scale", min = 0.1f, max = 5f) private float billboardScale = 1f;
+    @Setting(name = "item-size", min = 8f, max = 32f) private float itemSize = 16f;
+
+    @Setting(name = "background-color") private String backgroundColor = "000000";
+
+    @Setting private Border border = Border.NONE;
+    @Setting private AutoScale autoScale = AutoScale.SUBLINEAR;
+    @Setting private Background background = Background.DEFAULT;
+
+    @Setting(name = "bedwars-only") private boolean bedwarsOnly = false;
+    @Setting(name = "first-bed-only") private boolean firstBedOnly = false;
 
     private final HudUtils hudUtils = HudUtils.getInstance();
 
@@ -56,74 +69,14 @@ public class Bedplates extends Feature {
     private final List<Map<Block, Integer>> bedLayers = new ArrayList<>();
     private long lastUpdateTime = 0;
 
-    @Override
-    public String getName() {
-        return "BedPlates";
+    public Bedplates() {
+        super("BedPlates", GuiCategory.RENDER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.RENDER;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, getClass());
-
-            yShiftProperty = creator.createFloatProperty(
-                    "y-offset", 2f, -5f, 10f);
-            updateRateProperty = creator.createFloatProperty(
-                    "update-rate", 1000f, 250f, 5000f);
-            rangeProperty = creator.createFloatProperty(
-                    "range", 0f, 0f, 1000f);
-            layersProperty = creator.createFloatProperty(
-                    "layers", 5f, 1f, 10f);
-            firstBedOnlyProperty = creator.createBooleanProperty(
-                    "first-bed-only", false);
-            borderModeProperty = creator.createEnumProperty(
-                    "border", 0,
-                    new String[] { "NONE", "HUD" });
-            borderThicknessProperty = creator.createFloatProperty(
-                    "border-thickness", 1.5f, 0.5f, 5f);
-            autoScaleProperty = creator.createEnumProperty(
-                    "auto-scale", 1,
-                    new String[] { "LINEAR", "SUBLINEAR" });
-            billboardScaleProperty = creator.createFloatProperty(
-                    "scale", 1f, 0.1f, 5f);
-            itemSizeProperty = creator.createFloatProperty(
-                    "item-size", 16f, 8f, 32f);
-            backgroundModeProperty = creator.createEnumProperty(
-                    "background", 1,
-                    new String[] { "NONE", "DEFAULT",
-                            "HUD", "CUSTOM" });
-            backgroundColorProperty = creator.createStringProperty(
-                    "background-color", "000000");
-            bedwarsOnlyProperty = creator.createBooleanProperty(
-                    "bedwars-only", false);
-
-            creator.registerProperties(moduleInstance,
-                    yShiftProperty, updateRateProperty,
-                    rangeProperty, layersProperty,
-                    firstBedOnlyProperty, borderModeProperty,
-                    borderThicknessProperty, autoScaleProperty,
-                    billboardScaleProperty, itemSizeProperty,
-                    backgroundModeProperty,
-                    backgroundColorProperty,
-                    bedwarsOnlyProperty);
-
-            hudUtils.initialize();
-            hookBedESP();
-
-            manager.reloadModuleCommand();
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-        } catch (Exception t) {
-            MyauLogger.error("FEATURE_FAIL", t);
-            return false;
-        }
+    protected void init() throws Exception {
+        hudUtils.initialize();
+        hookBedESP();
     }
 
     private void hookBedESP() {
@@ -157,17 +110,16 @@ public class Bedplates extends Feature {
     public void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START)
             return;
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
-        if (properties.getBoolean(bedwarsOnlyProperty, false)
-                && !BedwarsDetector.inBedWarsGame())
+        if (bedwarsOnly
+                && !HypixelUtils.inBedWarsGame())
             return;
 
         long now = System.currentTimeMillis();
-        long rate = (long) properties.getFloat(
-                updateRateProperty, 1000f);
+        long rate = (long) updateRate;
         if (now - lastUpdateTime < rate)
             return;
         lastUpdateTime = now;
@@ -178,35 +130,33 @@ public class Bedplates extends Feature {
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
-        if (properties.getBoolean(bedwarsOnlyProperty, false)
-                && !BedwarsDetector.inBedWarsGame())
+        if (bedwarsOnly
+                && !HypixelUtils.inBedWarsGame())
             return;
         if (bedFeet.isEmpty())
             return;
 
-        boolean firstOnly = properties.getBoolean(
-                firstBedOnlyProperty, false);
+        boolean firstOnly = firstBedOnly;
         int limit = firstOnly
                 ? Math.min(1, bedFeet.size())
                 : bedFeet.size();
 
-        float range = properties.getFloat(
-                rangeProperty, 0f);
+        float maxRange = range;
 
         for (int i = 0; i < limit; i++) {
             if (i < bedLayers.size()
                     && !bedLayers.get(i).isEmpty()) {
                 BlockPos pos = bedFeet.get(i);
-                if (range > 0) {
+                if (maxRange > 0) {
                     double dist = mc.thePlayer.getDistance(
                             pos.getX() + 0.5,
                             pos.getY(),
                             pos.getZ() + 0.5);
-                    if (dist > range)
+                    if (dist > maxRange)
                         continue;
                 }
                 drawPlate(pos, i);
@@ -214,12 +164,10 @@ public class Bedplates extends Feature {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "unused" })
     private void refreshBedPositions() {
-        float range = properties.getFloat(
-                rangeProperty, 0f);
-        boolean firstOnly = properties.getBoolean(
-                firstBedOnlyProperty, false);
+        float maxRange = range;
+        boolean firstOnly = firstBedOnly;
 
         Set<BlockPos> espBeds = null;
         if (bedESPModule != null && bedsField != null) {
@@ -331,8 +279,7 @@ public class Bedplates extends Feature {
     }
 
     private void rebuildAllLayers() {
-        int maxLayers = (int) properties.getFloat(
-                layersProperty, 5f);
+        int maxLayers = (int) layers;
 
         for (int i = 0; i < bedFeet.size()
                 && i < bedLayers.size(); i++) {
@@ -403,8 +350,7 @@ public class Bedplates extends Feature {
 
     private void drawPlate(BlockPos footPos, int index) {
         Map<Block, Integer> layerMap = bedLayers.get(index);
-        float yShift = properties.getFloat(
-                yShiftProperty, 2f);
+        float plateY = yShift;
 
         BlockPos headPos = index < bedHeads.size()
                 ? bedHeads.get(index)
@@ -420,17 +366,14 @@ public class Bedplates extends Feature {
             centerX = footPos.getX() + 0.5;
             centerZ = footPos.getZ() + 0.5;
         }
-        double centerY = footPos.getY() + yShift + 1;
+        double centerY = footPos.getY() + plateY + 1;
 
         double distance = mc.thePlayer.getDistance(
                 centerX, footPos.getY(), centerZ);
 
-        float maxDist = properties.getFloat(
-                rangeProperty, 0f);
-        int scaleMode = properties.getInt(
-                autoScaleProperty, 1);
-        float scaleMultiplier = properties.getFloat(
-                billboardScaleProperty, 1f);
+        float maxDist = range;
+        int scaleMode = autoScale.ordinal();
+        float scaleMultiplier = billboardScale;
         double billboardScale = BedBillboardRenderer.DEFAULT_BILLBOARD_SCALE
                 * scaleMultiplier;
         double scaleFactor = BedBillboardRenderer.computeScale(
@@ -439,34 +382,29 @@ public class Bedplates extends Feature {
         if (scaleFactor <= 0)
             return;
 
-        int borderMode = properties.getInt(
-                borderModeProperty, 0);
-        float borderThickness = properties.getFloat(
-                borderThicknessProperty, 1.5f);
+        int borderMode = border.ordinal();
+        float thickness = borderThickness;
         Color borderColor = (borderMode == 1)
                 ? hudUtils.getHudColor(
                         new Color(80, 200, 220))
                 : null;
 
-        int itemSize = (int) properties.getFloat(
-                itemSizeProperty, 16f);
+        int size = (int) itemSize;
 
-        int bgMode = properties.getInt(
-                backgroundModeProperty, 1);
+        int bgMode = background.ordinal();
         Color bgColor = null;
         if (bgMode == BedBillboardRenderer.BG_HUD) {
             bgColor = hudUtils.getHudColor(
                     new Color(80, 200, 220));
         } else if (bgMode == BedBillboardRenderer.BG_CUSTOM) {
-            String hex = properties.getString(
-                    backgroundColorProperty, "000000");
+            String hex = backgroundColor;
             bgColor = BedBillboardRenderer.parseHexColor(hex);
         }
 
         BedBillboardRenderer.draw(
                 layerMap, centerX, centerY, centerZ,
-                scaleFactor, borderColor, borderThickness,
-                itemSize, bgMode, bgColor);
+                scaleFactor, borderColor, thickness,
+                size, bgMode, bgColor);
     }
 
     private void clearBedData() {

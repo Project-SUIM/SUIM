@@ -1,16 +1,15 @@
 package coffee.axle.suim.feature.render.bedplates;
 
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.BlockPos;
 
 import java.util.HashMap;
 import java.util.Map;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public final class BlockBedScanner {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private BlockBedScanner() {
     }
