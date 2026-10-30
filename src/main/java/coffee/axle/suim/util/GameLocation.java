@@ -1,7 +1,6 @@
 package coffee.axle.suim.util;
 
 import coffee.axle.suim.events.HypixelLocationEvent;
-import net.minecraft.client.Minecraft;
 import net.minecraft.scoreboard.Score;
 import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
@@ -9,13 +8,12 @@ import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
- * Where we are right now, per the hypixel mod api. Falls back to the sidebar
- * scan while the location packet has not arrived (or on other servers).
+ * Service to know game location via Hypixel Mod API, essentially never wrong
  */
 public final class GameLocation {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static volatile String gameType;
     private static volatile String mode;
@@ -44,12 +42,10 @@ public final class GameLocation {
         return map;
     }
 
-    /** non-null while sitting in a lobby rather than a game */
     public static String getLobbyName() {
         return lobbyName;
     }
 
-    /** true once the server has told us where we are */
     public static boolean isKnown() {
         return known;
     }
@@ -62,8 +58,6 @@ public final class GameLocation {
         @SubscribeEvent
         public void onLocation(HypixelLocationEvent e) {
             gameType = e.getGameType();
-            // vanilla only carries a lobby name for lobbies, so its presence
-            // means we are not in a game yet
             lobbyName = e.getLobbyName();
             mode = e.getMode();
             map = e.getMap();
@@ -72,10 +66,9 @@ public final class GameLocation {
     }
 
     /**
-     * Sidebar fallback. Language agnostic: the title says BED WARS and the first
-     * two team rows start with R and B, which the lobby has neither of.
+     * @deprecated use {@link #inGame(String)} with "BEDWARS" as the argument instead.
      */
-    public static boolean bedwarsBySidebar() {
+    public static boolean bwViaSidebar() {
         if (mc.theWorld == null) return false;
         Scoreboard sb = mc.theWorld.getScoreboard();
         if (sb == null) return false;

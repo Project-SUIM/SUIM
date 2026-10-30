@@ -2,9 +2,8 @@ package coffee.axle.suim.feature.world;
 
 import coffee.axle.suim.events.HypixelLocationEvent;
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.BedwarsDetector;
+import coffee.axle.suim.util.HypixelUtils;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -31,41 +30,31 @@ public class BedwarsOnly extends Feature {
     private static boolean wasInGame;
     private static long checkedAt;
 
-    @Override
-    public String getName() {
-        return "BedwarsOnly";
+    public BedwarsOnly() {
+        super("BedwarsOnly");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            propertyGetValue = manager.getPropertyGetValueMethod();
-            if (propertyGetValue == null) {
-                MyauLogger.log(getName(), "PROPERTY_METHOD_NULL");
-                return false;
-            }
-
-            for (String name : GATED_MODULES) {
-                Object module = manager.findModule(name);
-                if (module == null) {
-                    MyauLogger.log(getName(), name + " module not found");
-                    continue;
-                }
-                Object prop = creator.createBooleanProperty("bedwars-only", false);
-                creator.registerProperties(module, prop);
-                gated.put(module, prop);
-            }
-
-            active = !gated.isEmpty();
-            MyauLogger.log(getName(), "gated " + gated.size() + " modules with bedwars-only");
-            if (active) {
-                MinecraftForge.EVENT_BUS.register(this);
-            }
-            return active;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
+    protected void init() throws Exception {
+        propertyGetValue = manager.getPropertyGetValueMethod();
+        if (propertyGetValue == null) {
+            MyauLogger.log(getName(), "PROPERTY_METHOD_NULL");
+            return;
         }
+
+        for (String name : GATED_MODULES) {
+            Object target = manager.findModule(name);
+            if (target == null) {
+                MyauLogger.log(getName(), name + " module not found");
+                continue;
+            }
+            Object prop = creator.createBooleanProperty("bedwars-only", false);
+            creator.registerProperties(target, prop);
+            gated.put(target, prop);
+        }
+
+        active = !gated.isEmpty();
+        MyauLogger.log(getName(), "gated " + gated.size() + " modules with bedwars-only");
     }
 
     // called from MixinModule on every myau.V.isEnabled, keep it cheap
@@ -82,7 +71,7 @@ public class BedwarsOnly extends Feature {
     @SubscribeEvent
     public void onLocation(HypixelLocationEvent e) {
         if (!active) return;
-        if (!BedwarsDetector.inBedWarsGame()) return;
+        if (!HypixelUtils.inBedWarsGame()) return;
         enableAll();
     }
 
@@ -120,7 +109,7 @@ public class BedwarsOnly extends Feature {
     private static boolean inGameCached() {
         long now = System.currentTimeMillis();
         if (now - checkedAt > 250L) {
-            cachedInGame = BedwarsDetector.inBedWarsGame();
+            cachedInGame = HypixelUtils.inBedWarsGame();
             checkedAt = now;
         }
         return cachedInGame;
