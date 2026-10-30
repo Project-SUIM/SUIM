@@ -6,13 +6,12 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.feature.world.blockin.BlockInUtils;
 import coffee.axle.suim.feature.world.blockin.BlockInUtils.AimPoint;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.rotation.RotationState;
-import coffee.axle.suim.hooks.ModulePropertyManager;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
@@ -27,7 +26,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraftforge.client.event.MouseEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Mouse;
@@ -43,6 +41,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Places blocks on the faces around you while a bed is being broken.
@@ -53,26 +52,22 @@ import java.util.Set;
  */
 public class AutoBlockIn extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    // static so the helper methods below can read settings
-    private static ModulePropertyManager props;
-
-    private static Object moduleInstance;
-    private static Object delayProperty;
-    private static Object disableInCreativeProperty;
-    private static Object disableObsidianProperty;
-    private static Object disableWhenCompleteProperty;
-    private static Object onlyWhileMiddleClickingProperty;
-    private static Object prioritizeStrongerBlocksProperty;
-    private static Object showPercentageProperty;
-    private static Object silentAimProperty;
-    private static Object silentSwingProperty;
-    private static Object skipNearBedProperty;
+    @Setting(min = 0, max = 20) private static int delay = 1;
+    @Setting private static boolean disableInCreative = true;
+    @Setting private static boolean disableObsidian = true;
+    @Setting private static boolean disableWhenComplete = false;
+    @Setting private static boolean onlyWhileMiddleClicking = true;
+    @Setting private static boolean prioritizeStrongerBlocks = false;
+    @Setting private static boolean showPercentage = true;
+    @Setting private static boolean silentAim = true;
+    @Setting private static boolean silentSwing = false;
+    @Setting private static boolean skipNearBed = true;
 
     private static final class Node {
         final BlockPos pos;
         final int score;
+        @SuppressWarnings("unused")
         final int cost;
 
         Node(BlockPos pos, int score, int cost) {
@@ -101,6 +96,7 @@ public class AutoBlockIn extends Feature {
     private static final Set<BlockPos> retrySet = new HashSet<BlockPos>();
     private static final Set<BlockPos> failed = new HashSet<BlockPos>();
     private static EnumFacing[] facings;
+    @SuppressWarnings("unused")
     private static EnumFacing startFacing;
     private static final EnumFacing[] ORDER = {EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST, EnumFacing.UP, EnumFacing.DOWN};
     private static final EnumFacing[] ORDER_UP = {EnumFacing.UP, EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST, EnumFacing.DOWN};
@@ -120,102 +116,28 @@ public class AutoBlockIn extends Feature {
     private boolean sentUseEntity;
     private boolean sentAnyDigging;
 
-    @Override
-    public String getName() {
-        return "AutoBlockIn";
+    public AutoBlockIn() {
+        super("AutoBlockIn", GuiCategory.WORLD);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.WORLD;
+    protected void init() throws Exception {
+        RotationState.getInstance().register();
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, AutoBlockIn.class);
-            props = properties;
-
-            delayProperty = creator.createIntegerProperty("delay", 1, 0, 20);
-            disableInCreativeProperty = creator.createBooleanProperty("disable-in-creative", true);
-            disableObsidianProperty = creator.createBooleanProperty("disable-obsidian", true);
-            disableWhenCompleteProperty = creator.createBooleanProperty("disable-when-complete", false);
-            onlyWhileMiddleClickingProperty = creator.createBooleanProperty("only-while-middle-clicking", true);
-            prioritizeStrongerBlocksProperty = creator.createBooleanProperty("prioritize-stronger-blocks", false);
-            showPercentageProperty = creator.createBooleanProperty("show-percentage", true);
-            silentAimProperty = creator.createBooleanProperty("silent-aim", true);
-            silentSwingProperty = creator.createBooleanProperty("silent-swing", false);
-            skipNearBedProperty = creator.createBooleanProperty("skip-near-bed", true);
-
-            creator.registerProperties(moduleInstance, delayProperty,
-                    disableInCreativeProperty, disableObsidianProperty,
-                    disableWhenCompleteProperty, onlyWhileMiddleClickingProperty,
-                    prioritizeStrongerBlocksProperty, showPercentageProperty,
-                    silentAimProperty, silentSwingProperty, skipNearBedProperty);
-
-            manager.reloadModuleCommand();
-            RotationState.getInstance().register();
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("AutoBlockIn:init", e);
-            return false;
-        }
-    }
-
-    private void onEnable() {
+    protected void onEnable() {
         MyauLogger.log(getName(), "MODULE_ENABLED");
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         reset();
         waitRelease = false;
         rotating = false;
         MyauLogger.log(getName(), "MODULE_DISABLED");
     }
 
-    private static int getDelay() {
-        return props.getInt(delayProperty, 1);
-    }
-
-    private static boolean getDisableInCreative() {
-        return props.getBoolean(disableInCreativeProperty, true);
-    }
-
-    private static boolean getDisableObsidian() {
-        return props.getBoolean(disableObsidianProperty, true);
-    }
-
-    private static boolean getDisableWhenComplete() {
-        return props.getBoolean(disableWhenCompleteProperty, false);
-    }
-
-    private static boolean getOnlyWhileMiddleClicking() {
-        return props.getBoolean(onlyWhileMiddleClickingProperty, true);
-    }
-
-    private static boolean getPrioritizeStrongerBlocks() {
-        return props.getBoolean(prioritizeStrongerBlocksProperty, false);
-    }
-
-    private static boolean getShowPercentage() {
-        return props.getBoolean(showPercentageProperty, true);
-    }
-
-    private static boolean getSilentAim() {
-        return props.getBoolean(silentAimProperty, true);
-    }
-
-    private static boolean getSilentSwing() {
-        return props.getBoolean(silentSwingProperty, false);
-    }
-
-    private static boolean getSkipNearBed() {
-        return props.getBoolean(skipNearBedProperty, true);
-    }
 
     private static float clamp01(float f) {
         return MathHelper.clamp_float(f, 0.0f, 1.0f);
@@ -225,7 +147,7 @@ public class AutoBlockIn extends Feature {
     // walking packet. PreMotionEvent (PlayerTick START) is the same point.
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) {
+        if (!isEnabled()) {
             rotating = false;
             return;
         }
@@ -244,10 +166,10 @@ public class AutoBlockIn extends Feature {
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return;
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!Utils.nullCheck()) return;
 
-        if (lastYaw != null && !getSilentAim()) {
+        if (lastYaw != null && !silentAim) {
             mc.thePlayer.rotationYaw = lastYaw;
             mc.thePlayer.rotationPitch = lastPitch;
         }
@@ -261,10 +183,10 @@ public class AutoBlockIn extends Feature {
         percentText = percent + "%";
         percentColor = percent != 100 ? -1 : Color.green.getRGB();
         percentHalfWidth = (float) mc.fontRendererObj.getStringWidth(percentText) / 2.0f - 2.0f;
-        if (percent == 100 && getDisableWhenComplete()) {
-            if (!getOnlyWhileMiddleClicking()) {
+        if (percent == 100 && disableWhenComplete) {
+            if (!onlyWhileMiddleClicking) {
                 try {
-                    manager.setModuleEnabled(moduleInstance, false);
+                    manager.setModuleEnabled(getModuleInstance(), false);
                 } catch (Exception ex) {
                     MyauLogger.error("AutoBlockIn:disable", ex);
                 }
@@ -281,7 +203,7 @@ public class AutoBlockIn extends Feature {
                 || !mc.thePlayer.capabilities.allowEdit
                 || mc.currentScreen != null
                 || !noUseOrDig()
-                || getDisableInCreative() && mc.thePlayer.capabilities.isCreativeMode) {
+                || disableInCreative && mc.thePlayer.capabilities.isCreativeMode) {
             if (middleHeld) {
                 stop();
             } else if (active) {
@@ -289,13 +211,13 @@ public class AutoBlockIn extends Feature {
             }
             return null;
         }
-        if (getOnlyWhileMiddleClicking() && waitRelease) {
+        if (onlyWhileMiddleClicking && waitRelease) {
             if (Mouse.isButtonDown(2)) {
                 return null;
             }
             waitRelease = false;
         }
-        boolean run = !getOnlyWhileMiddleClicking() || Mouse.isButtonDown(2);
+        boolean run = !onlyWhileMiddleClicking || Mouse.isButtonDown(2);
         if (!run && middleHeld) {
             stop();
         }
@@ -361,7 +283,7 @@ public class AutoBlockIn extends Feature {
             float aimP = aimPitch;
             MovingObjectPosition hit = BlockInUtils.rayTraceBlock(against, face, reach, wrappedYaw, aimP);
             if (hit != null && mc.playerController.onPlayerRightClick(mc.thePlayer, mc.theWorld, itemStack, against, face, aim.point)) {
-                BlockInUtils.swing(getSilentSwing(), true);
+                BlockInUtils.swing(silentSwing, true);
                 if (path != null && !path.isEmpty() && path.get(0).equals(targetPos)) {
                     path.remove(0);
                 }
@@ -380,7 +302,7 @@ public class AutoBlockIn extends Feature {
             clearTarget();
         }
         if (fromYaw != null || lastYaw != null) {
-            int n = getDelay();
+            int n = delay;
             if (n > 0 && step < n) {
                 float t = clamp01(((float) step + 1.0f) / (float) n);
                 float startYaw = fromYaw != null ? fromYaw : (lastYaw != null ? unWrap(lastYaw, refYaw != null ? refYaw : mc.thePlayer.rotationYaw) : mc.thePlayer.rotationYaw);
@@ -427,7 +349,7 @@ public class AutoBlockIn extends Feature {
         sentAnyDigging = false;
 
         C03PacketPlayer c03 = (C03PacketPlayer) packet;
-        boolean enabled = manager.isModuleEnabled(moduleInstance);
+        boolean enabled = isEnabled();
 
         // one snap-back packet the tick after rotation stops, so the server
         // yaw and the player yaw line up again
@@ -609,7 +531,7 @@ public class AutoBlockIn extends Feature {
             if (!usable(itemStack)) continue;
             Block block = BlockInUtils.blockOf(itemStack);
             int size = itemStack.stackSize;
-            if (getPrioritizeStrongerBlocks()) {
+            if (prioritizeStrongerBlocks) {
                 float f = BlockInUtils.breakTicks(block, null, true);
                 if (f < 0.0f) continue;
                 if (!(f > best || f == best && size > most)) continue;
@@ -634,7 +556,7 @@ public class AutoBlockIn extends Feature {
         if (!BlockInUtils.isPlaceable(block)) {
             return false;
         }
-        if (block == Blocks.pumpkin || getDisableObsidian() && block == Blocks.obsidian) {
+        if (block == Blocks.pumpkin || disableObsidian && block == Blocks.obsidian) {
             return false;
         }
         return itemStack.stackSize > 0;
@@ -663,7 +585,7 @@ public class AutoBlockIn extends Feature {
     }
 
     private static boolean skip(BlockPos pos) {
-        return failed.contains(pos) || BlockInUtils.isPlayerBlock(pos) || getSkipNearBed() && BlockInUtils.bedAdjacent(pos);
+        return failed.contains(pos) || BlockInUtils.isPlayerBlock(pos) || skipNearBed && BlockInUtils.bedAdjacent(pos);
     }
 
     private static void stop() {
@@ -857,7 +779,7 @@ public class AutoBlockIn extends Feature {
     }
 
     private static void resetSteps() {
-        steps = getDelay();
+        steps = delay;
         step = 0;
     }
 
@@ -905,7 +827,7 @@ public class AutoBlockIn extends Feature {
 
     @SubscribeEvent
     public void onRenderTick(TickEvent.RenderTickEvent e) {
-        if (!getShowPercentage() || percentText == null || e.phase != TickEvent.Phase.END) return;
+        if (!showPercentage || percentText == null || e.phase != TickEvent.Phase.END) return;
         if (!Utils.nullCheck() || !mc.inGameHasFocus || mc.gameSettings.showDebugInfo || mc.currentScreen != null) return;
 
         long now = System.currentTimeMillis();
@@ -978,7 +900,7 @@ public class AutoBlockIn extends Feature {
 
     @Override
     public void disable() {
-        if (moduleInstance != null) {
+        if (getModuleInstance() != null) {
             onDisable();
         }
     }
