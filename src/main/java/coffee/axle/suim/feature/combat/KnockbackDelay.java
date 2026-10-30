@@ -30,7 +30,7 @@ public class KnockbackDelay extends Feature {
     private Object onlyGroundProperty;
 
     private final Deque<BufferedPacket> bufferedPackets = new ArrayDeque<>();
-    // raven's antiknockback delayUntil equivalent, backtrack gates its start on it
+    // backtrack gates its start on this
     public static boolean active = false;
 
     @Override
