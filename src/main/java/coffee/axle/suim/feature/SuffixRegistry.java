@@ -42,9 +42,10 @@ public final class SuffixRegistry {
      */
     public static void registerStatic(Object moduleInstance, String... suffix) {
         if (moduleInstance != null && suffix != null) {
-            // Capture a snapshot - no allocation per frame
             final String[] copy = suffix.clone();
-            registry.put(moduleInstance, () -> copy);
+            // fresh array each read - myau's HUD lowercases the returned array
+            // in place, which would otherwise corrupt the cached copy
+            registry.put(moduleInstance, () -> copy.clone());
         }
     }
 

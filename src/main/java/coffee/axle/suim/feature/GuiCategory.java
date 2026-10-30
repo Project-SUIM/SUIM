@@ -1,11 +1,6 @@
 package coffee.axle.suim.feature;
 
-/**
- * Categories for GUI module panels.
- */
 public enum GuiCategory {
-    // order decides B3 panel layout - settings/scripts sit on the second
-    // row of panels, settings below world
     WORLD,
     COMBAT,
     RENDER,

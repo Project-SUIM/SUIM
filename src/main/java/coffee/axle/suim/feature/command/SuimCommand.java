@@ -51,7 +51,9 @@ public class SuimCommand extends Feature {
         manager.sendMessage("  &7• &fBedESP: &eColor Mode (Team)");
         manager.sendMessage("  &7• &fBedPlates");
         manager.sendMessage("  &7• &fSkullESP");
-        manager.sendMessage("  &7• &fXray: &eSpawner-Nametags");
+        manager.sendMessage("  &7• &fItemESP: &eName-Tags");
+        manager.sendMessage("  &7• &fChestESP: &ePer-Container Visuals");
+        manager.sendMessage("  &7• &fXray: &eSpawner-Nametags &7& &eDragon-Egg");
         manager.sendMessage("");
 
         manager.sendMessage("&6&lClient");
