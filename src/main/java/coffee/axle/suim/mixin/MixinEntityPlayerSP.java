@@ -17,7 +17,10 @@ public class MixinEntityPlayerSP {
     private void onUpdate(CallbackInfo ci) {
         if (Freeze.shouldCancelUpdate()) {
             ci.cancel();
+            return;
         }
+        // Jade's stasis freezes from onUpdate HEAD
+        Stasis.jadePreUpdate((EntityPlayerSP) (Object) this);
     }
 
     // PlayerTick.END runs inside super.onUpdate(), before the walking packet
@@ -26,10 +29,12 @@ public class MixinEntityPlayerSP {
         MinecraftForge.EVENT_BUS.post(new PostMotionEvent());
     }
 
-    // openb4 fires stasis.afterplayerupdate from this same tail point
+    // stasis.afterPlayerUpdate has to run from this same tail point
     @Inject(method = "onUpdate", at = @At("RETURN"))
     private void suim$afterUpdate(CallbackInfo ci) {
-        Stasis.afterPlayerUpdate((EntityPlayerSP) (Object) this);
+        EntityPlayerSP self = (EntityPlayerSP) (Object) this;
+        Stasis.afterPlayerUpdate(self);
+        Stasis.jadePostUpdate(self);
     }
 
 // hateful horrible code
