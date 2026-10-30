@@ -45,25 +45,17 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 /**
- * AutoBlockIn - 1:1 port of OpenB4's AutoBlockinModule.
+ * Places blocks on the faces around you while a bed is being broken.
  * <p>
- * Rotation model matches raven: the aim logic runs once per player tick
- * BEFORE the walking packet is composed (raven: Hooks.onUpdate), and the
- * resulting rotation is applied silently by rewriting the outgoing C03
- * (raven replaces onUpdateWalkingPlayer entirely). silent-aim off applies
- * lastYaw/lastPitch to the camera from the client tick, like raven's
- * onUpdate.
- * <p>
- * Dropped raven gates with no suim counterpart: ScaffoldModule.active,
- * AutoToolModule.previousSlot, own clickgui screens, chatAsInventory,
- * global jitter-yaw.
+ * The aim runs once per player tick, before the walking packet is built, and
+ * silent aim rewrites the outgoing C03 instead of the camera. With silent aim
+ * off the camera gets lastYaw/lastPitch from the client tick.
  */
 public class AutoBlockIn extends Feature {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
 
-    // static so the ported static helpers (usable, findSlot, skip, ...) can
-    // read settings like raven's static settings do
+    // static so the helper methods below can read settings
     private static ModulePropertyManager props;
 
     private static Object moduleInstance;
@@ -119,12 +111,12 @@ public class AutoBlockIn extends Feature {
     private static Float refYaw;
     private static int steps, step;
 
-    // silent rotation state, mirrors raven's RotationManager fields
+    // silent rotation state
     private boolean rotating;
     private boolean wasRotating;
     private float serverYaw, serverPitch;
 
-    // per-tick interaction flags, raven resets these on every C03
+    // per-tick interaction flags, reset on every C03
     private boolean sentUseEntity;
     private boolean sentAnyDigging;
 
@@ -226,12 +218,11 @@ public class AutoBlockIn extends Feature {
     }
 
     private static float clamp01(float f) {
-        return f < 0.0f ? 0.0f : Math.min(f, 1.0f);
+        return MathHelper.clamp_float(f, 0.0f, 1.0f);
     }
 
-    // raven: Hooks.onUpdate fires getRotations from EntityPlayerSP.onUpdate,
-    // before movement and before the walking packet. suim's PreMotionEvent
-    // (PlayerTick START) is the same point in the tick.
+    // runs from EntityPlayerSP.onUpdate, before movement and before the
+    // walking packet. PreMotionEvent (PlayerTick START) is the same point.
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
         if (!manager.isModuleEnabled(moduleInstance)) {
@@ -248,8 +239,8 @@ public class AutoBlockIn extends Feature {
         }
     }
 
-    // raven: Module.onUpdate is dispatched from the client tick, which runs
-    // before the player tick. camera apply + progress tracking live here.
+    // runs on the client tick, before the player tick. camera apply and
+    // progress tracking live here.
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return;
@@ -285,7 +276,7 @@ public class AutoBlockIn extends Feature {
     }
 
     private float[] getRotations() {
-        // raven gate minus scaffold/autotool/own-screen checks (no suim counterparts)
+        // module gate
         if (!Utils.nullCheck() || !mc.inGameHasFocus
                 || !mc.thePlayer.capabilities.allowEdit
                 || mc.currentScreen != null
@@ -358,10 +349,10 @@ public class AutoBlockIn extends Feature {
             aimAt(aim);
             if (steps > 0 && step < steps) {
                 float t = clamp01(((float) step + 1.0f) / (float) steps);
-                float startYaw = fromYaw != null ? fromYaw : (lastYaw != null ? unwrap(lastYaw, refYaw != null ? refYaw : mc.thePlayer.rotationYaw) : mc.thePlayer.rotationYaw);
+                float startYaw = fromYaw != null ? fromYaw : (lastYaw != null ? unWrap(lastYaw, refYaw != null ? refYaw : mc.thePlayer.rotationYaw) : mc.thePlayer.rotationYaw);
                 float startPitch = fromPitch != null ? fromPitch : (lastPitch != null ? lastPitch : mc.thePlayer.rotationPitch);
-                float y = lerp(startYaw, aimYaw, t);
-                float p = lerp(startPitch, aimPitch, t);
+                float y = Utils.lerp(aimYaw, startYaw, t);
+                float p = Utils.lerp(aimPitch, startPitch, t);
                 ++step;
                 return finish(y, p);
             }
@@ -380,7 +371,7 @@ public class AutoBlockIn extends Feature {
                 if (refYaw == null) {
                     refYaw = y;
                 }
-                float u = unwrap(y, refYaw);
+                float u = unWrap(y, refYaw);
                 setFrom(u, lastPitch != null ? lastPitch : aimP);
                 return finish(aimYaw, aimPitch);
             }
@@ -392,10 +383,10 @@ public class AutoBlockIn extends Feature {
             int n = getDelay();
             if (n > 0 && step < n) {
                 float t = clamp01(((float) step + 1.0f) / (float) n);
-                float startYaw = fromYaw != null ? fromYaw : (lastYaw != null ? unwrap(lastYaw, refYaw != null ? refYaw : mc.thePlayer.rotationYaw) : mc.thePlayer.rotationYaw);
+                float startYaw = fromYaw != null ? fromYaw : (lastYaw != null ? unWrap(lastYaw, refYaw != null ? refYaw : mc.thePlayer.rotationYaw) : mc.thePlayer.rotationYaw);
                 float startPitch = fromPitch != null ? fromPitch : (lastPitch != null ? lastPitch : mc.thePlayer.rotationPitch);
-                float y = lerp(startYaw, aimYaw, t);
-                float p = lerp(startPitch, aimPitch, t);
+                float y = Utils.lerp(aimYaw, startYaw, t);
+                float p = Utils.lerp(aimPitch, startPitch, t);
                 ++step;
                 return finish(y, p);
             }
@@ -412,8 +403,8 @@ public class AutoBlockIn extends Feature {
         return rotating && wasRotating ? serverPitch : mc.thePlayer.rotationPitch;
     }
 
-    // raven tracks these in its packet hook and resets them on every C03,
-    // so theyre effectively per-tick "did we interact" flags
+    // tracked in the packet hook and reset on every C03, so they are
+    // effectively per-tick "did we interact" flags
     private boolean noUseOrDig() {
         return !sentUseEntity && !sentAnyDigging;
     }
@@ -438,14 +429,14 @@ public class AutoBlockIn extends Feature {
         C03PacketPlayer c03 = (C03PacketPlayer) packet;
         boolean enabled = manager.isModuleEnabled(moduleInstance);
 
-        // raven: one snap-back packet the tick after rotation stops, so the
-        // servers yaw and the players yaw line up again
+        // one snap-back packet the tick after rotation stops, so the server
+        // yaw and the player yaw line up again
         if (enabled && !rotating && wasRotating) {
             wasRotating = rotating;
             if (Utils.nullCheck()) {
                 float snapYaw = serverYaw - serverYaw % 360.0f + mc.thePlayer.rotationYaw % 360.0f;
                 e.setCanceled(true);
-                PacketUtils.sendPacketNoEvent(copyRot(c03, snapYaw, mc.thePlayer.rotationPitch));
+                PacketUtils.sendPacketNoEvent(PacketUtils.withRotation(c03, snapYaw, mc.thePlayer.rotationPitch));
                 RotationState.getInstance().setServerAngles(snapYaw, mc.thePlayer.rotationPitch);
                 return;
             }
@@ -455,7 +446,7 @@ public class AutoBlockIn extends Feature {
         if (enabled && rotating) {
             wasRotating = rotating;
             e.setCanceled(true);
-            PacketUtils.sendPacketNoEvent(copyRot(c03, lastYaw, lastPitch));
+            PacketUtils.sendPacketNoEvent(PacketUtils.withRotation(c03, lastYaw, lastPitch));
             RotationState.getInstance().setServerAngles(lastYaw, lastPitch);
             mc.thePlayer.rotationYawHead = lastYaw;
             return;
@@ -463,30 +454,15 @@ public class AutoBlockIn extends Feature {
         wasRotating = rotating;
     }
 
-    private static Packet<?> copyRot(C03PacketPlayer orig, float yaw, float pitch) {
-        if (orig instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
-            C03PacketPlayer.C06PacketPlayerPosLook pos = (C03PacketPlayer.C06PacketPlayerPosLook) orig;
-            return new C03PacketPlayer.C06PacketPlayerPosLook(
-                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
-                    yaw, pitch, orig.isOnGround());
-        }
-        if (orig instanceof C03PacketPlayer.C04PacketPlayerPosition) {
-            C03PacketPlayer.C04PacketPlayerPosition pos = (C03PacketPlayer.C04PacketPlayerPosition) orig;
-            return new C03PacketPlayer.C06PacketPlayerPosLook(
-                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
-                    yaw, pitch, orig.isOnGround());
-        }
-        return new C03PacketPlayer.C05PacketPlayerLook(yaw, pitch, orig.isOnGround());
-    }
 
     private void aimAt(AimPoint aim) {
         boolean changed = aimedAgainst == null || !aimedAgainst.equals(against) || aimedFace != face;
-        float dYaw = Math.abs(wrap(aim.yaw - aimYaw));
+        float dYaw = Math.abs(MathHelper.wrapAngleTo180_float(aim.yaw - aimYaw));
         float dPitch = Math.abs(aim.pitch - aimPitch);
         boolean moved = dYaw > 1.0f || dPitch > 1.0f;
         if (!changed && !moved && fromYaw != null) {
             float ref = refYaw != null ? refYaw : mc.thePlayer.rotationYaw;
-            aimYaw = unwrap(aim.yaw, ref);
+            aimYaw = unWrap(aim.yaw, ref);
             aimPitch = aim.pitch;
         } else {
             float y = lastYaw != null ? lastYaw : mc.thePlayer.rotationYaw;
@@ -494,8 +470,8 @@ public class AutoBlockIn extends Feature {
             if (refYaw == null) {
                 refYaw = y;
             }
-            float u = unwrap(y, refYaw);
-            float target = unwrap(aim.yaw, refYaw);
+            float u = unWrap(y, refYaw);
+            float target = unWrap(aim.yaw, refYaw);
             setFrom(u, p);
             aimYaw = target;
             aimPitch = aim.pitch;
@@ -619,10 +595,6 @@ public class AutoBlockIn extends Feature {
         return BlockInUtils.isReplaceable(roof) && BlockInUtils.hasSupport(roof) && !skip(roof) && findSupport(roof);
     }
 
-    private static int score(Node n) {
-        return n.score;
-    }
-
     private static void captureFacings() {
         EnumFacing f = startFacing = mc.thePlayer.getHorizontalFacing();
         facings = new EnumFacing[]{f, f.rotateY(), f.getOpposite(), f.rotateYCCW()};
@@ -653,9 +625,6 @@ public class AutoBlockIn extends Feature {
         return slot;
     }
 
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
-    }
 
     private static boolean usable(ItemStack itemStack) {
         if (!BlockInUtils.isBlockItem(itemStack)) {
@@ -745,7 +714,7 @@ public class AutoBlockIn extends Feature {
         }
         int size = open.size();
         int limit = Math.min(8000, Math.max(500, size * 2));
-        PriorityQueue<Node> queue = new PriorityQueue<Node>(Comparator.comparingInt(AutoBlockIn::score));
+        PriorityQueue<Node> queue = new PriorityQueue<Node>(Comparator.comparingInt(n -> n.score));
         HashMap<BlockPos, Integer> cost = new HashMap<BlockPos, Integer>(size);
         HashMap<BlockPos, BlockPos> parent = new HashMap<BlockPos, BlockPos>(size);
         for (BlockPos p : starts) {
@@ -842,16 +811,6 @@ public class AutoBlockIn extends Feature {
         return against != null && face != null && targetPos != null && !BlockInUtils.isPlayerBlock(targetPos) && BlockInUtils.isReplaceable(targetPos);
     }
 
-    private static float wrap(float f) {
-        f %= 360.0f;
-        if (f >= 180.0f) {
-            f -= 360.0f;
-        }
-        if (f < -180.0f) {
-            f += 360.0f;
-        }
-        return f;
-    }
 
     private static void reset() {
         if (active) {
@@ -887,7 +846,7 @@ public class AutoBlockIn extends Feature {
         if (refYaw == null) {
             refYaw = lastYaw;
         }
-        refYaw = unwrap(lastYaw, refYaw);
+        refYaw = unWrap(lastYaw, refYaw);
         return new float[]{lastYaw, lastPitch};
     }
 
@@ -927,8 +886,8 @@ public class AutoBlockIn extends Feature {
         return facings != null ? facings : new EnumFacing[]{EnumFacing.EAST, EnumFacing.WEST, EnumFacing.NORTH, EnumFacing.SOUTH};
     }
 
-    private static float unwrap(float yaw, float ref) {
-        float d = wrap(yaw - ref);
+    private static float unWrap(float yaw, float ref) {
+        float d = MathHelper.wrapAngleTo180_float(yaw - ref);
         return ref + d;
     }
 
