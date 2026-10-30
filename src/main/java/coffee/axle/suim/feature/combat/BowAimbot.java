@@ -2,7 +2,8 @@ package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-import coffee.axle.suim.rotation.BowAimRotation;
+import coffee.axle.suim.rotation.BowAimbotRotation;
+import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
@@ -15,16 +16,11 @@ import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
 
-/**
- * Breeze 2.3 BowAim 1:1 port. Iterates a simulated target trajectory, solves
- * the bow projectile arc for the first step whose flat travel reaches the
- * target, ray-checks the flight path, then lerps the player's real rotations
- * toward it.
- */
-public class BowAim extends Feature {
+import java.util.HashSet;
+import java.util.Set;
+
+public class BowAimbot extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static final int MODE_YAW = 0;
@@ -34,12 +30,16 @@ public class BowAim extends Feature {
     private static final int PRIORITY_DISTANCE = 0;
     private static final int PRIORITY_ANGLE = 1;
     private static final int PRIORITY_HEALTH = 2;
+    private static final int PRIORITY_FOV = 3;
 
     private static final int TRAJECTORY_TICKS = 40;
 
+    private static final double ARROW_DRAG = 0.99;
+
     private Object moduleInstance;
+    private Object aimModeProperty;
     private Object modeProperty;
-    private Object priorityProperty;
+    private Object reachableProperty;
     private Object rangeProperty;
     private Object fovProperty;
     private Object smoothingProperty;
@@ -47,11 +47,16 @@ public class BowAim extends Feature {
     private Object verticalSpeedProperty;
     private Object predictMsProperty;
 
-    private BowAimRotation rotation;
+    private BowAimbotRotation rotation;
+
+    private final Set<EntityPlayer> skipped = new HashSet<EntityPlayer>();
+
+    private double pointX, pointY, pointZ;
+    private double spawnX, spawnY, spawnZ;
 
     @Override
     public String getName() {
-        return "BowAim";
+        return "BowAimbot";
     }
 
     @Override
@@ -63,39 +68,57 @@ public class BowAim extends Feature {
     public boolean initialize() {
         try {
             moduleInstance = createModule();
-            creator.injectModule(moduleInstance, BowAim.class);
+            creator.injectModule(moduleInstance, BowAimbot.class);
 
-            modeProperty = creator.createEnumProperty("mode", MODE_BOTH,
+            aimModeProperty = creator.createEnumProperty("aim-mode", MODE_BOTH,
                     new String[] { "YAW", "PITCH", "BOTH" });
-            priorityProperty = creator.createEnumProperty("priority", PRIORITY_DISTANCE,
-                    new String[] { "DISTANCE", "ANGLE", "HEALTH" });
+            modeProperty = creator.createEnumProperty("mode", PRIORITY_DISTANCE,
+                    new String[] { "DISTANCE", "ANGLE", "HEALTH", "FOV" });
+            reachableProperty = creator.createBooleanProperty("reachable", true);
             rangeProperty = creator.createIntegerProperty("range", 50, 1, 200);
             fovProperty = creator.createIntegerProperty("fov", 50, 0, 360);
             smoothingProperty = creator.createFloatProperty("smoothing", 0.2f, 0.0f, 1.0f);
             horizontalSpeedProperty = creator.createFloatProperty("horizontal-speed", 7.5f, 1.0f, 10.0f);
             verticalSpeedProperty = creator.createFloatProperty("vertical-speed", 7.5f, 1.0f, 10.0f);
-            predictMsProperty = creator.createIntegerProperty("predict-ms", 200, 0, 500);
+            predictMsProperty = creator.createIntegerProperty("predict-ms", 1000, 0, 2000);
 
-            creator.registerProperties(moduleInstance, modeProperty, priorityProperty,
-                    rangeProperty, fovProperty, smoothingProperty,
+            creator.registerProperties(moduleInstance, aimModeProperty, modeProperty,
+                    reachableProperty, rangeProperty, fovProperty, smoothingProperty,
                     horizontalSpeedProperty, verticalSpeedProperty, predictMsProperty);
             manager.reloadModuleCommand();
 
             RotationState.getInstance().register();
-            rotation = new BowAimRotation(RotationState.getInstance());
+            rotation = new BowAimbotRotation(RotationState.getInstance());
 
             MinecraftForge.EVENT_BUS.register(this);
             manager.registerModuleCallbacks(moduleInstance, () -> {
             }, () -> { });
             return true;
         } catch (Exception e) {
-            MyauLogger.error("BowAim:init", e);
+            MyauLogger.error("BowAimbot:init", e);
             return false;
         }
     }
 
-    private int mode() {
-        return properties.getInt(modeProperty, MODE_BOTH);
+    private int aimMode() {
+        return properties.getInt(aimModeProperty, MODE_BOTH);
+    }
+
+    // how far ahead we are allowed to simulate the target, 0 means aim at where
+    // they are right now
+    private int maxTicks() {
+        int ms = properties.getInt(predictMsProperty, 1000);
+        if (ms <= 0) {
+            return 1;
+        }
+        return Math.min(TRAJECTORY_TICKS, Math.max(1, ms / 50));
+    }
+
+    private void setSpawn() {
+        double yaw = Math.toRadians(mc.thePlayer.rotationYaw);
+        spawnX = mc.thePlayer.posX - Math.cos(yaw) * 0.16;
+        spawnY = mc.thePlayer.posY + mc.thePlayer.getEyeHeight() - 0.1;
+        spawnZ = mc.thePlayer.posZ - Math.sin(yaw) * 0.16;
     }
 
     @SuppressWarnings("unused")
@@ -107,65 +130,63 @@ public class BowAim extends Feature {
         if (mc.currentScreen != null
                 || mc.thePlayer.getHeldItem() == null
                 || !(mc.thePlayer.getHeldItem().getItem() instanceof ItemBow)
-                || !physicalKeyDown(mc.gameSettings.keyBindUseItem.getKeyCode())) {
+                || !Utils.isKeyDown(mc.gameSettings.keyBindUseItem.getKeyCode())) {
             return;
         }
         EntityPlayer target = findTarget();
-        if (target == null) {
-            return;
+        float[] angles = null;
+        while (target != null) {
+            setSpawn();
+            angles = solveArc(predict(target, maxTicks()));
+            if (angles != null || !properties.getBoolean(reachableProperty, true)) {
+                break;
+            }
+            skipped.add(target);
+            target = findTarget();
         }
-        Vec3[] trajectory = predictTarget(target);
-        float[] angles = solveArc(trajectory);
+        skipped.clear();
         if (angles == null) {
             return;
         }
 
-        // breeze lerps the real camera per frame, the myau-style step cap +
-        // gcd chain in Rotation replaces its raw min/max lerp
         float[] next = rotation.aim(angles[0], angles[1],
                 properties.getFloat(smoothingProperty, 0.2f),
                 properties.getFloat(horizontalSpeedProperty, 7.5f),
                 properties.getFloat(verticalSpeedProperty, 7.5f));
 
-        if (mode() != MODE_PITCH) {
+        if (aimMode() != MODE_PITCH) {
             float before = mc.thePlayer.rotationYaw;
             mc.thePlayer.rotationYaw = next[0];
             mc.thePlayer.prevRotationYaw += mc.thePlayer.rotationYaw - before;
         }
-        if (mode() != MODE_YAW) {
+        if (aimMode() != MODE_YAW) {
             float before = mc.thePlayer.rotationPitch;
             mc.thePlayer.rotationPitch = next[1];
             mc.thePlayer.prevRotationPitch += mc.thePlayer.rotationPitch - before;
         }
     }
 
-    private boolean physicalKeyDown(int code) {
-        if (code < 0) {
-            int button = 100 + code;
-            return button >= 0 && button < Mouse.getButtonCount() && Mouse.isButtonDown(button);
-        }
-        return code < Keyboard.getKeyCount() && Keyboard.isKeyDown(code);
-    }
-
-    // breeze getDistance_2: fov gate is on the yaw-to-target angle, priority
-    // picks the smallest distance/angle/health, filters are myau's own
     private EntityPlayer findTarget() {
         EntityPlayer best = null;
         double bestScore = Double.MAX_VALUE;
         double halfFov = properties.getInt(fovProperty, 50) / 2.0;
         double range = properties.getInt(rangeProperty, 50);
-        int priority = properties.getInt(priorityProperty, PRIORITY_DISTANCE);
+        int priority = properties.getInt(modeProperty, PRIORITY_DISTANCE);
         for (EntityPlayer p : mc.theWorld.playerEntities) {
             if (p == mc.thePlayer || p.deathTime != 0) continue;
+            if (skipped.contains(p)) continue;
             if (Backtrack.isBot(p) || Backtrack.isFriend(p) || Backtrack.isTeammate(p)) continue;
             if (mc.thePlayer.getDistanceSqToEntity(p) > range * range) continue;
             double dist = mc.thePlayer.getDistanceToEntity(p);
-            Vec3 center = boxCenter(p.getEntityBoundingBox()).addVector(0.0, 0.3, 0.0);
-            float yawTo = yawTo(center, mc.thePlayer);
-            float angleDiff = Math.abs(MathHelper.wrapAngleTo180_float(yawTo - mc.thePlayer.rotationYaw));
+            Vec3 center = Utils.boxCenter(p.getEntityBoundingBox()).addVector(0.0, 0.3, 0.0);
+            float[] aim = angy(center, mc.thePlayer);
+            float angleDiff = Math.abs(MathHelper.wrapAngleTo180_float(aim[0] - mc.thePlayer.rotationYaw));
             if (angleDiff > halfFov) continue;
             double score;
-            if (priority == PRIORITY_ANGLE) {
+            if (priority == PRIORITY_FOV) {
+                double dp = MathHelper.wrapAngleTo180_float(aim[1] - mc.thePlayer.rotationPitch);
+                score = Math.sqrt(angleDiff * angleDiff + dp * dp);
+            } else if (priority == PRIORITY_ANGLE) {
                 score = angleDiff;
             } else if (priority == PRIORITY_HEALTH) {
                 score = p.getHealth();
@@ -180,82 +201,125 @@ public class BowAim extends Feature {
         return best;
     }
 
-    private float[] solveArc(Vec3[] trajectory) {
-        double step = properties.getInt(predictMsProperty, 200) / 50.0f;
-        double drag = Math.log(0.99);
-        float velocity = 3.0f;
-        double t = 1.0;
-        for (float i = (float) step; i < trajectory.length; i += 0.01f) {
-            Vec3 point = trajectory[MathHelper.clamp_int(Math.round(i), 0, trajectory.length - 1)];
-            double flat = mc.thePlayer.getDistance(point.xCoord, mc.thePlayer.posY, point.zCoord);
-            // breeze solves the bow arc analytically, gravity 0.05 per drag tick
-            double arc = Math.pow(0.99, t) - 1.0;
-            float[] angles = anglesTo(point, mc.thePlayer);
-            float yaw = angles[0];
-            double eyeY = mc.thePlayer.posY + mc.thePlayer.getEyeHeight() - 0.1f;
-            float pitch = (float) Math.toDegrees(
-                    Math.asin((5.0 - (point.yCoord - eyeY + 5.0f * t) * (drag / arc)) / velocity));
-            if (Float.isInfinite(pitch) || Float.isNaN(pitch)) {
-                pitch = angles[1];
-            }
-            double dx = -Math.sin(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)) * velocity;
-            double dz = Math.cos(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch)) * velocity;
-            double vx = -(Math.cos(Math.toDegrees(yaw)) * 0.16f);
-            double vz = -(Math.sin(Math.toDegrees(yaw)) * 0.16f);
-            double cx = vx + dx * (arc / drag);
-            double cz = vz + dz * (arc / drag);
-            double travel = Math.sqrt(cx * cx + cz * cz);
-            t += 0.01;
-            if (flat < travel) {
-                Vec3 from = new Vec3(
-                        mc.thePlayer.posX + vx,
-                        mc.thePlayer.posY + mc.thePlayer.getEyeHeight() - 0.1f,
-                        mc.thePlayer.posZ + vz);
-                if (!pathClear(MathHelper.clamp_int(Math.round(i), 0, trajectory.length),
-                        from, dx, velocity * -Math.sin(Math.toRadians(pitch)), dz, flat)) {
-                    return null;
+    // solve the exact flight time. vanilla integrates move-then-drag, so the velocity after k ticks is v0*d^k - g*(1-d^k)/(1-d), and summing that over k gives the reachable displacement for n ticks. required speed falls as n grows up to the flat arc then rises again for the lob, so thefirst crossing is the flat one
+    private float[] solveArc(Vec3[] path) {
+        // charge only draws at 20 ticks per second, a half drawn bow is slow
+        float charge = mc.thePlayer.getItemInUseDuration() / 20.0f;
+        charge = MathHelper.clamp_float(charge, 0.0f, 1.0f);
+        charge = (charge * charge + charge * 2.0f) / 3.0f;
+        double speed = charge * 3.0;
+        if (speed < 0.1) {
+            return null;
+        }
+        double limit = Math.min(TRAJECTORY_TICKS, path.length - 1);
+        double prevTicks = 1.0;
+        double prevError = speedErr(path, prevTicks, speed);
+
+        if (prevError <= 0.0) {
+            return aimAt(path, prevTicks);
+        }
+        for (double n = prevTicks + 1.0; n <= limit; n += 1.0) {
+            double error = speedErr(path, n, speed);
+            if (error <= 0.0) {
+                // bracket found, bisect down to the real crossing
+                double lo = prevTicks;
+                double hi = n;
+                for (int i = 0; i < 8; i++) {
+                    double mid = (lo + hi) * 0.5;
+                    if (speedErr(path, mid, speed) > 0.0) {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
                 }
-                return new float[] { yaw, pitch };
+                return aimAt(path, hi);
             }
+            prevTicks = n;
+            prevError = error;
         }
         return null;
     }
 
-    // breeze rayTrace: march the arrow sim forward, blocked is only a miss if
-    // the block is closer than the target
-    private boolean pathClear(int ticks, Vec3 from, double dx, double dy, double dz, double targetDist) {
-        Vec3 end = from.addVector(dx, dy, dz);
-        Vec3 start = from;
-        for (int n = 0; n <= ticks; n++) {
-            MovingObjectPosition hit = mc.theWorld.rayTraceBlocks(start, end);
-            if (hit != null) {
-                double fx = end.xCoord - from.xCoord;
-                double fz = end.zCoord - from.zCoord;
-                return targetDist < Math.sqrt(fx * fx + fz * fz);
+    private double speedErr(Vec3[] path, double ticks, double speed) {
+        atPoint(path, ticks);
+        double s = sumDrag(ticks);
+        if (s <= 0.0) {
+            return Double.MAX_VALUE;
+        }
+        double vx = pointX / s;
+        double vy = (pointY + grav(ticks)) / s;
+        double vz = pointZ / s;
+        return Math.sqrt(vx * vx + vy * vy + vz * vz) - speed;
+    }
+
+    private float[] aimAt(Vec3[] path, double ticks) {
+        atPoint(path, ticks);
+        double s = sumDrag(ticks);
+        double vx = pointX / s;
+        double vy = (pointY + grav(ticks)) / s;
+        double vz = pointZ / s;
+        if (!herpable(vx, vy, vz, (int) Math.ceil(ticks))) {
+            return null;
+        }
+        double flat = Math.sqrt(vx * vx + vz * vz);
+        float rawYaw = (float) (Math.atan2(vz, vx) * 180.0 / Math.PI) - 90.0f;
+        float yaw = mc.thePlayer.rotationYaw
+                + MathHelper.wrapAngleTo180_float(rawYaw - mc.thePlayer.rotationYaw);
+        float pitch = (float) (-Math.atan2(vy, flat) * 180.0 / Math.PI);
+        return new float[] { yaw, pitch };
+    }
+
+    // interpolated target offset from the arrow spawn, written to pointX/Y/Z
+    private void atPoint(Vec3[] path, double ticks) {
+        double t = MathHelper.clamp_double(ticks, 0.0, path.length - 1);
+        int i = (int) t;
+        double f = t - i;
+        Vec3 a = path[i];
+        Vec3 b = i + 1 < path.length ? path[i + 1] : a;
+        pointX = a.xCoord + (b.xCoord - a.xCoord) * f - spawnX;
+        pointY = a.yCoord + (b.yCoord - a.yCoord) * f - spawnY;
+        pointZ = a.zCoord + (b.zCoord - a.zCoord) * f - spawnZ;
+    }
+
+    // sum of drag^k for k in [0, n), the horizontal displacement per unit v0
+    private static double sumDrag(double n) {
+        return n <= 0.0 ? 0.0 : (1.0 - Math.pow(ARROW_DRAG, n)) / (1.0 - ARROW_DRAG);
+    }
+
+    // extra launch speed needed to climb against n ticks of gravity
+    private static double grav(double n) {
+        return 0.05 / (1.0 - ARROW_DRAG) * (n - sumDrag(n));
+    }
+
+    private boolean herpable(double vx, double vy, double vz, int ticks) {
+        double x = spawnX;
+        double y = spawnY;
+        double z = spawnZ;
+        for (int i = 0; i < ticks; i++) {
+            if (mc.theWorld.rayTraceBlocks(new Vec3(x, y, z),
+                    new Vec3(x + vx, y + vy, z + vz), false, true, false) != null) {
+                return false;
             }
-            dx *= 0.99;
-            dz *= 0.99;
-            dy = dy * 0.99 - 0.05;
-            start = end;
-            end = end.addVector(dx, dy, dz);
+            x += vx;
+            y += vy;
+            z += vz;
+            vx *= ARROW_DRAG;
+            vy = vy * ARROW_DRAG - 0.05;
+            vz *= ARROW_DRAG;
         }
         return true;
     }
 
-    // breeze TargetUtil + BlockUtil10.getPredictedHitboxes: simulate the
-    // target's movement 40 ticks ahead and keep the box centers
-    private Vec3[] predictTarget(EntityPlayer target) {
-        Vec3[] points = new Vec3[TRAJECTORY_TICKS + 1];
+    private Vec3[] predict(EntityPlayer target, int ticks) {
+        Vec3[] points = new Vec3[ticks + 1];
         AxisAlignedBB box = target.getEntityBoundingBox();
         double motionX = target.posX - target.lastTickPosX;
         double motionY = (target.posY - target.lastTickPosY - 0.08) * 0.98f;
         double motionZ = target.posZ - target.lastTickPosZ;
         boolean ground = target.onGround;
-        boolean collidedHorizontally = target.isCollidedHorizontally;
-        boolean collidedVertically = target.isCollidedVertically;
         float forward = 0.0f, strafe = 0.0f;
         if (target != mc.thePlayer) {
-            // breeze absValue: infer forward/strafe from last motion, deadzone 0.1
+            // infer forward/strafe from last motion, deadzone 0.1
             strafe = (float) (motionZ * Math.cos(Math.toRadians(target.rotationYaw))
                     - motionX * Math.sin(Math.toRadians(target.rotationYaw)));
             forward = (float) (motionX * Math.cos(Math.toRadians(target.rotationYaw))
@@ -271,37 +335,29 @@ public class BowAim extends Feature {
             strafe = mc.thePlayer.moveStrafing;
         }
         double speedLen = Math.sqrt(motionX * motionX + motionZ * motionZ + motionY * motionY);
-        points[0] = boxCenter(box).addVector(0.0, 0.3, 0.0);
+        points[0] = Utils.boxCenter(box).addVector(0.0, 0.3, 0.0);
         if (speedLen > 5.0) {
-            for (int n = 1; n <= TRAJECTORY_TICKS; n++) {
-                points[n] = boxCenter(box).addVector(0.0, 0.3, 0.0);
-            }
+            // blinked or teleported, extrapolating that would aim nonsense
             return points;
         }
+        int steps = Math.min(ticks, TRAJECTORY_TICKS);
         boolean inWater = mc.theWorld.isMaterialInBB(box.expand(-0.1, -0.4, -0.1), net.minecraft.block.material.Material.water);
         boolean inLava = mc.theWorld.isMaterialInBB(box.expand(-0.1, -0.4, -0.1), net.minecraft.block.material.Material.lava);
-        for (int n = 0; n < TRAJECTORY_TICKS; n++) {
-            if (target.capabilities.isFlying && target.ridingEntity == null) {
-                double y = motionY;
-                float jump = target.jumpMovementFactor;
-                stepGround(box, target, forward, strafe, false, inWater, inLava, motionHolder);
-                motionY = y * 0.6;
-            } else {
-                stepGround(box, target, forward, strafe, ground, inWater, inLava, motionHolder);
-            }
+        for (int n = 0; n < steps; n++) {
+            boolean flying = target.capabilities.isFlying && target.ridingEntity == null;
+            double fall = motionY;
+            step(box, target, forward, strafe, flying ? false : ground, inWater, inLava, motionHolder);
             box = motionHolder.box;
             motionX = motionHolder.x;
-            motionY = motionHolder.y;
+            motionY = flying ? fall * 0.6 : motionHolder.y;
             motionZ = motionHolder.z;
             ground = motionHolder.ground;
-            collidedHorizontally = motionHolder.horizontal;
-            collidedVertically = motionHolder.vertical;
-            points[n + 1] = boxCenter(box).addVector(0.0, 0.3, 0.0);
+            points[n + 1] = Utils.boxCenter(box).addVector(0.0, 0.3, 0.0);
         }
         return points;
     }
 
-    // breeze's per-tick sim leaks state through statics, we hold it in a cell
+    // the sim needs mutable per-tick state, keep it in one reusable cell
     private static final class Motion {
         AxisAlignedBB box;
         double x, y, z;
@@ -310,62 +366,48 @@ public class BowAim extends Feature {
 
     private final Motion motionHolder = new Motion();
 
-    private void stepGround(AxisAlignedBB box, EntityPlayer target, float forward, float strafe,
+    private void step(AxisAlignedBB box, EntityPlayer target, float forward, float strafe,
             boolean ground, boolean inWater, boolean inLava, Motion out) {
-        double motionX = out.x;
-        double motionY = out.y;
-        double motionZ = out.z;
-        if (!inWater && !inLava) {
-            float slipperiness = 0.91f;
-            if (ground) {
-                Vec3 center = boxCenter(box);
-                slipperiness = mc.theWorld.getBlockState(
-                        new net.minecraft.util.BlockPos(MathHelper.floor_double(center.xCoord),
-                                MathHelper.floor_double(box.minY) - 1,
-                                MathHelper.floor_double(center.zCoord)))
-                        .getBlock().slipperiness * 0.91f;
-            }
-            float friction = ground ? target.getAIMoveSpeed()
-                    * (0.16277136f / (slipperiness * slipperiness * slipperiness))
-                    : target.jumpMovementFactor;
-            move(motionHolder, forward, strafe, friction, target);
-            slipperiness = 0.91f;
-            if (ground) {
-                Vec3 center = boxCenter(box);
-                slipperiness = mc.theWorld.getBlockState(
-                        new net.minecraft.util.BlockPos(MathHelper.floor_double(center.xCoord),
-                                MathHelper.floor_double(box.minY) - 1,
-                                MathHelper.floor_double(center.zCoord)))
-                        .getBlock().slipperiness * 0.91f;
-            }
-            if (target.isOnLadder()) {
-                motionX = MathHelper.clamp_double(motionHolder.x, -0.15, 0.15);
-                motionZ = MathHelper.clamp_double(motionHolder.z, -0.15, 0.15);
-                if (motionY < -0.15) {
-                    motionY = -0.15;
-                }
-                if (target.isSneaking() && motionY < 0.0) {
-                    motionY = 0.0;
-                }
-            }
-            move(motionHolder, forward, strafe, friction, target);
-            motionY = motionHolder.y;
-            if (target.isOnLadder() && motionHolder.horizontal) {
-                motionY = 0.2;
-            }
-            motionY -= 0.08;
-            motionY *= 0.98f;
-            motionX = motionHolder.x * slipperiness;
-            motionZ = motionHolder.z * slipperiness;
-            if (!inWater && !inLava) {
-                // breeze returns here, the water/lava branch below is dead for us
-                out.box = collide(box, target, motionX, motionY, motionZ, out);
-                out.x = motionX;
-                out.y = motionY;
-                out.z = motionZ;
-                return;
-            }
+        if (inWater || inLava) {
+            stupidFluid(box, target, forward, strafe, ground, out);
+            return;
         }
+        double motionY = out.y;
+        float slip = slip(box, ground);
+        float friction = ground ? target.getAIMoveSpeed()
+                * (0.16277136f / (slip * slip * slip))
+                : target.jumpMovementFactor;
+        move(out, forward, strafe, friction, target);
+        // second pass, the source called it twice per tick
+        move(out, forward, strafe, friction, target);
+        motionY = out.y;
+        if (target.isOnLadder() && out.horizontal) {
+            motionY = 0.2;
+        }
+        motionY -= 0.08;
+        motionY *= 0.98f;
+        double motionX = out.x * slip;
+        double motionZ = out.z * slip;
+        out.box = colilision(box, target, motionX, motionY, motionZ, out);
+        out.x = motionX;
+        out.y = motionY;
+        out.z = motionZ;
+    }
+
+    private float slip(AxisAlignedBB box, boolean ground) {
+        if (!ground) {
+            return 0.91f;
+        }
+        Vec3 center = Utils.boxCenter(box);
+        return mc.theWorld.getBlockState(new net.minecraft.util.BlockPos(
+                MathHelper.floor_double(center.xCoord),
+                MathHelper.floor_double(box.minY) - 1,
+                MathHelper.floor_double(center.zCoord)))
+                .getBlock().slipperiness * 0.91f;
+    }
+
+    private void stupidFluid(AxisAlignedBB box, EntityPlayer target, float forward, float strafe,
+            boolean ground, Motion out) {
         double minY = box.minY;
         float drag = 0.8f;
         float accel = 0.02f;
@@ -380,21 +422,20 @@ public class BowAim extends Feature {
             drag += (0.54600006f - drag) * depthStrider / 3.0f;
             accel += (target.getAIMoveSpeed() - accel) * depthStrider / 3.0f;
         }
-        move(motionHolder, forward, strafe, accel, target);
-        motionX = motionHolder.x;
-        motionY = motionHolder.y;
-        motionZ = motionHolder.z;
-        out.box = collide(box, target, motionX, motionY, motionZ, out);
-        out.x = motionHolder.x * drag;
-        out.y = motionHolder.y * 0.8f - 0.02;
-        out.z = motionHolder.z * drag;
+        move(out, forward, strafe, accel, target);
+        out.box = colilision(box, target, out.x, out.y, out.z, out);
+        // collide zeroes the blocked axes, the fluid drag applies after that
+        double y = out.y;
+        out.x *= drag;
+        out.y = y * 0.8f - 0.02;
+        out.z *= drag;
         if (minY != out.box.minY) {
-            out.y = motionHolder.y;
+            out.y = y;
         }
     }
 
-    // breeze calculate(): rotate the wanted move into world space, scale to
-    // the tick's friction, add it to the running motion
+    // rotate the wanted move into world space, scale to the tick friction,
+    // add it to the running motion
     private void move(Motion m, float forward, float strafe, float friction, EntityPlayer target) {
         float len = forward * forward + strafe * strafe;
         if (len < 1.0E-4f) {
@@ -413,11 +454,11 @@ public class BowAim extends Feature {
         m.z += strafe * cos + forward * sin;
     }
 
-    // breeze getHitbox_2: the vanilla moveEntity flow, web drag + sneak edge
-    // clamp + y/x/z collision order + step, then zero motion on collision
-    private AxisAlignedBB collide(AxisAlignedBB box, EntityPlayer target,
+    // vanilla moveEntity flow: web drag, sneak edge clamp, y/x/z collision
+    // order and step, zero motion on collision
+    private AxisAlignedBB colilision(AxisAlignedBB box, EntityPlayer target,
             double x, double y, double z, Motion out) {
-        Vec3 center = boxCenter(box);
+        Vec3 center = Utils.boxCenter(box);
         if (mc.theWorld.isMaterialInBB(box.expand(-0.1f, -0.4f, -0.1f), net.minecraft.block.material.Material.web)) {
             x *= 0.25;
             y *= 0.05f;
@@ -561,31 +602,13 @@ public class BowAim extends Feature {
         return box;
     }
 
-    private static Vec3 boxCenter(AxisAlignedBB box) {
-        return new Vec3(box.minX + (box.maxX - box.minX) * 0.5,
-                box.minY + (box.maxY - box.minY) * 0.5,
-                box.minZ + (box.maxZ - box.minZ) * 0.5);
-    }
-
-    // breeze RotationUtil7.getAnglesTo: eyes at partialTick 1.0, wrapped delta
-    private static float[] anglesTo(Vec3 to, EntityPlayer from) {
+    private static float[] angy(Vec3 to, EntityPlayer from) {
         Vec3 eyes = from.getPositionEyes(1.0f);
-        double dx = to.xCoord - eyes.xCoord;
-        double dy = to.yCoord - eyes.yCoord;
-        double dz = to.zCoord - eyes.zCoord;
-        double flat = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
-        float pitch = (float) (-Math.toDegrees(Math.atan2(dy, flat)));
+        float[] rot = RotationMath.toRotationsFromDelta(
+                to.xCoord - eyes.xCoord, to.yCoord - eyes.yCoord, to.zCoord - eyes.zCoord);
         return new float[] {
-                from.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - from.rotationYaw),
-                from.rotationPitch + MathHelper.wrapAngleTo180_float(pitch - from.rotationPitch)
+                from.rotationYaw + MathHelper.wrapAngleTo180_float(rot[0] - from.rotationYaw),
+                from.rotationPitch + MathHelper.wrapAngleTo180_float(rot[1] - from.rotationPitch)
         };
-    }
-
-    private static float yawTo(Vec3 to, EntityPlayer from) {
-        Vec3 eyes = from.getPositionEyes(1.0f);
-        double dx = to.xCoord - eyes.xCoord;
-        double dz = to.zCoord - eyes.zCoord;
-        return (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
     }
 }
