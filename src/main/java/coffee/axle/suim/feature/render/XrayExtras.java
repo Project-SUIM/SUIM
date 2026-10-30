@@ -21,17 +21,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-/**
- * XRAY SpAWNER NAMETAGSSSS
- * 
- * @maybsomeday
- */
-public class XraySpawnerNameTags extends Feature {
+public class XrayExtras extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
+    private static XrayExtras instance;
 
     private Object xrayModule;
     private Object spawnersProperty;
     private Object spawnersNametagsProperty;
+    private Object dragonEggProperty;
     private Object rangeProperty;
     private Field trackedBlocksField;
     private Field pendingBlocksField;
@@ -52,7 +49,7 @@ public class XraySpawnerNameTags extends Feature {
 
     @Override
     public String getName() {
-        return "Xray:SpawnersNametags";
+        return "XrayExtras";
     }
 
     @Override
@@ -78,6 +75,12 @@ public class XraySpawnerNameTags extends Feature {
                 MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
                 return false;
             }
+            dragonEggProperty = creator.createBooleanProperty("dragon-egg", false);
+            if (!creator.injectPropertyAfter(xrayModule, dragonEggProperty, "warts-tracers")) {
+                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
+                return false;
+            }
+            instance = this;
             try {
                 for (Field field : xrayModule.getClass().getDeclaredFields()) {
                     field.setAccessible(true);
@@ -85,16 +88,16 @@ public class XraySpawnerNameTags extends Feature {
                         Object value = field.get(xrayModule);
                         if (value != null) {
                             String fieldName = field.getName();
-                            if (fieldName.equals("X")) {
+                            if (fieldName.equals("G")) {
                                 trackedBlocksField = field;
-                            } else if (fieldName.equals("c")) {
+                            } else if (fieldName.equals("d")) {
                                 pendingBlocksField = field;
                             }
                         }
                     }
                 }
 
-                if (trackedBlocksField == null) {
+                if (trackedBlocksField == null || pendingBlocksField == null) {
                     failedTrackedBlocksAccess = true;
                 }
 
@@ -112,6 +115,10 @@ public class XraySpawnerNameTags extends Feature {
             MyauLogger.error("FEATURE_FAIL", e);
             return false;
         }
+    }
+
+    public static boolean isDragonEggEnabled(int id) {
+        return id == 122 && instance != null && instance.properties.getBoolean(instance.dragonEggProperty, false);
     }
 
     @SubscribeEvent
