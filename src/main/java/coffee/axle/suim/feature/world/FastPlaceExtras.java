@@ -1,16 +1,13 @@
 package coffee.axle.suim.feature.world;
 
 import coffee.axle.suim.feature.Feature;
-
-import coffee.axle.suim.hooks.ModulePropertyManager;
-import coffee.axle.suim.hooks.MyauModuleManager;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import net.minecraft.block.*;
 import net.minecraft.block.material.Material;
-import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Adds skip-obsidian and skip-interactable properties to FastPlace module
@@ -20,41 +17,20 @@ import net.minecraft.item.ItemStack;
  * (default: false)
  */
 public class FastPlaceExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
-    private static MyauModuleManager staticManager;
-    private static ModulePropertyManager staticProperties;
 
-    private static Object fastPlaceModule;
-    private static Object skipObsidianProperty;
-    private static Object skipInteractableProperty;
-    private static boolean initialized = false;
+    @Setting(after = "place-fix") private boolean skipObsidian = true;
+    @Setting(after = "skip-obsidian") private boolean skipInteractable = false;
 
-    @Override
-    public String getName() {
-        return "FastPlace:Extras";
+    private static FastPlaceExtras instance;
+
+    public FastPlaceExtras() {
+        super("FastPlace:Extras");
+        instance = this;
     }
 
     @Override
-    public boolean initialize() throws Exception {
-        staticManager = this.manager;
-        staticProperties = this.properties;
-
-        fastPlaceModule = manager.findModule("FastPlace");
-
-        if (fastPlaceModule == null) {
-            MyauLogger.log("FastPlace module not found!");
-            return false;
-        }
-
-        skipObsidianProperty = creator.createBooleanProperty("skip-obsidian", true);
-        skipInteractableProperty = creator.createBooleanProperty("skip-interactable", false);
-
-        creator.injectPropertyAfter(fastPlaceModule, skipObsidianProperty, "place-fix");
-        creator.injectPropertyAfter(fastPlaceModule, skipInteractableProperty, "skip-obsidian");
-
-        initialized = true;
-
-        return true;
+    protected String targetModule() {
+        return "FastPlace";
     }
 
     /**
@@ -63,12 +39,8 @@ public class FastPlaceExtras extends Feature {
      */
     public static boolean shouldSkipFastPlace() {
         try {
-            if (!initialized || fastPlaceModule == null || skipObsidianProperty == null
-                    || skipInteractableProperty == null) {
-                return false;
-            }
-
-            if (!staticManager.isModuleEnabled(fastPlaceModule)) {
+            FastPlaceExtras f = instance;
+            if (f == null || !f.isEnabled()) {
                 return false;
             }
 
@@ -76,19 +48,16 @@ public class FastPlaceExtras extends Feature {
                 return false;
             }
 
-            Boolean skipObsidian = (Boolean) staticProperties.getPropertyValue(skipObsidianProperty);
-            Boolean skipInteractable = (Boolean) staticProperties.getPropertyValue(skipInteractableProperty);
-
             ItemStack heldItem = mc.thePlayer.getHeldItem();
 
-            if (skipObsidian && heldItem != null && heldItem.getItem() instanceof ItemBlock) {
+            if (f.skipObsidian && heldItem != null && heldItem.getItem() instanceof ItemBlock) {
                 Block block = ((ItemBlock) heldItem.getItem()).getBlock();
                 if (block == Blocks.obsidian) {
                     return true;
                 }
             }
 
-            if (skipInteractable && mc.objectMouseOver != null) {
+            if (f.skipInteractable && mc.objectMouseOver != null) {
                 if (mc.objectMouseOver.typeOfHit == net.minecraft.util.MovingObjectPosition.MovingObjectType.BLOCK) {
                     net.minecraft.util.BlockPos pos = mc.objectMouseOver.getBlockPos();
                     Block block = mc.theWorld.getBlockState(pos).getBlock();

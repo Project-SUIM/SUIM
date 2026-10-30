@@ -1,35 +1,26 @@
 package coffee.axle.suim.feature.command;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.MyauLogger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class SuimCommand extends Feature {
 
-    @Override
-    public String getName() {
-        return "Command:Suim";
+    public SuimCommand() {
+        super("Command:Suim");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("suim", "myau"));
-            creator.registerCommand(commandNames, this::handleCommand);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("suim", "projectsuim", "notkolsshittysolutionimsosorryiloveyousucheneventhoughyourprotisshit"));
+        creator.registerCommand(commandNames, this::handleCommand);
     }
 
     private void handleCommand(ArrayList<String> args) {
-        manager.sendMessage("&d&m--------------------------------");
-        manager.sendMessage("&d&l    SUIM &f&l@axle.coffee");
-        manager.sendMessage("&d&m--------------------------------");
+        manager.sendMessage("&d&m---------------------------------");
+        manager.sendMessage("&d&l  SUIM - Made by &f&l@axle.coffee");
+        manager.sendMessage("&d&m---------------------------------");
         manager.sendMessage("");
 
         manager.sendMessage("&c&lCombat");
@@ -63,6 +54,6 @@ public class SuimCommand extends Feature {
         manager.sendMessage("  &7• &f.status");
         manager.sendMessage("");
 
-        manager.sendMessage("&d&m--------------------------------");
+        manager.sendMessage("&d&m---------------------------------");
     }
 }

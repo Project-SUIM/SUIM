@@ -6,12 +6,12 @@ import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.events.ReceivePacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.client.C03PacketPlayer;
@@ -23,43 +23,40 @@ import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovementInput;
 import net.minecraft.world.World;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * herp
  * hypixel vs patching me
  */
 public class Stasis extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static Stasis instance;
 
-    private static final int MODE_SUIM = 0;
-    private static final int MODE_RESTORE = 1;
-    private static final int MODE_RAVEN = 2;
-    private static final int MODE_JADE = 3;
+    public enum Mode {
+        SUIM, RESTORE, RAVEN, JADE
+    }
 
     private static final int JADE_LOCK_TICKS = 2;
 
     private static final double MOTION_EPS = 1.0E-4;
     private static final double GRAVITY_MATCH_EPS = 0.02;
 
-    private Object moduleInstance;
-    private Object modeProperty;
-    private Object flaglessProperty;
-    private Object cancelOnDeathProperty;
-    private Object pulseProperty;
-    private Object pulseWindowProperty;
-    private Object velocityTicksProperty;
-    private Object velocityBlockProperty;
-    private Object maxFallProperty;
-    private Object blockAfterDisableProperty;
-    private Object positionReminderProperty;
-    private Object groundStableProperty;
-    private int lastMode;
+    @Setting(min = 2, max = 85) private int pulse = 60;
+    @Setting(min = 1, max = 20) private int pulseWindow = 1;
+    @Setting(min = 0, max = 20) private int velocityTicks = 2;
+    @Setting(min = 0, max = 20) private int velocityBlock = 2;
+    @Setting(min = 0, max = 5) private float maxFall = 0.5f;
+    @Setting(min = 0, max = 20) private int blockAfterDisable = 3;
+    @Setting(min = 1, max = 100) private int positionReminder = 20;
+    @Setting(min = 1, max = 20) private int groundStable = 3;
+    @Setting private Mode mode = Mode.JADE;
+    @Setting private boolean flagless = false;
+    @Setting private boolean cancelOnDeath = false;
+    private Mode lastMode;
 
     public static boolean frozen;
 
@@ -110,58 +107,26 @@ public class Stasis extends Feature {
     private double jadeMotionX, jadeMotionY, jadeMotionZ;
     private boolean jadeMotionSaved;
 
-    @Override
-    public String getName() {
-        return "Stasis";
+    public Stasis() {
+        super("Stasis", GuiCategory.WORLD);
+        instance = this;
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.WORLD;
+    protected void onEnable() {
+        lastMode = mode;
+        startEngine(mode);
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            instance = this;
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, Stasis.class);
-            modeProperty = creator.createEnumProperty("mode", MODE_JADE,
-                    new String[] { "SUIM", "RESTORE", "RAVEN", "JADE" });
-            flaglessProperty = creator.createBooleanProperty("flagless", false);
-            cancelOnDeathProperty = creator.createBooleanProperty("cancel-on-death", false);
-            pulseProperty = creator.createIntegerProperty("pulse", 60, 2, 85);
-            pulseWindowProperty = creator.createIntegerProperty("pulse-window", 1, 1, 20);
-            velocityTicksProperty = creator.createIntegerProperty("velocity-ticks", 2, 0, 20);
-            velocityBlockProperty = creator.createIntegerProperty("velocity-block", 2, 0, 20);
-            maxFallProperty = creator.createFloatProperty("max-fall", 0.5f, 0.0f, 5.0f);
-            blockAfterDisableProperty = creator.createIntegerProperty("block-after-disable", 3, 0, 20);
-            positionReminderProperty = creator.createIntegerProperty("position-reminder", 20, 1, 100);
-            groundStableProperty = creator.createIntegerProperty("ground-stable", 3, 1, 20);
-            creator.registerProperties(moduleInstance,
-                    modeProperty, flaglessProperty, cancelOnDeathProperty,
-                    pulseProperty, pulseWindowProperty,
-                    velocityTicksProperty, velocityBlockProperty, maxFallProperty,
-                    blockAfterDisableProperty, positionReminderProperty, groundStableProperty);
-            manager.reloadModuleCommand();
-            lastMode = getMode();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance,
-                    () -> startEngine(getMode()),
-                    () -> stopEngine(getMode()));
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("Stasis:init", e);
-            return false;
-        }
+    protected void onDisable() {
+        stopEngine(mode);
     }
 
-    private void startEngine(int mode) {
-        if (mode == MODE_RAVEN) {
-            onEnable();
-        } else if (mode == MODE_JADE) {
+    private void startEngine(Mode mode) {
+        if (mode == Mode.RAVEN) {
+            onEnableLegacy();
+        } else if (mode == Mode.JADE) {
             jadeEnable();
         } else {
             allowNextC03 = false;
@@ -170,17 +135,18 @@ public class Stasis extends Feature {
         }
     }
 
-    private void stopEngine(int mode) {
-        if (mode == MODE_RAVEN) {
-            onDisable();
-        } else if (mode == MODE_JADE) {
+    private void stopEngine(Mode mode) {
+        if (mode == Mode.RAVEN) {
+            onDisableLegacy();
+            frozen = false;
+        } else if (mode == Mode.JADE) {
             jadeDisable();
             frozen = false;
         } else {
             allowNextC03 = false;
             pulseTick = 0;
             pulseActive = false;
-            if (mode == MODE_RESTORE && Utils.nullCheck()) {
+            if (mode == Mode.RESTORE && Utils.nullCheck()) {
                 mc.thePlayer.motionX = savedMotionX;
                 mc.thePlayer.motionY = savedMotionY;
                 mc.thePlayer.motionZ = savedMotionZ;
@@ -188,29 +154,29 @@ public class Stasis extends Feature {
         }
     }
 
-    private int getMode() {
-        return properties.getInt(modeProperty, MODE_RAVEN);
+    private Mode getMode() {
+        return mode;
     }
 
     private boolean isFlagless() {
-        return properties.getBoolean(flaglessProperty, false);
+        return flagless;
     }
 
     private int getVelocityTicks() {
-        return properties.getInt(velocityTicksProperty, 2);
+        return velocityTicks;
     }
 
     private int getPositionReminder() {
-        return properties.getInt(positionReminderProperty, 20);
+        return positionReminder;
     }
 
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
-        int mode = getMode();
-        if (mode == MODE_RAVEN || mode == MODE_JADE) return;
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        Mode mode = getMode();
+        if (mode == Mode.RAVEN || mode == Mode.JADE) return;
+        if (!isEnabled()) return;
         if (!Utils.nullCheck()) return;
-        pulseActive = getMode() == MODE_SUIM && pulseTick % 80L < 4L;
+        pulseActive = getMode() == Mode.SUIM && pulseTick % 80L < 4L;
         pulseTick++;
         if (mc.thePlayer.hurtTime != 0) return;
         if (pulseActive) return;
@@ -222,16 +188,16 @@ public class Stasis extends Feature {
 
     @SubscribeEvent
     public void onPrePlayerInput(PrePlayerInputEvent e) {
-        if (getMode() == MODE_RAVEN) {
+        if (getMode() == Mode.RAVEN) {
             onPostPlayerInputAlways(e);
             return;
         }
-        if (getMode() == MODE_JADE) {
+        if (getMode() == Mode.JADE) {
             // always called: the 2 tick lock after a disable still needs to run
             jadeMoveInput(e);
             return;
         }
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         e.setForward(0.0f);
         e.setStrafe(0.0f);
     }
@@ -239,14 +205,14 @@ public class Stasis extends Feature {
     // EntityPlayerSP.onUpdate HEAD/RETURN, same two points Jade posts its
     // PreUpdateEvent/PostUpdateEvent from
     public static void jadePreUpdate(EntityPlayerSP p) {
-        if (instance != null && instance.getMode() == MODE_JADE && instance.isEnabled()) {
+        if (instance != null && instance.getMode() == Mode.JADE && instance.isEnabled()) {
             instance.jadePre(p);
             instance.updateFrozen();
         }
     }
 
     public static void jadePostUpdate(EntityPlayerSP p) {
-        if (instance != null && instance.getMode() == MODE_JADE && instance.isEnabled()) {
+        if (instance != null && instance.getMode() == Mode.JADE && instance.isEnabled()) {
             instance.jadePost(p);
             instance.updateFrozen();
         }
@@ -254,19 +220,19 @@ public class Stasis extends Feature {
 
     @SubscribeEvent
     public void onSendPacket(SendPacketEvent e) {
-        if (getMode() == MODE_RAVEN) {
+        if (getMode() == Mode.RAVEN) {
             if (!onSendPacketAlways(e.getPacket())) {
                 e.setCanceled(true);
             }
             return;
         }
-        if (getMode() == MODE_JADE) {
-            if (manager.isModuleEnabled(moduleInstance) && !jadeSend(e.getPacket())) {
+        if (getMode() == Mode.JADE) {
+            if (isEnabled() && !jadeSend(e.getPacket())) {
                 e.setCanceled(true);
             }
             return;
         }
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!(e.getPacket() instanceof C03PacketPlayer)) return;
         if (allowNextC03) {
             allowNextC03 = false;
@@ -281,19 +247,19 @@ public class Stasis extends Feature {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onReceivePacket(ReceivePacketEvent e) {
-        if (getMode() == MODE_RAVEN) {
+        if (getMode() == Mode.RAVEN) {
             if (!onReceivePacketAlways(e.getPacket())) {
                 e.setCanceled(true);
             }
             return;
         }
-        if (getMode() == MODE_JADE) {
-            if (manager.isModuleEnabled(moduleInstance) && !e.isCanceled()) {
+        if (getMode() == Mode.JADE) {
+            if (isEnabled() && !e.isCanceled()) {
                 jadeReceive(e.getPacket());
             }
             return;
         }
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (e.getPacket() instanceof S08PacketPlayerPosLook) {
             allowNextC03 = true;
             // a lagback/teleport invalidates the frozen position - restart the
@@ -305,17 +271,17 @@ public class Stasis extends Feature {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onClientTick(TickEvent.ClientTickEvent e) {
-        int mode = getMode();
+        Mode mode = getMode();
         if (mode != lastMode) {
             // engine switch mid run: stop old, start new. disabled engines are
             // already stopped so there's nothing to do
-            if (manager.isModuleEnabled(moduleInstance)) {
+            if (isEnabled()) {
                 stopEngine(lastMode);
                 startEngine(mode);
             }
             lastMode = mode;
         }
-        if (mode != MODE_RAVEN) return;
+        if (mode != Mode.RAVEN) return;
         if (e.phase == TickEvent.Phase.START) {
             onClientTickStart();
         } else {
@@ -327,15 +293,11 @@ public class Stasis extends Feature {
     public void onUnload(WorldEvent.Unload e) {
         if (e.world == null || !e.world.isRemote) return;
         // jade keeps running across a world change, it only drops held packets
-        if (getMode() == MODE_JADE) return;
-        if (getMode() != MODE_RAVEN) return;
-        if (manager.isModuleEnabled(moduleInstance)) {
+        if (getMode() == Mode.JADE) return;
+        if (getMode() != Mode.RAVEN) return;
+        if (isEnabled()) {
             reset();
         }
-    }
-
-    private boolean isEnabled() {
-        return manager.isModuleEnabled(moduleInstance);
     }
 
     private boolean isPulseEnabled() {
@@ -343,14 +305,14 @@ public class Stasis extends Feature {
     }
 
     private int getPulseInterval() {
-        return properties.getInt(pulseProperty, 60);
+        return pulse;
     }
 
     private boolean isActive() {
         return this.isEnabled() && Utils.nullCheck();
     }
 
-    private void onEnable() {
+    private void onEnableLegacy() {
         this.motionStored = false;
         this.velocityTicksRemaining = 0;
         this.velocityInputBlockRemaining = 0;
@@ -374,7 +336,7 @@ public class Stasis extends Feature {
         updateFrozen();
     }
 
-    private void onDisable() {
+    private void onDisableLegacy() {
         reset();
     }
 
@@ -394,17 +356,17 @@ public class Stasis extends Feature {
         this.groundStableTicks = 0;
         this.feetSampled = false;
         this.anchorKnown = false;
-        this.blockAfterDisableRemaining = properties.getInt(blockAfterDisableProperty, 3);
+        this.blockAfterDisableRemaining = blockAfterDisable;
         updateFrozen();
     }
 
     private void updateFrozen() {
-        int mode = getMode();
-        frozen = this.isEnabled() && (mode == MODE_JADE ? this.jadeIsFrozen() : this.isFrozen());
+        Mode mode = getMode();
+        frozen = this.isEnabled() && (mode == Mode.JADE ? this.jadeIsFrozen() : this.isFrozen());
     }
 
     public static void afterPlayerUpdate(EntityPlayerSP p) {
-        if (instance == null || instance.getMode() != MODE_RAVEN || p == null
+        if (instance == null || instance.getMode() != Mode.RAVEN || p == null
                 || !instance.isActive() || !instance.holding) {
             return;
         }
@@ -416,9 +378,8 @@ public class Stasis extends Feature {
     }
 
     private void maybeFinishVelocityForFall(EntityPlayerSP p) {
-        float maxFall = properties.getFloat(maxFallProperty, 0.5f);
-        if (this.velocityTicksRemaining > 0 && maxFall > 0.0f && this.velocityFallStartY - p.posY >= maxFall) {
-            this.velocityTicksRemaining = 0;
+        float fall = maxFall;
+        if (this.velocityTicksRemaining > 0 && fall > 0.0f && this.velocityFallStartY - p.posY >= fall) {            this.velocityTicksRemaining = 0;
             this.finishVelocityPassthrough(p);
         }
     }
@@ -457,9 +418,9 @@ public class Stasis extends Feature {
     }
 
     private void onServerTeleport(EntityPlayerSP p, double x, double y, double z) {
-        if (properties.getBoolean(cancelOnDeathProperty, false) && !this.isLikelyFlagTeleport(p, x, y, z)) {
+        if (cancelOnDeath && !this.isLikelyFlagTeleport(p, x, y, z)) {
             try {
-                manager.setModuleEnabled(moduleInstance, false);
+                manager.setModuleEnabled(getModuleInstance(), false);
             } catch (Exception ex) {
                 MyauLogger.error("Stasis:disable", ex);
             }
@@ -499,7 +460,7 @@ public class Stasis extends Feature {
         this.airReminderTicksRemaining = 0;
         this.pendingAirReminder = false;
         this.velocityTicksRemaining = getVelocityTicks();
-        this.velocityInputBlockRemaining = properties.getInt(velocityBlockProperty, 2);
+        this.velocityInputBlockRemaining = velocityBlock;
         EntityPlayerSP p = mc.thePlayer;
         this.velocityFallStartY = p != null ? p.posY : 0.0;
         this.groundStableTicks = 0;
@@ -664,7 +625,7 @@ public class Stasis extends Feature {
         if (this.keysDown || motionSpeed(p.motionX, p.motionY, p.motionZ) > MOTION_EPS) {
             return false;
         }
-        return this.groundStableTicks >= properties.getInt(groundStableProperty, 3);
+        return this.groundStableTicks >= groundStable;
     }
 
     private void updateHoldingState(EntityPlayerSP p) {
@@ -981,7 +942,7 @@ public class Stasis extends Feature {
     }
 
     private void startPulse() {
-        this.pulseTicksRemaining = properties.getInt(pulseWindowProperty, 1);
+        this.pulseTicksRemaining = pulseWindow;
         this.applyStoredMotion();
         this.pulseCooldownRemaining = this.getPulseInterval();
         this.groundStableTicks = 0;

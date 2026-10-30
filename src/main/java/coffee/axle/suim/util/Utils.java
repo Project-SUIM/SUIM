@@ -1,11 +1,11 @@
 package coffee.axle.suim.util;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.Vec3;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Basic utils
@@ -13,7 +13,6 @@ import org.lwjgl.input.Mouse;
  * @author maybsomeday (meow) - ported to SUIM
  */
 public class Utils {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     public static boolean nullCheck() {
         return mc.thePlayer != null && mc.theWorld != null;

@@ -2,8 +2,9 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 
+import coffee.axle.suim.property.Setting;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.nbt.NBTTagCompound;
@@ -11,7 +12,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityMobSpawner;
 import net.minecraft.util.BlockPos;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
@@ -20,15 +20,14 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArraySet;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class XrayExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static XrayExtras instance;
 
-    private Object xrayModule;
     private Object spawnersProperty;
-    private Object spawnersNametagsProperty;
-    private Object dragonEggProperty;
+    @Setting(after = "spawners") private boolean spawnersNametags = false;
+    @Setting(after = "warts-tracers") private boolean dragonEgg = false;
     private Object rangeProperty;
     private Field trackedBlocksField;
     private Field pendingBlocksField;
@@ -47,78 +46,55 @@ public class XrayExtras extends Feature {
     private boolean initialized = false;
     private boolean failedTrackedBlocksAccess = false;
 
-    @Override
-    public String getName() {
-        return "XrayExtras";
+    public XrayExtras() {
+        super("XrayExtras");
     }
 
     @Override
-    public boolean initialize() {
+    protected String targetModule() {
+        return "Xray";
+    }
+
+    @Override
+    protected void init() throws Exception {
+        spawnersProperty = manager.findProperty(module, "spawners");
+        if (spawnersProperty == null) {
+            MyauLogger.log(getName(), "PROPERTY_NOT_FOUND");
+            return;
+        }
+
+        rangeProperty = manager.findProperty(module, "range");
+
+        instance = this;
         try {
-            xrayModule = manager.findModule("Xray");
-            if (xrayModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            spawnersProperty = manager.findProperty(xrayModule, "spawners");
-            if (spawnersProperty == null) {
-                MyauLogger.log(getName(), "PROPERTY_NOT_FOUND");
-                return false;
-            }
-
-            rangeProperty = manager.findProperty(xrayModule, "range");
-
-            spawnersNametagsProperty = creator.createBooleanProperty("spawners-nametags", false);
-
-            if (!creator.injectPropertyAfter(xrayModule, spawnersNametagsProperty, "spawners")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-            dragonEggProperty = creator.createBooleanProperty("dragon-egg", false);
-            if (!creator.injectPropertyAfter(xrayModule, dragonEggProperty, "warts-tracers")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-            instance = this;
-            try {
-                for (Field field : xrayModule.getClass().getDeclaredFields()) {
-                    field.setAccessible(true);
-                    if (field.getType() == CopyOnWriteArraySet.class) {
-                        Object value = field.get(xrayModule);
-                        if (value != null) {
-                            String fieldName = field.getName();
-                            if (fieldName.equals("G")) {
-                                trackedBlocksField = field;
-                            } else if (fieldName.equals("d")) {
-                                pendingBlocksField = field;
-                            }
+            for (Field field : module.getClass().getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == CopyOnWriteArraySet.class) {
+                    Object value = field.get(module);
+                    if (value != null) {
+                        String fieldName = field.getName();
+                        if (fieldName.equals(MyauMappings.FIELD_XRAY_TRACKED_BLOCKS)) {
+                            trackedBlocksField = field;
+                        } else if (fieldName.equals(MyauMappings.FIELD_XRAY_PENDING_BLOCKS)) {
+                            pendingBlocksField = field;
                         }
                     }
                 }
+            }
 
-                if (trackedBlocksField == null || pendingBlocksField == null) {
-                    failedTrackedBlocksAccess = true;
-                }
-
-            } catch (Exception e) {
+            if (trackedBlocksField == null || pendingBlocksField == null) {
                 failedTrackedBlocksAccess = true;
             }
 
-            initialized = true;
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
         } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
+            failedTrackedBlocksAccess = true;
         }
+
+        initialized = true;
     }
 
     public static boolean isDragonEggEnabled(int id) {
-        return id == 122 && instance != null && instance.properties.getBoolean(instance.dragonEggProperty, false);
+        return id == 122 && instance != null && instance.dragonEgg;
     }
 
     @SubscribeEvent
@@ -137,7 +113,7 @@ public class XrayExtras extends Feature {
                 return;
             }
 
-            if (!manager.isModuleEnabled(xrayModule)) {
+            if (!manager.isModuleEnabled(module)) {
                 return;
             }
 
@@ -146,8 +122,7 @@ public class XrayExtras extends Feature {
                 return;
             }
 
-            Boolean nametagsEnabled = safeGetBooleanProperty(spawnersNametagsProperty);
-            if (!nametagsEnabled) {
+            if (!spawnersNametags) {
                 return;
             }
 
@@ -345,7 +320,7 @@ public class XrayExtras extends Feature {
         }
 
         try {
-            return (CopyOnWriteArraySet<BlockPos>) trackedBlocksField.get(xrayModule);
+            return (CopyOnWriteArraySet<BlockPos>) trackedBlocksField.get(module);
         } catch (Exception e) {
             return null;
         }
@@ -358,7 +333,7 @@ public class XrayExtras extends Feature {
         }
 
         try {
-            return (CopyOnWriteArraySet<BlockPos>) pendingBlocksField.get(xrayModule);
+            return (CopyOnWriteArraySet<BlockPos>) pendingBlocksField.get(module);
         } catch (Exception e) {
             return null;
         }

@@ -28,6 +28,7 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Static utility methods ported from Kotlin extension functions in GuiUtils.kt.
@@ -36,7 +37,6 @@ public final class GuiUtils {
 
     public static final GuiUtils INSTANCE = new GuiUtils();
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final Pattern FORMATTING_CODE_PATTERN = Pattern.compile("(?i)\u00A7[0-9a-fk-or]");
 
     private GuiUtils() {

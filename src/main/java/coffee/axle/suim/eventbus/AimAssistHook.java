@@ -6,8 +6,8 @@ import coffee.axle.suim.rotation.AimAssistRotation;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.rotation.RotationState;
 import net.minecraft.entity.EntityLivingBase;
+import coffee.axle.suim.util.HypixelUtils;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.AxisAlignedBB;
@@ -19,11 +19,11 @@ import java.lang.reflect.Method;
 import java.util.Locale;
 
 import coffee.axle.suim.feature.SuffixRegistry;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 // event-bus registration leaves hash-checked AimAssist bytecode untouched
 public class AimAssistHook {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static AimAssistRotation aimRotation;
     private static boolean loggedInit = false;
@@ -58,12 +58,6 @@ public class AimAssistHook {
     // Cached AimAssist module instance (from event bus handler map)
     private static Object aimAssistInstance;
     private static boolean instanceSearchDone = false;
-
-    // Reflection caches - TeamUtil (myau.kY) bot/team filters
-    private static Method isBotMethod;
-    private static Method isTeamMethod;
-    @SuppressWarnings("unused")
-    private static boolean teamUtilFailed = false;
 
     /**
      * Registers this handler on Myau's event bus.
@@ -136,10 +130,11 @@ public class AimAssistHook {
             if (modeOrdinal == 0) {
                 if (nativeTargetMethod == null) {
                     Class<?> aaClass = Class.forName(MyauMappings.CLASS_AIM_ASSIST);
-                    Field key = aaClass.getDeclaredField("c");
+                    Field key = aaClass.getDeclaredField(MyauMappings.FIELD_AIM_ASSIST_NATIVE_KEY);
                     key.setAccessible(true);
                     nativeTargetKey = key.getLong(null) ^ 0x03b549d59f77L;
-                    nativeTargetMethod = aaClass.getDeclaredMethod("B", long.class);
+                    nativeTargetMethod = aaClass.getDeclaredMethod(
+                            MyauMappings.METHOD_AIM_ASSIST_NATIVE_TARGET, long.class);
                     nativeTargetMethod.setAccessible(true);
                 }
                 target = (EntityLivingBase) nativeTargetMethod.invoke(aaInstance, nativeTargetKey);
@@ -294,11 +289,12 @@ public class AimAssistHook {
 
             Class<?> aaClass = Class.forName(MyauMappings.CLASS_AIM_ASSIST);
             if (nativeOutputField == null) {
-                nativeOutputField = aaClass.getDeclaredField("P");
+                nativeOutputField = aaClass.getDeclaredField(MyauMappings.FIELD_AIM_ASSIST_NATIVE_OUTPUT);
                 nativeOutputField.setAccessible(true);
             }
             if (nativeIntegratedField == null) {
-                nativeIntegratedField = aaClass.getDeclaredField("S");
+                nativeIntegratedField = aaClass.getDeclaredField(
+                        MyauMappings.FIELD_AIM_ASSIST_NATIVE_INTEGRATED);
                 nativeIntegratedField.setAccessible(true);
             }
             float[] output = (float[]) nativeOutputField.get(aaInstance);
@@ -472,33 +468,12 @@ public class AimAssistHook {
     // myau.G.s() skip Hypixel bots when bot-check is on, same-team players when team filter is on
     private static boolean isBotOrTeam(Object aaInstance, EntityPlayer player) {
         if (aaInstance == null) return false;
-        try {
-            if (getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_BOT_CHECKS, false)
-                    && (Boolean) isBotMethod().invoke(null, player)) {
-                return true;
-            }
-            return getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_TEAM, false)
-                    && (Boolean) isTeamMethod().invoke(null, player);
-        } catch (Exception e) {
-            teamUtilFailed = true;
-            return false;
+        if (getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_BOT_CHECKS, false)
+                && HypixelUtils.isBot(player)) {
+            return true;
         }
-    }
-
-    private static Method isBotMethod() throws Exception {
-        if (isBotMethod == null) {
-            isBotMethod = Class.forName(MyauMappings.CLASS_TEAM_UTIL)
-                    .getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_BOT, EntityPlayer.class);
-        }
-        return isBotMethod;
-    }
-
-    private static Method isTeamMethod() throws Exception {
-        if (isTeamMethod == null) {
-            isTeamMethod = Class.forName(MyauMappings.CLASS_TEAM_UTIL)
-                    .getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_TEAM, EntityPlayer.class);
-        }
-        return isTeamMethod;
+        return getBoolProp(aaInstance, MyauMappings.FIELD_AIM_ASSIST_TEAM, false)
+                && HypixelUtils.isTeammate(player);
     }
 
     private static void registerSuffix(Object module) {

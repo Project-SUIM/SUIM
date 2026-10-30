@@ -1,7 +1,6 @@
 package coffee.axle.suim.render;
 
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -15,10 +14,10 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public final class BedBillboardRenderer {
 
-        private static final Minecraft mc = Minecraft.getMinecraft();
 
         public static final double DEFAULT_BILLBOARD_SCALE = 1.0 / 60.0;
         public static final int DEFAULT_ITEM_SIZE = 16;

@@ -1,8 +1,8 @@
 package coffee.axle.suim.feature.command;
 
+import coffee.axle.suim.clickgui.util.ChatUtils;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.util.ChatComponentText;
@@ -20,24 +20,16 @@ import java.util.Date;
 public class ClientInfoCommand extends Feature {
     private static final File CONFIG_FILE = new File("config/Myau/clientname.txt");
 
-    @Override
-    public String getName() {
-        return "Command:ClientInfo";
+    public ClientInfoCommand() {
+        super("Command:ClientInfo");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("client", "info"));
-            creator.registerCommand(commandNames, this::handleCommand);
-            registerSetClientNameCommand();
-            loadClientName();
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("client", "info"));
+        creator.registerCommand(commandNames, this::handleCommand);
+        registerSetClientNameCommand();
+        loadClientName();
     }
 
     private void handleCommand(ArrayList<String> args) {
@@ -73,9 +65,7 @@ public class ClientInfoCommand extends Feature {
             root.appendSibling(new ChatComponentText(color("&7» &fSaved Configs: &6" + configCount + "\n")));
             root.appendSibling(new ChatComponentText(color("&f&m----------------------------------------")));
 
-            if (Minecraft.getMinecraft().thePlayer != null) {
-                Minecraft.getMinecraft().thePlayer.addChatMessage(root);
-            }
+            ChatUtils.chatMessage(root);
         } catch (Exception e) {
             manager.sendMessage("&cError retrieving client info: " + e.getMessage());
             MyauLogger.error("ClientInfo:handler", e);

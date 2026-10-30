@@ -13,7 +13,6 @@ import coffee.axle.suim.clickgui.settings.impl.EnumModuleSetting;
 import coffee.axle.suim.clickgui.settings.impl.NumberModuleSetting;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
@@ -30,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Panel ClickGUI in the Raven B3 style. Port of the B4 ClickGUI script
@@ -62,7 +62,6 @@ public class B3ClickGuiScreen extends GuiScreen {
     private static boolean searching;
     private static boolean movementKeysUpdated;
     private int screenWidth, screenHeight;
-    private final Minecraft mc = Minecraft.getMinecraft();
 
     public static void open() {
         // deferred like the other modes - opening mid-input-processing gets the

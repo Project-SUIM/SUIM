@@ -2,29 +2,21 @@ package coffee.axle.suim.feature.command;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.exploit.Shopper;
-import coffee.axle.suim.util.MyauLogger;
 
 import java.util.ArrayList;
 
 public class ShopperCommand extends Feature {
 
-    @Override
-    public String getName() {
-        return "Command:Shopper";
+    public ShopperCommand() {
+        super("Command:Shopper");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            ArrayList<String> names = new ArrayList<>();
-            names.add("shopperconfig");
-            names.add("sh");
-            creator.registerCommand(names, this::handle);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        ArrayList<String> names = new ArrayList<>();
+        names.add("shopperconfig");
+        names.add("sh");
+        creator.registerCommand(names, this::handle);
     }
 
     private void handle(ArrayList<String> args) {

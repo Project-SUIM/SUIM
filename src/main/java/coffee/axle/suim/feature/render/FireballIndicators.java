@@ -1,10 +1,9 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.HudUtils;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.util.AxisAlignedBB;
@@ -13,7 +12,6 @@ import net.minecraft.util.BlockPos;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
@@ -23,6 +21,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * FireballIndicators
@@ -30,27 +29,27 @@ import java.util.Map;
  */
 public class FireballIndicators extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
-    private static final int COLOR_NONE = 0;
-    private static final int COLOR_DEFAULT = 1;
-    private static final int COLOR_HUD = 2;
-    private static final String[] COLOR_MODES = { "NONE", "DEFAULT", "HUD" };
+
+    public enum ColorMode {
+        NONE, DEFAULT, HUD
+    }
+
     private static final int MAX_FIREBALLS = 10;
     private static final int MAX_STEPS = 200;
     private static final long FADE_MS = 500;
 
     private static final long STUCK_MS = 2000;
 
-    private Object indicatorsModule;
-    private Object lineColorProperty;
-    private Object drawLineProperty;
-    private Object lineWidthProperty;
-    private Object impactColorProperty;
-    private Object drawImpactProperty;
-    private Object impactOpacityProperty;
-    private Object impactOutlineProperty;
-    private Object borderColorProperty;
-    private Object renderDistanceProperty;
+    @Setting(after = "arrows") private ColorMode lineColor = ColorMode.DEFAULT;
+
+    @Setting(name = "draw-line") private boolean drawLine = true;
+    @Setting(name = "line-width", min = 0.1f, max = 3.0f) private float lineWidth = 0.9f;
+    @Setting(name = "impact-color") private ColorMode impactColor = ColorMode.DEFAULT;
+    @Setting(name = "draw-impact") private boolean drawImpact = true;
+    @Setting(name = "impact-opacity", min = 0, max = 100) private int impactOpacity = 40;
+    @Setting(name = "impact-outline") private boolean impactOutline = true;
+    @Setting(name = "border-color") private ColorMode borderColor = ColorMode.NONE;
+    @Setting(name = "render-distance", min = 0, max = 256) private int renderDistance = 64;
 
     private final Map<EntityFireball, Trail> trails = new LinkedHashMap<>();
 
@@ -63,50 +62,19 @@ public class FireballIndicators extends Feature {
         double lastX, lastY, lastZ;
     }
 
-    @Override
-    public String getName() {
-        return "Indicators:Fireball";
+    public FireballIndicators() {
+        super("Indicators:Fireball");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            indicatorsModule = manager.findModule("Indicators");
-            if (indicatorsModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            lineColorProperty = creator.createEnumProperty("line-color", COLOR_DEFAULT, COLOR_MODES);
-            drawLineProperty = creator.createBooleanProperty("draw-line", true);
-            lineWidthProperty = creator.createFloatProperty("line-width", 0.9f, 0.1f, 3.0f);
-            impactColorProperty = creator.createEnumProperty("impact-color", COLOR_DEFAULT, COLOR_MODES);
-            drawImpactProperty = creator.createBooleanProperty("draw-impact", true);
-            impactOpacityProperty = creator.createIntegerProperty("impact-opacity", 40, 0, 100);
-            impactOutlineProperty = creator.createBooleanProperty("impact-outline", true);
-            borderColorProperty = creator.createEnumProperty("border-color", COLOR_NONE, COLOR_MODES);
-            renderDistanceProperty = creator.createIntegerProperty("render-distance", 64, 0, 256);
-
-            if (!creator.injectPropertyAfter(indicatorsModule, lineColorProperty, "arrows")) {
-                creator.registerProperties(indicatorsModule, lineColorProperty);
-            }
-            creator.registerProperties(indicatorsModule, drawLineProperty, lineWidthProperty,
-                    impactColorProperty, drawImpactProperty, impactOpacityProperty,
-                    impactOutlineProperty, borderColorProperty, renderDistanceProperty);
-
-            MinecraftForge.EVENT_BUS.register(this);
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "Indicators";
     }
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         try {
-            if (!manager.isModuleEnabled(indicatorsModule)) {
+            if (!manager.isModuleEnabled(module)) {
                 trails.clear();
                 return;
             }
@@ -117,48 +85,47 @@ public class FireballIndicators extends Feature {
 
             updateTrails(event.partialTicks);
 
-            Color lineColor = colorFor(properties.getInt(lineColorProperty, COLOR_DEFAULT));
-            int impactMode = properties.getInt(impactColorProperty, COLOR_DEFAULT);
-            Color impactColor = colorFor(impactMode);
-            Color borderColor = colorFor(properties.getInt(borderColorProperty, COLOR_NONE));
+            Color lineTint = colorFor(this.lineColor.ordinal());
+            Color impactTint = colorFor(this.impactColor.ordinal());
+            Color borderTint = colorFor(this.borderColor.ordinal());
 
-            float lineWidth = properties.getFloat(lineWidthProperty, 0.9f);
-            int impactOpacity = properties.getInt(impactOpacityProperty, 40);
-            boolean drawLine = properties.getBoolean(drawLineProperty, true);
-            boolean drawImpact = properties.getBoolean(drawImpactProperty, true);
-            boolean impactOutline = properties.getBoolean(impactOutlineProperty, true);
+            float width = this.lineWidth;
+            int opacityPct = this.impactOpacity;
+            boolean wantLine = this.drawLine;
+            boolean wantImpact = this.drawImpact;
+            boolean wantOutline = this.impactOutline;
 
             for (Trail trail : trails.values()) {
                 float alpha = fadeAlpha(trail);
                 if (alpha <= 0.0f) continue;
 
-                if (drawLine && lineColor != null && trail.points.size() > 1) {
-                    drawLine(trail.points, lineColor, alpha, lineWidth);
+                if (wantLine && lineTint != null && trail.points.size() > 1) {
+                    drawLine(trail.points, lineTint, alpha, width);
                 }
 
-                if (drawImpact && impactColor != null && trail.impact != null) {
+                if (wantImpact && impactTint != null && trail.impact != null) {
                     BlockPos p = trail.impact;
                     AxisAlignedBB box = new AxisAlignedBB(p.getX(), p.getY(), p.getZ(),
                             p.getX() + 1, p.getY() + 1, p.getZ() + 1)
                             .offset(-mc.getRenderManager().viewerPosX,
                                     -mc.getRenderManager().viewerPosY,
                                     -mc.getRenderManager().viewerPosZ);
-                    float a = impactOpacity / 100.0f * alpha;
+                    float a = opacityPct / 100.0f * alpha;
                     GlStateManager.enableBlend();
                     GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
                     GlStateManager.disableTexture2D();
                     GlStateManager.disableCull();
                     GlStateManager.disableDepth();
-                    GL11.glColor4f(impactColor.getRed() / 255.0f,
-                            impactColor.getGreen() / 255.0f,
-                            impactColor.getBlue() / 255.0f, a);
+                    GL11.glColor4f(impactTint.getRed() / 255.0f,
+                            impactTint.getGreen() / 255.0f,
+                            impactTint.getBlue() / 255.0f, a);
                     fillBox(box);
                     GlStateManager.enableDepth();
                     GlStateManager.enableTexture2D();
                     GlStateManager.enableCull();
                     GlStateManager.disableBlend();
 
-                    if (impactOutline && borderColor != null) {
+                    if (wantOutline && borderTint != null) {
                         GlStateManager.enableBlend();
                         GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
                         GlStateManager.disableTexture2D();
@@ -167,8 +134,8 @@ public class FireballIndicators extends Feature {
                         GL11.glEnable(GL11.GL_LINE_SMOOTH);
                         GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
                         RenderGlobal.drawOutlinedBoundingBox(box,
-                                borderColor.getRed(), borderColor.getGreen(),
-                                borderColor.getBlue(), (int) (255 * alpha));
+                                borderTint.getRed(), borderTint.getGreen(),
+                                borderTint.getBlue(), (int) (255 * alpha));
                         GL11.glDisable(GL11.GL_LINE_SMOOTH);
                         GlStateManager.enableDepth();
                         GlStateManager.enableTexture2D();
@@ -184,8 +151,8 @@ public class FireballIndicators extends Feature {
     private void updateTrails(float partialTicks) {
         long now = System.currentTimeMillis();
         long tick = mc.theWorld.getTotalWorldTime();
-        int renderDistance = properties.getInt(renderDistanceProperty, 64);
-        double maxDistSq = (double) renderDistance * (double) renderDistance;
+        int cullDistance = renderDistance;
+        double maxDistSq = (double) cullDistance * (double) cullDistance;
 
         // cull dead / far / stuck / finished fireballs
         Iterator<Map.Entry<EntityFireball, Trail>> it = trails.entrySet().iterator();
@@ -286,8 +253,8 @@ public class FireballIndicators extends Feature {
     }
 
     private Color colorFor(int mode) {
-        if (mode == COLOR_NONE) return null;
-        if (mode == COLOR_HUD) return HudUtils.getInstance().getHudColor(new Color(0xFFFFFF));
+        if (mode == ColorMode.NONE.ordinal()) return null;
+        if (mode == ColorMode.HUD.ordinal()) return HudUtils.getInstance().getHudColor(new Color(0xFFFFFF));
         return new Color(0xFFFFFF);
     }
 
@@ -329,13 +296,13 @@ public class FireballIndicators extends Feature {
         GL11.glEnd();
     }
 
-    private void drawLine(List<Vec3> points, Color color, float alpha, float lineWidth) {
+    private void drawLine(List<Vec3> points, Color color, float alpha, float width) {
         GlStateManager.pushMatrix();
         GlStateManager.enableBlend();
         GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
-        GL11.glLineWidth(lineWidth);
+        GL11.glLineWidth(width);
         GL11.glEnable(GL11.GL_LINE_SMOOTH);
         GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
         GL11.glColor4f(color.getRed() / 255.0f, color.getGreen() / 255.0f,

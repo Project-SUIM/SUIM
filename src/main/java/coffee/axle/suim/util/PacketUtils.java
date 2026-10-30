@@ -1,13 +1,13 @@
 package coffee.axle.suim.util;
 
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.client.C03PacketPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Storing some packets
@@ -15,7 +15,6 @@ import java.util.List;
  */
 @SuppressWarnings({ "unused", "rawtypes" })
 public class PacketUtils {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     public static List<Packet> skipSendEvent = new ArrayList<>();
 

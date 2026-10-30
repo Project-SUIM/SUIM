@@ -19,7 +19,7 @@ public class MixinGuiContainer {
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void suim$clickOutOfContainers(int mouseX, int mouseY, int mouseButton, CallbackInfo ci) {
-        if (!ClickOutOfContainers.isEnabled()) return;
+        if (!ClickOutOfContainers.active()) return;
         if (mouseButton != 0 && mouseButton != 1) return;
 
         boolean outside = mouseX < guiLeft || mouseY < guiTop

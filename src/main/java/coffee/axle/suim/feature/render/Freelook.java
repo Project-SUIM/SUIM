@@ -4,13 +4,12 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.hooks.FreelookHooks;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Freelook
@@ -18,18 +17,15 @@ import org.lwjgl.input.Keyboard;
  */
 public class Freelook extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
-
-    private Object holdProperty;
-    private Object invertPitchProperty;
-    private Object lockPitchProperty;
-    private Object yawProperty;
-    private Object pitchProperty;
-    private Object customFovProperty;
-    private Object fovProperty;
-    private Object keybindProperty;
+    @Setting(min = 10, max = 150) private float fov = 70f;
+    @Setting private String keybind = "LMENU";
+    @Setting(name = "require-hold") private boolean hold = false;
+    @Setting private boolean invertPitch = false;
+    @Setting private boolean lockPitch = true;
+    @Setting private boolean yaw = true;
+    @Setting private boolean pitch = true;
+    @Setting private boolean customFov = false;
 
     public static boolean perspectiveToggled = false;
     public static boolean prevKeyState = false;
@@ -39,65 +35,19 @@ public class Freelook extends Feature {
     private int previousPerspective;
     private float lastFov;
 
-    @Override
-    public String getName() {
-        return "Freelook";
+    public Freelook() {
+        super("Freelook", GuiCategory.RENDER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.RENDER;
+    protected void init() throws Exception {
+        FreelookHooks.instance = this;
+        lastFov = mc.gameSettings.fovSetting;
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            FreelookHooks.instance = this;
-
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, getClass());
-
-            holdProperty = creator.createBooleanProperty("require-hold", false);
-            keybindProperty = creator.createStringProperty("keybind", "LMENU");
-            invertPitchProperty = creator.createBooleanProperty("invert-pitch", false);
-            lockPitchProperty = creator.createBooleanProperty("lock-pitch", true);
-            yawProperty = creator.createBooleanProperty("yaw", true);
-            pitchProperty = creator.createBooleanProperty("pitch", true);
-            customFovProperty = creator.createBooleanProperty("custom-fov", false);
-            fovProperty = creator.createFloatProperty("fov", 70f, 10f, 150f);
-
-            creator.registerProperties(
-                    moduleInstance,
-                    holdProperty,
-                    keybindProperty,
-                    invertPitchProperty,
-                    lockPitchProperty,
-                    yawProperty,
-                    pitchProperty,
-                    customFovProperty,
-                    fovProperty);
-
-            manager.reloadModuleCommand();
-
-            lastFov = mc.gameSettings.fovSetting;
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(
-                    moduleInstance,
-                    () -> onModuleEnabled(),
-                    () -> onModuleDisabled());
-            return true;
-
-        } catch (Exception t) {
-            MyauLogger.error("FEATURE_FAIL", t);
-            return false;
-        }
-    }
-
-    private void onModuleDisabled() {
+    protected void onDisable() {
         safeReset();
-    }
-
-    private void onModuleEnabled() {
     }
 
     @SubscribeEvent
@@ -109,7 +59,7 @@ public class Freelook extends Feature {
         if (mc.currentScreen != null)
             return;
 
-        if (!manager.isModuleEnabled(moduleInstance)) {
+        if (!isEnabled()) {
             if (perspectiveToggled)
                 safeReset();
             return;
@@ -145,7 +95,6 @@ public class Freelook extends Feature {
             safeReset();
         }
     }
-
     private void enter() {
         perspectiveToggled = true;
 
@@ -169,56 +118,43 @@ public class Freelook extends Feature {
     }
 
     private boolean getHoldSafe() {
-        try {
-            return (Boolean) properties.getPropertyValue(holdProperty);
-        } catch (Throwable t) {
-            return false;
-        }
+        return hold;
     }
 
     private boolean getCustomFovSafe() {
-        try {
-            return (Boolean) properties.getPropertyValue(customFovProperty);
-        } catch (Throwable t) {
-            return false;
-        }
+        return customFov;
     }
 
     private int getKeybind() {
-        try {
-            String keyName = (String) properties.getPropertyValue(keybindProperty);
-            return Keyboard.getKeyIndex(keyName.toUpperCase());
-        } catch (Throwable t) {
-            return Keyboard.KEY_LMENU;
-        }
+        return Keyboard.getKeyIndex(keybind.toUpperCase());
     }
 
-    public boolean getHold() throws Exception {
-        return (Boolean) properties.getPropertyValue(holdProperty);
+    public boolean getHold() {
+        return hold;
     }
 
-    public boolean getYaw() throws Exception {
-        return (Boolean) properties.getPropertyValue(yawProperty);
+    public boolean getYaw() {
+        return yaw;
     }
 
-    public boolean getPitch() throws Exception {
-        return (Boolean) properties.getPropertyValue(pitchProperty);
+    public boolean getPitch() {
+        return pitch;
     }
 
-    public boolean getInvertPitch() throws Exception {
-        return (Boolean) properties.getPropertyValue(invertPitchProperty);
+    public boolean getInvertPitch() {
+        return invertPitch;
     }
 
-    public boolean getLockPitch() throws Exception {
-        return (Boolean) properties.getPropertyValue(lockPitchProperty);
+    public boolean getLockPitch() {
+        return lockPitch;
     }
 
-    public boolean getCustomFov() throws Exception {
-        return (Boolean) properties.getPropertyValue(customFovProperty);
+    public boolean getCustomFov() {
+        return customFov;
     }
 
-    public float getFov() throws Exception {
-        return (Float) properties.getPropertyValue(fovProperty);
+    public float getFov() {
+        return fov;
     }
 
     @Override

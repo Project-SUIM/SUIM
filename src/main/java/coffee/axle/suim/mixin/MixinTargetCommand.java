@@ -18,6 +18,11 @@ import java.io.File;
 public class MixinTargetCommand {
 
     @Overwrite
+    /**
+     * @author axle.coffee
+     * Overrides the Myau k method to support multiple usernames for target commands!!
+     * @reason myau doesnt
+     */
     public void k(ArrayList<String> args) {
         try {
             Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);

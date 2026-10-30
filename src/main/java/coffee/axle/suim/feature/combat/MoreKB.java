@@ -2,95 +2,55 @@ package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.rotation.RotationMath;
-import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.network.play.client.C0BPacketEntityAction;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * MoreKB - sprint-reset knockback enhancement
  * Ported from OpenMyau's MoreKB module
  */
 public class MoreKB extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
-    private Object modeProperty;
-    private Object intelligentProperty;
-    private Object onlyGroundProperty;
+    public enum Mode {
+        LEGIT, LEGIT_FAST, LESS_PACKET, PACKET, DOUBLE_PACKET
+    }
+
+    @Setting private Mode mode = Mode.LEGIT;
+    @Setting private boolean intelligent = false;
+    @Setting private boolean onlyGround = true;
 
     @SuppressWarnings("unused")
     private boolean shouldSprintReset;
     private EntityLivingBase target;
 
-    @Override
-    public String getName() {
-        return "MoreKB";
+    public MoreKB() {
+        super("MoreKB", GuiCategory.COMBAT);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.COMBAT;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, MoreKB.class);
-
-            modeProperty = creator.createEnumProperty(
-                    "mode", 0,
-                    new String[] {
-                            "LEGIT", "LEGIT_FAST", "LESS_PACKET",
-                            "PACKET", "DOUBLE_PACKET"
-                    });
-
-            intelligentProperty = creator.createBooleanProperty("intelligent", false);
-            onlyGroundProperty = creator.createBooleanProperty("only-ground", true);
-
-            creator.registerProperties(moduleInstance,
-                    modeProperty, intelligentProperty, onlyGroundProperty);
-
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(
-                    moduleInstance,
-                    this::onModuleEnabled,
-                    this::onModuleDisabled);
-
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
-    }
-
-    private void onModuleEnabled() {
+    protected void onEnable() {
         shouldSprintReset = false;
         target = null;
     }
 
-    private void onModuleDisabled() {
+    @Override
+    protected void onDisable() {
         shouldSprintReset = false;
         target = null;
     }
 
     @SubscribeEvent
     public void onAttack(AttackEntityEvent event) {
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
 
         Entity targetEntity = event.target;
@@ -99,21 +59,20 @@ public class MoreKB extends Feature {
         }
     }
 
+    @SuppressWarnings("incomplete-switch")
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.START)
             return;
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
 
-        int mode = getMode();
-
         // LEGIT_FAST mode uses attack target directly
-        if (mode == 1) {
+        if (mode == Mode.LEGIT_FAST) {
             if (this.target != null && isMoving()) {
-                if ((getOnlyGround() && mc.thePlayer.onGround) || !getOnlyGround()) {
+                if ((onlyGround && mc.thePlayer.onGround) || !onlyGround) {
                     mc.thePlayer.sprintingTicksLeft = 0;
                 }
                 this.target = null;
@@ -133,7 +92,7 @@ public class MoreKB extends Feature {
             return;
 
         // Intelligent check - skip if target is facing away
-        if (getIntelligent()) {
+        if (intelligent) {
             float calcYaw = RotationMath.toRotationsFromDelta(
                     mc.thePlayer.posX - entity.posX,
                     0,
@@ -146,7 +105,7 @@ public class MoreKB extends Feature {
 
         if (entity.hurtTime == 10) {
             switch (mode) {
-                case 0: // LEGIT
+                case LEGIT:
                     shouldSprintReset = true;
                     if (mc.thePlayer.isSprinting()) {
                         mc.thePlayer.setSprinting(false);
@@ -155,7 +114,7 @@ public class MoreKB extends Feature {
                     shouldSprintReset = false;
                     break;
 
-                case 2: // LESS_PACKET
+                case LESS_PACKET:
                     if (mc.thePlayer.isSprinting()) {
                         mc.thePlayer.setSprinting(false);
                     }
@@ -165,7 +124,7 @@ public class MoreKB extends Feature {
                     mc.thePlayer.setSprinting(true);
                     break;
 
-                case 3: // PACKET
+                case PACKET:
                     mc.thePlayer.sendQueue.addToSendQueue(
                             new C0BPacketEntityAction(mc.thePlayer,
                                     C0BPacketEntityAction.Action.STOP_SPRINTING));
@@ -175,7 +134,7 @@ public class MoreKB extends Feature {
                     mc.thePlayer.setSprinting(true);
                     break;
 
-                case 4: // DOUBLE_PACKET
+                case DOUBLE_PACKET:
                     mc.thePlayer.sendQueue.addToSendQueue(
                             new C0BPacketEntityAction(mc.thePlayer,
                                     C0BPacketEntityAction.Action.STOP_SPRINTING));
@@ -197,29 +156,5 @@ public class MoreKB extends Feature {
     private boolean isMoving() {
         return mc.thePlayer.moveForward != 0.0F
                 || mc.thePlayer.moveStrafing != 0.0F;
-    }
-
-    private int getMode() {
-        try {
-            return (Integer) properties.getPropertyValue(modeProperty);
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private boolean getIntelligent() {
-        try {
-            return (Boolean) properties.getPropertyValue(intelligentProperty);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean getOnlyGround() {
-        try {
-            return (Boolean) properties.getPropertyValue(onlyGroundProperty);
-        } catch (Exception e) {
-            return true;
-        }
     }
 }

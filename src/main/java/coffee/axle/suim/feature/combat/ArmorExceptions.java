@@ -1,9 +1,7 @@
 package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
-
-import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
+import coffee.axle.suim.property.Setting;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
@@ -17,53 +15,29 @@ import java.util.Set;
  */
 public class ArmorExceptions extends Feature {
     @SuppressWarnings("unused")
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static ArmorExceptions INSTANCE = null;
 
-    private Object killAuraModule;
-    private Object armorExceptionsProperty;
+    @Setting(after = "sort") private String filterArmor = "none";
+
     private Set<String> cachedExceptions = new HashSet<>();
     private int cacheUpdateCounter = 0;
     private static final int CACHE_UPDATE_INTERVAL = 20;
 
-    private boolean initialized = false;
     private String lastExceptionString = "";
 
-    @Override
-    public String getName() {
-        return "KillAura:armor-exceptions";
+    public ArmorExceptions() {
+        super("KillAura:armor-exceptions");
+        INSTANCE = this;
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            killAuraModule = manager.findModule("KillAura");
-
-            if (killAuraModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            armorExceptionsProperty = creator.createStringProperty("filter-armor", "none");
-
-            if (!creator.injectPropertyAfter(killAuraModule, armorExceptionsProperty, "sort")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-
-            initialized = true;
-            INSTANCE = this;
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "KillAura";
     }
 
     public boolean isInitialized() {
-        return initialized;
+        return INSTANCE != null;
     }
 
     /**
@@ -71,7 +45,7 @@ public class ArmorExceptions extends Feature {
      * Called from mixin
      */
     public boolean shouldExcludeEntity(EntityLivingBase entity) {
-        if (!initialized) {
+        if (INSTANCE == null) {
             return false;
         }
 
@@ -107,7 +81,7 @@ public class ArmorExceptions extends Feature {
 
     private void updateExceptionsCache() {
         try {
-            String exceptionsValue = (String) properties.getPropertyValue(armorExceptionsProperty);
+            String exceptionsValue = filterArmor;
             if (exceptionsValue == null)
                 exceptionsValue = "none";
 

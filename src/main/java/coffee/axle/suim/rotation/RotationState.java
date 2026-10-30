@@ -1,8 +1,8 @@
 package coffee.axle.suim.rotation;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraftforge.common.MinecraftForge;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Singleton server-side rotation tracker.
@@ -19,7 +19,6 @@ import net.minecraftforge.common.MinecraftForge;
 public final class RotationState {
 
     private static final RotationState INSTANCE = new RotationState();
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private float serverYaw;
     private float serverPitch;

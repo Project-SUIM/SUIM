@@ -1,12 +1,11 @@
 package coffee.axle.suim.hooks;
 
+import coffee.axle.suim.clickgui.util.ChatUtils;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.feature.clickgui.ClickGui;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.ChatComponentText;
 
 import java.io.File;
 import java.io.InputStreamReader;
@@ -21,12 +20,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static coffee.axle.suim.hooks.MyauMappings.*;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Manages existing Myau modules
  */
 public class MyauModuleManager {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private final MyauHook hook;
     private final Map<String, Object> moduleCache = new ConcurrentHashMap<>();
@@ -493,11 +492,7 @@ public class MyauModuleManager {
             } catch (Exception e) {
                 prefix = "§7[§cMyau§7]§r ";
             }
-
-            String formatted = (prefix + message).replaceAll("&([0-9a-fk-or])", "§$1");
-            if (mc.thePlayer != null) {
-                mc.thePlayer.addChatMessage(new ChatComponentText(formatted));
-            }
+            ChatUtils.chatMessage(prefix + message);
         } catch (Exception e) {
             MyauLogger.error("Manager:sendMessage", e);
         }

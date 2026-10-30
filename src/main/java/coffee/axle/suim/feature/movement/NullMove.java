@@ -3,17 +3,12 @@ package coffee.axle.suim.feature.movement;
 import coffee.axle.suim.events.PrePlayerInputEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class NullMove extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
-
-    private Object moduleInstance;
 
     private boolean prevW = false;
     private boolean prevS = false;
@@ -22,31 +17,18 @@ public class NullMove extends Feature {
     private int lastForwardSign = 0;
     private int lastStrafeSign = 0;
 
-    @Override
-    public String getName() {
-        return "NullMove";
+    public NullMove() {
+        super("NullMove", GuiCategory.WORLD);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.WORLD;
+    protected void onEnable() {
+        resetState();
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, NullMove.class);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, this::resetState, this::resetState);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("NullMove:init", e);
-            return false;
-        }
+    protected void onDisable() {
+        resetState();
     }
 
     private void resetState() {
@@ -60,7 +42,7 @@ public class NullMove extends Feature {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onPrePlayerInput(PrePlayerInputEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!Utils.nullCheck()) return;
         if (mc.currentScreen != null) return;
 

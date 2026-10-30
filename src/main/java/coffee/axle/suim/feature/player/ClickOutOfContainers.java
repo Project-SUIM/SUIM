@@ -2,43 +2,21 @@ package coffee.axle.suim.feature.player;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-import coffee.axle.suim.util.MyauLogger;
 
 public class ClickOutOfContainers extends Feature {
 
-    private static Object moduleInstance;
     private static ClickOutOfContainers instance;
 
-    @Override
-    public String getName() {
-        return "ClickOutContainers";
+    public ClickOutOfContainers() {
+        super("ClickOutContainers", GuiCategory.PLAYER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.PLAYER;
+    protected void init() throws Exception {
+        instance = this;
     }
 
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            instance = this;
-            creator.injectModule(moduleInstance, ClickOutOfContainers.class);
-            manager.reloadModuleCommand();
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("ClickOutContainers:init", e);
-            return false;
-        }
-    }
-
-    public static boolean isEnabled() {
-        if (moduleInstance == null || instance == null) return false;
-        try {
-            return instance.manager.isModuleEnabled(moduleInstance);
-        } catch (Exception e) {
-            return false;
-        }
+    public static boolean active() {
+        return instance != null && instance.isEnabled();
     }
 }

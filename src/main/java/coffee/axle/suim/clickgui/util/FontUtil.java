@@ -2,7 +2,6 @@ package coffee.axle.suim.clickgui.util;
 
 import coffee.axle.suim.clickgui.ClickGuiConfig;
 import coffee.axle.suim.clickgui.render.font.CFontRenderer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
@@ -13,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Provides methods for rendering text.
@@ -32,7 +32,6 @@ public final class FontUtil {
     private static final Pattern FORMATTING_CODE_PATTERN = Pattern.compile("\u00A7[0-9a-fk-or]",
             Pattern.CASE_INSENSITIVE);
 
-    private final Minecraft mc = Minecraft.getMinecraft();
     private FontRenderer fontRenderer = mc.fontRendererObj;
     private CFontRenderer customFontRenderer;
     private volatile boolean fontSetupAttempted = false;

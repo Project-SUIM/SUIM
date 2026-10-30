@@ -1,15 +1,11 @@
 package coffee.axle.suim.feature.movement;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.hooks.MyauMappings;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-
-import java.lang.reflect.Field;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Injects KOL's prediction-air mode into myau's KeepSprint (myau.J5).
@@ -27,64 +23,28 @@ import java.lang.reflect.Field;
  * per tick based on onGround, not per attack.
  */
 public class KeepSprintExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object keepSprintModule;
-    private Object modeProperty;
-    private Object groundOnlyProperty;
+    public enum Mode {
+        NORMAL, PREDICTION_AIR
+    }
 
-    private Field enabledField;
+    @Setting private Mode mode = Mode.NORMAL;
+    @Setting(existing = true) private boolean groundOnly = false;
 
     private boolean pinned;
     private boolean savedGroundOnly;
 
-    @Override
-    public String getName() {
-        return "KeepSprint:Extras";
+    public KeepSprintExtras() {
+        super("KeepSprint:Extras");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            keepSprintModule = manager.findModule("KeepSprint");
-            if (keepSprintModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            enabledField = keepSprintModule.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_MODULE_ENABLED);
-            enabledField.setAccessible(true);
-
-            modeProperty = creator.createEnumProperty("mode", 0,
-                    new String[] { "NORMAL", "PREDICTION_AIR" });
-            creator.registerProperties(keepSprintModule, modeProperty);
-
-            groundOnlyProperty = manager.findProperty(keepSprintModule, "ground-only");
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            MyauLogger.log(getName(), "prediction-air ready");
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "KeepSprint";
     }
 
     private boolean isPredictionAir() {
-        if (modeProperty == null || keepSprintModule == null) {
-            return false;
-        }
-        try {
-            if (!enabledField.getBoolean(keepSprintModule)) {
-                return false;
-            }
-            Object value = properties.getPropertyValue(modeProperty);
-            return value instanceof Integer && (Integer) value == 1;
-        } catch (Exception e) {
-            return false;
-        }
+        return isEnabled() && mode == Mode.PREDICTION_AIR;
     }
 
     // ClientTick START runs before any attack this tick, and a.W/mixin f
@@ -106,36 +66,21 @@ public class KeepSprintExtras extends Feature {
         // module has no effect - vanilla attack reset happens untouched
         boolean airborne = !mc.thePlayer.onGround && mc.thePlayer.isSprinting();
         if (airborne) {
-            if (!pinned && groundOnlyProperty != null) {
-                savedGroundOnly = properties.getBoolean(groundOnlyProperty, false);
+            if (!pinned) {
+                savedGroundOnly = groundOnly;
                 pinned = true;
             }
-            if (groundOnlyProperty != null) {
-                setBool(groundOnlyProperty, true);
-            }
+            set("groundOnly", true);
         } else {
             restore();
         }
     }
 
     private void restore() {
-        if (pinned && groundOnlyProperty != null) {
-            setBool(groundOnlyProperty, savedGroundOnly);
+        if (pinned) {
+            set("groundOnly", savedGroundOnly);
         }
         pinned = false;
-    }
-
-    private void setBool(Object property, boolean value) {
-        try {
-            // write Q directly - manager.setPropertyValue fires a config
-            // save on every call and we flip this every mode change
-            Field valueField = property.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            valueField.setAccessible(true);
-            valueField.set(property, value);
-        } catch (Exception e) {
-            MyauLogger.error("KeepSprint:Extras set", e);
-        }
     }
 
     @Override

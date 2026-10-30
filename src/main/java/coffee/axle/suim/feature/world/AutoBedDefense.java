@@ -6,11 +6,15 @@ import coffee.axle.suim.events.PrePlayerInputEvent;
 import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
+import coffee.axle.suim.rotation.BedDefenseRotation;
+import coffee.axle.suim.rotation.Rotation;
+import coffee.axle.suim.rotation.RotationMath;
+import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
@@ -22,7 +26,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
@@ -31,13 +34,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 // AutoDef port. PRE phase: step rotation toward the placement aim. POST phase:
 // validate the aim and place, same tick. timers ticked once per phase.
 // candidates are raycast-validated before use.
 public class AutoBedDefense extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final double REACH_SQ = 20.25;  // 4.5^2
 
     private static final String[] FACE_NAMES = {"DOWN", "UP", "SOUTH", "NORTH", "WEST", "EAST"};
@@ -45,16 +48,15 @@ public class AutoBedDefense extends Feature {
     private static final int[] FACE_DY = {1, -1, 0, 0, 0, 0};
     private static final int[] FACE_DZ = {0, 0, -1, 1, 0, 0};
 
-    private Object moduleInstance;
-    private Object defenseProperty;
-    private Object onlyTopBedsProperty;
-    private Object ticksPerBlockProperty;
-    private Object delayAfterSwapProperty;
-    private Object delayAfterAimProperty;
-    private Object sneakHoldTicksProperty;
-    private Object fovProperty;
-    private Object rotSpeedProperty;
-    private Object rotToleranceProperty;
+    @Setting(name = "defense", names = { "Wool1Layer", "EndWoolCorners", "EndWoolCorners2", "EndGlassNoCorners", "WoodWoolCorners", "EndGlassWool", "EndWoodLongCorners", "EndWoolLong" }) private int defensePreset = 0;
+    @Setting(min = 0, max = 20) private int ticksPerBlock = 0;
+    @Setting(min = 0, max = 10) private int delayAfterSwap = 0;
+    @Setting(min = 0, max = 10) private int delayAfterAim = 0;
+    @Setting(min = 0, max = 20) private int sneakHoldTicks = 5;
+    @Setting(min = 0, max = 180) private int fov = 180;
+    @Setting(min = 3, max = 90) private int rotSpeed = 12;
+    @Setting(min = 1, max = 45) private int rotTolerance = 25;
+    @Setting private boolean onlyTopBeds = true;
 
     private int idx;
     private int workIdx;
@@ -83,48 +85,15 @@ public class AutoBedDefense extends Feature {
     private float placePitch;
     private int flagIgnoreTicks;
 
-    @Override
-    public String getName() {
-        return "AutoBedDefense";
+    private final BedDefenseRotation rotation =
+            new BedDefenseRotation(RotationState.getInstance());
+
+    public AutoBedDefense() {
+        super("AutoBedDefense", GuiCategory.WORLD);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.WORLD;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, AutoBedDefense.class);
-
-            defenseProperty = creator.createEnumProperty("defense", 0, DefData.NAMES);
-            onlyTopBedsProperty = creator.createBooleanProperty("only-top-beds", true);
-            ticksPerBlockProperty = creator.createIntegerProperty("ticks-per-block", 0, 0, 20);
-            delayAfterSwapProperty = creator.createIntegerProperty("delay-after-swap", 0, 0, 10);
-            delayAfterAimProperty = creator.createIntegerProperty("delay-after-aim", 0, 0, 10);
-            sneakHoldTicksProperty = creator.createIntegerProperty("sneak-hold-ticks", 5, 0, 20);
-            fovProperty = creator.createIntegerProperty("fov", 180, 0, 180);
-            rotSpeedProperty = creator.createIntegerProperty("rot-speed", 12, 3, 90);
-            rotToleranceProperty = creator.createIntegerProperty("rot-tolerance", 25, 1, 45);
-
-            creator.registerProperties(moduleInstance, defenseProperty, onlyTopBedsProperty,
-                    ticksPerBlockProperty, delayAfterSwapProperty, delayAfterAimProperty,
-                    sneakHoldTicksProperty, fovProperty, rotSpeedProperty, rotToleranceProperty);
-
-            manager.reloadModuleCommand();
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("AutoBedDefense:init", e);
-            return false;
-        }
-    }
-
-    private void onEnable() {
+    protected void onEnable() {
         curDefIdx = -1;  // force loadDefense to pick up the preset
         loadDefense();
         if (mc.thePlayer != null) {
@@ -133,7 +102,8 @@ public class AutoBedDefense extends Feature {
         }
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         if (sneaked) {
             setSneak(false);
         }
@@ -142,7 +112,7 @@ public class AutoBedDefense extends Feature {
     }
 
     private void loadDefense() {
-        int defIdx = properties.getInt(defenseProperty, 0);
+        int defIdx = defensePreset;
         if (defIdx != curDefIdx) {
             curDefIdx = defIdx;
             defense = DefData.get(defIdx);
@@ -160,7 +130,7 @@ public class AutoBedDefense extends Feature {
         started = false;
         sneaked = false;
         lockedDir = "";
-        aimTicks = properties.getInt(delayAfterAimProperty, 0);
+        aimTicks = delayAfterAim;
         placeCooldown = 0;
         invCache.clear();
         origin = null;
@@ -180,7 +150,7 @@ public class AutoBedDefense extends Feature {
     // the outgoing C03 IS the server rotation (no silent packet rewriting)
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onSendPacket(SendPacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!(e.getPacket() instanceof C03PacketPlayer)) return;
         C03PacketPlayer packet = (C03PacketPlayer) e.getPacket();
         if (packet.getRotating()) {
@@ -192,7 +162,7 @@ public class AutoBedDefense extends Feature {
     // PRE phase: pick the work block, step rotation toward the placement aim
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public void onPreMotion(PreMotionEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (mc.currentScreen != null) return;
 
@@ -219,7 +189,7 @@ public class AutoBedDefense extends Feature {
         if (swapTicks > 0) swapTicks--;
 
         if (placeTarget != null && placeSupport != null) {
-            float[] stepped = RotStep.step(e.getYaw(), e.getPitch(), placeYaw, placePitch, effSpeed());
+            float[] stepped = rotation.step(e.getYaw(), e.getPitch(), placeYaw, placePitch, effSpeed());
             e.setYaw(stepped[0]);
             e.setPitch(stepped[1]);
         }
@@ -228,22 +198,19 @@ public class AutoBedDefense extends Feature {
     // move fix: re-project input onto the spoofed yaw frame for this tick
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onPreInput(PrePlayerInputEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (mc.thePlayer == null) return;
         if (e.getForward() == 0.0f && e.getStrafe() == 0.0f) return;
-        float delta = (float) Math.toRadians(mc.thePlayer.rotationYaw - serverYaw);
-        float cos = MathHelper.cos(delta);
-        float sin = MathHelper.sin(delta);
-        float fwd = e.getForward();
-        float str = e.getStrafe();
-        e.setForward(fwd * cos + str * sin);
-        e.setStrafe(str * cos - fwd * sin);
+        float[] fixed = Rotation.moveFix(e.getForward(), e.getStrafe(),
+                mc.thePlayer.rotationYaw - serverYaw);
+        e.setForward(fixed[0]);
+        e.setStrafe(fixed[1]);
     }
 
     // POST phase: validate the aim and place, same tick the rotation was set
     @SubscribeEvent
     public void onPostMotion(PostMotionEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (mc.currentScreen != null) return;
 
@@ -288,7 +255,7 @@ public class AutoBedDefense extends Feature {
         }
         if (mc.thePlayer.inventory.currentItem != want) {
             mc.thePlayer.inventory.currentItem = want;
-            swapTicks = properties.getInt(delayAfterSwapProperty, 0);
+            swapTicks = delayAfterSwap;
         }
 
         trackPlacement(target);
@@ -319,7 +286,7 @@ public class AutoBedDefense extends Feature {
         if (blockName(placeSupport).contains("bed")) {
             setSneak(true);
             sneaked = true;
-            sneakHoldRemaining = properties.getInt(sneakHoldTicksProperty, 5);
+            sneakHoldRemaining = sneakHoldTicks;
         }
     }
 
@@ -364,7 +331,7 @@ public class AutoBedDefense extends Feature {
     private boolean hitStillValid(BlockPos target) {
         if (placeHit == null || placeSupport == null || placeFacing == null) return false;
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        float[] r = rots(eye, placeHit.xCoord, placeHit.yCoord, placeHit.zCoord);
+        float[] r = RotationMath.toRotations(eye, placeHit.xCoord, placeHit.yCoord, placeHit.zCoord);
         float yaw = unwrap(r[0], placeYaw);
         MovingObjectPosition ray = raycast(yaw, r[1], 4.5);
         if (ray == null || ray.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) return false;
@@ -390,7 +357,7 @@ public class AutoBedDefense extends Feature {
                 double dx = p[0] - eye.xCoord, dy = p[1] - eye.yCoord, dz = p[2] - eye.zCoord;
                 double distSq = dx * dx + dy * dy + dz * dz;
                 if (distSq > REACH_SQ) continue;
-                float[] r = rots(eye, p[0], p[1], p[2]);
+                float[] r = RotationMath.toRotations(eye, p[0], p[1], p[2]);
                 float yaw = unwrap(r[0], placeYaw);
                 MovingObjectPosition ray = raycast(yaw, r[1], 4.5);
                 if (ray == null || ray.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
@@ -414,7 +381,7 @@ public class AutoBedDefense extends Feature {
     private void aimForPlace() {
         if (placeHit == null) return;
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        float[] r = rots(eye, placeHit.xCoord, placeHit.yCoord, placeHit.zCoord);
+        float[] r = RotationMath.toRotations(eye, placeHit.xCoord, placeHit.yCoord, placeHit.zCoord);
         float newYaw = unwrap(r[0], placeYaw);
         float newPitch = MathHelper.clamp_float(r[1], -90.0f, 90.0f);
         // skip wild re-aims (ray flipped to the other side of the block)
@@ -427,12 +394,12 @@ public class AutoBedDefense extends Feature {
     // full 6-face grid scan: raycast-validated candidates only
     private boolean findPlace(BlockPos target) {
         Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
-        int fov = properties.getInt(fovProperty, 180);
+        int fov = this.fov;
         float maxYaw = fov;
         float maxPitch = Math.min(fov, 90.0f);
         float curYaw = normYaw(serverYaw);
         float curPit = serverPitch;
-        boolean onlyTop = properties.getBoolean(onlyTopBedsProperty, true);
+        boolean onlyTop = onlyTopBeds;
 
         double inset = 0.05, step = 0.2;
         double insetTop = 1.0 - inset - 0.001;
@@ -470,7 +437,7 @@ public class AutoBedDefense extends Feature {
                     if (dx * dx + dy * dy + dz * dz > REACH_SQ) continue;
                     if (!clearRay(eye, px, py, pz, support)) continue;
 
-                    float[] r = rots(eye, px, py, pz);
+                    float[] r = RotationMath.toRotations(eye, px, py, pz);
                     if (Math.abs(wrapD(curYaw, r[0])) > maxYaw) continue;
                     if (Math.abs(r[1] - curPit) > maxPitch) continue;
                     if (Math.abs(r[1]) > 90.0f) continue;
@@ -525,7 +492,7 @@ public class AutoBedDefense extends Feature {
             return;
         }
 
-        boolean onlyTop = properties.getBoolean(onlyTopBedsProperty, true);
+        boolean onlyTop = onlyTopBeds;
         BlockPos support = null;
         EnumFacing face = null;
         Vec3 hit = null;
@@ -542,7 +509,7 @@ public class AutoBedDefense extends Feature {
         }
         // tolerance fallback: aim close enough to the tracked placement
         if (support == null && placeSupport != null && placeFacing != null && placeHit != null) {
-            int tol = properties.getInt(rotToleranceProperty, 25);
+            int tol = rotTolerance;
             float yawD = Math.abs(MathHelper.wrapAngleTo180_float(placeYaw - serverYaw));
             float pitchD = Math.abs(placePitch - serverPitch);
             if (yawD <= tol && pitchD <= tol && !mc.theWorld.isAirBlock(placeSupport)
@@ -565,8 +532,8 @@ public class AutoBedDefense extends Feature {
 
         if (workIdx <= idx) idx = workIdx + 1;
         skipFilled();
-        aimTicks = properties.getInt(delayAfterAimProperty, 0);
-        placeCooldown = properties.getInt(ticksPerBlockProperty, 0);
+        aimTicks = delayAfterAim;
+        placeCooldown = ticksPerBlock;
         clearPlace();
         if (aimTicks <= 0 && placeCooldown <= 0 && swapTicks <= 0 && idx < defense.size()) {
             setupTarget();
@@ -574,7 +541,7 @@ public class AutoBedDefense extends Feature {
     }
 
     private float effSpeed() {
-        int speed = properties.getInt(rotSpeedProperty, 12);
+        int speed = rotSpeed;
         return moving() ? Math.min(180.0f, speed * 3.0f) : speed;
     }
 
@@ -748,14 +715,6 @@ public class AutoBedDefense extends Feature {
         return mc.theWorld.rayTraceBlocks(start, end);
     }
 
-    private float[] rots(Vec3 eye, double tx, double ty, double tz) {
-        double dx = tx - eye.xCoord, dy = ty - eye.yCoord, dz = tz - eye.zCoord;
-        double hd = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0f;
-        float pitch = (float) Math.toDegrees(-Math.atan2(dy, hd));
-        return new float[]{normYaw(yaw), pitch};
-    }
-
     private static float normYaw(float yaw) {
         yaw = ((yaw % 360f) + 360f) % 360f;
         return yaw > 180f ? yaw - 360f : yaw;
@@ -771,7 +730,7 @@ public class AutoBedDefense extends Feature {
 
     private void disableSelf() {
         try {
-            manager.setModuleEnabled(moduleInstance, false);
+            manager.setModuleEnabled(getModuleInstance(), false);
         } catch (Exception e) {
             MyauLogger.error("AutoBedDefense:disable", e);
         }

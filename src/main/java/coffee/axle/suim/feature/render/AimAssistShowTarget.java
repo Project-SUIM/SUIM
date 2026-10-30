@@ -2,10 +2,9 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.HudUtils;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.entity.Entity;
@@ -17,13 +16,13 @@ import net.minecraft.item.ItemTool;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
 import java.awt.Color;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * AimAssist Show Target
@@ -32,15 +31,15 @@ import java.lang.reflect.Method;
  */
 public class AimAssistShowTarget extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
+    public enum ShowMode {
+        NONE, DEFAULT, HUD, BOX
+    }
 
-    private Object aimAssistModule;
-    private Object showTargetProperty;
+    @Setting(min = 1.0f, max = 5.0f) private float targetBoxWidth = 2.0f;
+    @Setting(after = "aim-bone") private ShowMode showTarget = ShowMode.NONE;
 
     private Object weaponsOnlyProperty;
     private Object allowToolsProperty;
-
-    private Object boxOutlineWidth;
 
     private Method isValidTargetMethod;
     private Method isInReachMethod;
@@ -53,57 +52,28 @@ public class AimAssistShowTarget extends Feature {
     private final Color defaultColorHurt = new Color(16733525);
     private final Color defaultColorNormal = new Color(5635925);
 
-    @Override
-    public String getName() {
-        return "AimAssist:ShowTarget";
+    public AimAssistShowTarget() {
+        super("AimAssist:ShowTarget");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            aimAssistModule = manager.findModule("AimAssist");
-            if (aimAssistModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
+    protected String targetModule() {
+        return "AimAssist";
+    }
 
-            HudUtils.getInstance().initialize();
+    @Override
+    protected void init() throws Exception {
+        HudUtils.getInstance().initialize();
 
-            weaponsOnlyProperty = manager.findProperty(
-                    aimAssistModule, "weapons-only");
-            allowToolsProperty = manager.findProperty(
-                    aimAssistModule, "allow-tools");
+        weaponsOnlyProperty = manager.findProperty(module, "weapons-only");
+        allowToolsProperty = manager.findProperty(module, "allow-tools");
 
-            showTargetProperty = creator.createEnumProperty(
-                    "show-target",
-                    0,
-                    new String[] { "NONE", "DEFAULT", "HUD", "BOX" });
-
-            boxOutlineWidth = creator.createFloatProperty(
-                    "target-box-width", 2.0f, 1.0f, 5.0f);
-
-            if (!creator.injectPropertyAfter(
-                    aimAssistModule, showTargetProperty, "aim-bone")) {
-                creator.registerProperties(aimAssistModule, showTargetProperty);
-            }
-
-            creator.registerProperties(aimAssistModule, boxOutlineWidth);
-
-            cacheAimAssistMethods();
-            cacheHurtTimeField();
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+        cacheAimAssistMethods();
+        cacheHurtTimeField();
     }
 
     private void cacheAimAssistMethods() {
-        for (Method m : aimAssistModule.getClass().getDeclaredMethods()) {
+        for (Method m : module.getClass().getDeclaredMethods()) {
             if (m.getParameterCount() == 1
                     && m.getParameterTypes()[0].equals(Entity.class)
                     && m.getReturnType().equals(boolean.class)) {
@@ -137,7 +107,7 @@ public class AimAssistShowTarget extends Feature {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         try {
-            if (!manager.isModuleEnabled(aimAssistModule)) {
+            if (!manager.isModuleEnabled(module)) {
                 cachedTarget = null;
                 return;
             }
@@ -152,8 +122,7 @@ public class AimAssistShowTarget extends Feature {
                 return;
             }
 
-            Integer mode = (Integer) properties.getPropertyValue(showTargetProperty);
-            if (mode == null || mode == 0)
+            if (showTarget == ShowMode.NONE)
                 return;
 
             targetUpdateCounter++;
@@ -170,14 +139,14 @@ public class AimAssistShowTarget extends Feature {
             }
 
             Color color;
-            if (mode == 1 || mode == 3) {
+            if (showTarget == ShowMode.DEFAULT || showTarget == ShowMode.BOX) {
                 color = getDefaultColorFast(cachedTarget);
             } else {
                 color = HudUtils.getInstance()
                         .getHudColor(defaultColorNormal);
             }
 
-            if (mode == 3) {
+            if (showTarget == ShowMode.BOX) {
                 drawEntityOutlineBox(cachedTarget, color, event.partialTicks);
             } else {
                 drawEntityBox(cachedTarget, color, event.partialTicks);
@@ -239,7 +208,7 @@ public class AimAssistShowTarget extends Feature {
                     continue;
 
                 if (!invokeQuietly(
-                        isValidTargetMethod, aimAssistModule, player)) {
+                        isValidTargetMethod, module, player)) {
                     continue;
                 }
 
@@ -252,7 +221,7 @@ public class AimAssistShowTarget extends Feature {
 
             if (closest != null && isInReachMethod != null) {
                 if (!invokeQuietly(
-                        isInReachMethod, aimAssistModule, closest)) {
+                        isInReachMethod, module, closest)) {
                     return null;
                 }
             }
@@ -296,11 +265,7 @@ public class AimAssistShowTarget extends Feature {
                         -mc.getRenderManager().viewerPosY,
                         -mc.getRenderManager().viewerPosZ);
 
-        float lineWidth = 2.0f;
-        try {
-            lineWidth = (Float) properties.getPropertyValue(boxOutlineWidth);
-        } catch (Exception ignored) {
-        }
+        float lineWidth = targetBoxWidth;
 
         GlStateManager.pushMatrix();
         GlStateManager.enableBlend();

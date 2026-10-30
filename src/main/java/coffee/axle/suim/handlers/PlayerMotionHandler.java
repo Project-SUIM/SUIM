@@ -1,13 +1,12 @@
 package coffee.axle.suim.handlers;
 
 import coffee.axle.suim.events.PreMotionEvent;
-import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class PlayerMotionHandler {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {

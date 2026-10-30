@@ -1,12 +1,11 @@
 package coffee.axle.suim.feature.command;
 
+import coffee.axle.suim.clickgui.util.ChatUtils;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.util.MyauLogger;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.ChatComponentText;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -16,23 +15,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 public class StatusCommand extends Feature {
-    private final Minecraft mc = Minecraft.getMinecraft();
 
-    @Override
-    public String getName() {
-        return "Command:Status";
+    public StatusCommand() {
+        super("Command:Status");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("status"));
-            creator.registerCommand(commandNames, this::handleCommand);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("status"));
+        creator.registerCommand(commandNames, this::handleCommand);
     }
 
     private void handleCommand(ArrayList<String> args) {
@@ -134,11 +125,7 @@ public class StatusCommand extends Feature {
     }
 
     private void sendMessage(String message) {
-        Minecraft.getMinecraft().addScheduledTask(() -> {
-            if (mc.thePlayer != null) {
-                mc.thePlayer.addChatMessage(new ChatComponentText(message));
-            }
-        });
+        ChatUtils.runOnMCThread(() -> ChatUtils.chatMessage(message, false));
     }
 
     private PlayerInfo fetchUUID(String username) {

@@ -4,83 +4,60 @@ import coffee.axle.suim.events.ReceivePacketEvent;
 import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.ShopDetectionUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.network.play.client.C0EPacketClickWindow;
 import net.minecraft.network.play.server.S2DPacketOpenWindow;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
-public class InvWalk extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
+import static coffee.axle.suim.ProjectSUIM.mc;
 
-    private Object moduleInstance;
-    private Object shopOnlyProperty;
-    private Object delayTicksProperty;
-    private Object keepSprintProperty;
+public class InvWalk extends Feature {
 
     private boolean clicked = false;
     private int ticksSinceClick = 0;
 
+    @Setting(after = "enabled") private boolean shopOnly = false;
+    @Setting(after = "shop-only", min = 0, max = 10) private int delayTicks = 5;
+    @Setting(after = "delay-ticks") private boolean keepSprint = true;
+
     private KeyBinding[] keybinds;
 
-    @Override
-    public String getName() {
-        return "InvWalk+";
+    public InvWalk() {
+        super("InvWalk+", GuiCategory.PLAYER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.PLAYER;
+    protected void init() throws Exception {
+        keybinds = new KeyBinding[]{
+                mc.gameSettings.keyBindForward,
+                mc.gameSettings.keyBindLeft,
+                mc.gameSettings.keyBindRight,
+                mc.gameSettings.keyBindBack,
+                mc.gameSettings.keyBindJump,
+                mc.gameSettings.keyBindSprint,
+                mc.gameSettings.keyBindSneak
+        };
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, InvWalk.class);
+    protected void onEnable() {
+        reset();
+    }
 
-            shopOnlyProperty = creator.createBooleanProperty("shop-only", false);
-            creator.injectPropertyAfter(moduleInstance, shopOnlyProperty, "enabled");
-
-            delayTicksProperty = creator.createIntegerProperty("delay-ticks", 5, 0, 10);
-            creator.injectPropertyAfter(moduleInstance, delayTicksProperty, "shop-only");
-
-            keepSprintProperty = creator.createBooleanProperty("keep-sprint", true);
-            creator.injectPropertyAfter(moduleInstance, keepSprintProperty, "delay-ticks");
-
-            keybinds = new KeyBinding[]{
-                    mc.gameSettings.keyBindForward,
-                    mc.gameSettings.keyBindLeft,
-                    mc.gameSettings.keyBindRight,
-                    mc.gameSettings.keyBindBack,
-                    mc.gameSettings.keyBindJump,
-                    mc.gameSettings.keyBindSprint,
-                    mc.gameSettings.keyBindSneak
-            };
-
-            manager.reloadModuleCommand();
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance,
-                    this::reset,
-                    this::releaseAll);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("InvWalk+:init", e);
-            return false;
-        }
+    @Override
+    protected void onDisable() {
+        releaseAll();
     }
 
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return;
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (mc.thePlayer == null) return;
 
         if (!(mc.currentScreen instanceof GuiContainer)) {
@@ -88,11 +65,11 @@ public class InvWalk extends Feature {
             return;
         }
 
-        if (properties.getBoolean(shopOnlyProperty, false) && !ShopDetectionUtils.isInShopGui()) return;
+        if (shopOnly && !ShopDetectionUtils.isInShopGui()) return;
 
-        int delay = properties.getInt(delayTicksProperty, 5);
+        int delay = delayTicks;
 
-        boolean keepSprint = properties.getBoolean(keepSprintProperty, true);
+        boolean keepSprint = this.keepSprint;
 
         if (!clicked || ticksSinceClick >= delay) {
             for (KeyBinding kb : keybinds) {
@@ -111,7 +88,7 @@ public class InvWalk extends Feature {
 
     @SubscribeEvent
     public void onSendPacket(SendPacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!(mc.currentScreen instanceof GuiContainer)) return;
 
         if (e.getPacket() instanceof C0EPacketClickWindow) {
@@ -125,7 +102,7 @@ public class InvWalk extends Feature {
 
     @SubscribeEvent
     public void onReceivePacket(ReceivePacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
 
         if (e.getPacket() instanceof S2DPacketOpenWindow) {
             clicked = false;

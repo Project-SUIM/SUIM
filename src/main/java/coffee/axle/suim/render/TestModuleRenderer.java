@@ -1,6 +1,5 @@
 package coffee.axle.suim.render;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -10,13 +9,13 @@ import net.minecraft.util.AxisAlignedBB;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.util.Vec3;
 import org.lwjgl.opengl.GL11;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Test module - originally seen in CoffeeClient to test if a mixin worked - proof of concept "hey injection works" ahh
  */
 
 public class TestModuleRenderer {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static boolean mixinEnabled = false;
     private static boolean moduleEnabled = false;

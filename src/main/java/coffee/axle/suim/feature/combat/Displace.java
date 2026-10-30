@@ -7,6 +7,7 @@ import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.eventbus.DisplaceHook;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.rotation.RotationState;
 import coffee.axle.suim.util.BlinkManager;
@@ -14,7 +15,6 @@ import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -30,7 +30,6 @@ import net.minecraft.util.BlockPos;
 import net.minecraft.block.state.IBlockState;
 import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -38,16 +37,19 @@ import org.lwjgl.opengl.GL11;
 
 import java.lang.reflect.Method;
 import java.util.Random;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 
 public class Displace extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     // hurt time is 3 btw
 
-    private static final int MODE_LEFT = 0;
-    private static final int MODE_RANDOM = 2;
-    private static final int MODE_VOID = 3;
-    private static final int MODE_SUIM = 4;
+    public enum Mode {
+        LEFT, RIGHT, RANDOM, VOID, SUIM
+    }
+
+    public enum Render {
+        NONE, ARROW
+    }
 
     // suim scan: 24 rays every 15 deg, steps of 0.25 out to 4 blocks
     private static final int SUIM_RAYS = 24;
@@ -57,26 +59,24 @@ public class Displace extends Feature {
     // void = no solid block in the 10 blocks below the step position
     private static final int SUIM_VOID_DEPTH = 10;
 
-    private static final int RENDER_NONE = 0;
-    private static final int RENDER_ARROW = 1;
-
     public static Displace instance;
 
-    private Object moduleInstance;
-    private Object debuggityProperty;
-    private Object modeProperty;
-    private Object angleProperty;
-    private Object cooldownProperty;
-    private Object hideRotationsProperty;
-    private Object onlyKnockbackItemsProperty;
-    private Object overrideAttacksProperty;
-    private Object playersOnlyProperty;
-    private Object renderProperty;
-    private Object renderColorProperty;
-    private Object arrowSizeProperty;
-    private Object manualProperty;
-    public Object autoClickerProperty;
-    public Object killAuraProperty;
+    @Setting(color = true) private int renderColor = HudUtils.getInstance().getHudColor().getRGB();
+    @Setting(min = 10, max = 180) private float angle = 100.0f;
+    @Setting(min = 0.2, max = 8.0) private float cooldown = 0.5f;
+    @Setting(min = 0.5, max = 3.0) private float arrowSize = 1.0f;
+    @Setting private Mode mode = Mode.SUIM;
+    @Setting private Render render = Render.ARROW;
+    @Setting(name = "killaura") public boolean killAura = true;
+    // its like verity but for debugging ....im so fucking brainrotted kms,,,
+    @Setting private boolean hideRotations = false;
+    @Setting private boolean onlyKnockbackItems = true;
+    @Setting private boolean overrideAttacks = true;
+    @Setting private boolean playersOnly = false;
+    // todo: LINE and BOX modes
+    @Setting private boolean manual = true;
+    @Setting public boolean autoClicker = true;
+    @Setting private boolean debuggity = false;
     private Method applyMovementState;
 
     private final Random random = new Random();
@@ -105,70 +105,18 @@ public class Displace extends Feature {
     private double arrowX, arrowY, arrowZ;
     private String arrowChar = ">";
 
-    @Override
-    public String getName() {
-        return "Displace";
+    public Displace() {
+        super("Displace", GuiCategory.COMBAT);
+        instance = this;
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.COMBAT;
-    }
+    protected void init() throws Exception {
+        applyMovementState = manager.getCachedClass(MyauMappings.CLASS_ROTATION_STATE).getMethod(
+                MyauMappings.METHOD_ROTATION_STATE_APPLY,
+                boolean.class, float.class, float.class, float.class, int.class);
 
-    @Override
-    public boolean initialize() {
-        try {
-            applyMovementState = manager.getCachedClass(MyauMappings.CLASS_ROTATION_STATE).getMethod(
-                    MyauMappings.METHOD_ROTATION_STATE_APPLY,
-                    boolean.class, float.class, float.class, float.class, int.class);
-            instance = this;
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, Displace.class);
-
-            modeProperty = creator.createEnumProperty("mode", MODE_LEFT,
-                    new String[] { "LEFT", "RIGHT", "RANDOM", "VOID", "SUIM" });
-            angleProperty = creator.createFloatProperty("angle", 100.0f, 10.0f, 180.0f);
-            cooldownProperty = creator.createFloatProperty("cooldown", 0.5f, 0.2f, 8.0f);
-            hideRotationsProperty = creator.createBooleanProperty("hide-rotations", false);
-            onlyKnockbackItemsProperty = creator.createBooleanProperty("only-knockback-items", true);
-            overrideAttacksProperty = creator.createBooleanProperty("override-attacks", true);
-            playersOnlyProperty = creator.createBooleanProperty("players-only", false);
-            // todo: LINE and BOX modes
-            renderProperty = creator.createEnumProperty("render", RENDER_ARROW,
-                    new String[] { "NONE", "ARROW" });
-            renderColorProperty = creator.createColorProperty("render-color",
-                    HudUtils.getInstance().getHudColor().getRGB());
-            arrowSizeProperty = creator.createFloatProperty("arrow-size", 1.0f, 0.5f, 3.0f);
-            manualProperty = creator.createBooleanProperty("manual", true);
-            autoClickerProperty = creator.createBooleanProperty("auto-clicker", true);
-            killAuraProperty = creator.createBooleanProperty("killaura", true);
-            // its like verity but for debugging ....im so fucking brainrotted kms,,,
-            debuggityProperty = creator.createBooleanProperty("debuggity", false);
-            creator.registerProperties(moduleInstance,
-                    modeProperty, angleProperty, cooldownProperty,
-                    hideRotationsProperty, onlyKnockbackItemsProperty,
-                    overrideAttacksProperty, playersOnlyProperty,
-                    renderProperty, renderColorProperty, arrowSizeProperty,
-                    manualProperty, autoClickerProperty, killAuraProperty, debuggityProperty);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, () -> {
-            }, this::onDisable);
-            RotationState.getInstance().register();
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("Displace:init", e);
-            return false;
-        }
-    }
-
-    private int mode() {
-        return properties.getInt(modeProperty, MODE_LEFT);
-    }
-
-    private int renderMode() {
-        return properties.getInt(renderProperty, RENDER_ARROW);
+        RotationState.getInstance().register();
     }
 
     @SubscribeEvent
@@ -176,14 +124,14 @@ public class Displace extends Feature {
         if (e.button != 0 || !e.buttonstate || !Utils.nullCheck()) {
             return;
         }
-        if (!manager.isModuleEnabled(moduleInstance)) {
+        if (!isEnabled()) {
             return;
         }
 
         if (DisplaceHook.isACActive()) {
             return;
         }
-        if (!properties.getBoolean(manualProperty, true)) {
+        if (!manual) {
             return;
         }
         Entity entity = null;
@@ -199,7 +147,7 @@ public class Displace extends Feature {
         if (canDisplace(entity, true, true)) {
             e.setCanceled(true);
             trigger(aim ? 1 : 0);
-        } else if (properties.getBoolean(overrideAttacksProperty, true)
+        } else if (overrideAttacks
                 && canDisplace(entity, false, false)) {
             e.setCanceled(true);
         }
@@ -208,7 +156,7 @@ public class Displace extends Feature {
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
         flicking = false;
-        if (!manager.isModuleEnabled(moduleInstance) || !Utils.nullCheck()) {
+        if (!isEnabled() || !Utils.nullCheck()) {
             return;
         }
         if (blinkTicks > 0 && --blinkTicks == 0) {
@@ -243,7 +191,7 @@ public class Displace extends Feature {
 
     @SubscribeEvent
     public void onSendPacket(SendPacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (!Utils.nullCheck())
             return;
@@ -264,7 +212,7 @@ public class Displace extends Feature {
             emit(PacketUtils.withRotation(c03, flickYaw, flickPitch));
             RotationState.getInstance().setServerAngles(flickYaw, flickPitch);
             mc.thePlayer.rotationYawHead = flickYaw;
-            if (properties.getBoolean(debuggityProperty, false)) {
+            if (debuggity) {
                 MyauLogger.log("DISPLACE", String.format("flick yaw=%.1f offset=%.1f packet=%s",
                         flickYaw, flickOffset, c03.getClass().getSimpleName()));
             }
@@ -277,7 +225,7 @@ public class Displace extends Feature {
         }
 
         if (awaitingRestore) {
-            if (properties.getBoolean(debuggityProperty, false)) {
+            if (debuggity) {
                 MyauLogger.log("DISPLACE", "RESTORE");
             }
             e.setCanceled(true);
@@ -289,7 +237,7 @@ public class Displace extends Feature {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onPreInput(PrePlayerInputEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance) || !flicking)
+        if (!isEnabled() || !flicking)
             return;
         if (!Utils.nullCheck())
             return;
@@ -336,7 +284,8 @@ public class Displace extends Feature {
         }
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         DisplaceHook.reset();
         if (blinkTicks > 0) {
             blinkTicks = 0;
@@ -368,7 +317,7 @@ public class Displace extends Feature {
             rotate = true;
         }
         lastAt = System.currentTimeMillis();
-        if (properties.getBoolean(debuggityProperty, false)) {
+        if (debuggity) {
             MyauLogger.log("DISPLACE", String.format("trigger source=%d", source));
         }
     }
@@ -379,14 +328,6 @@ public class Displace extends Feature {
 
     public void clear() {
         lastAt = 0L;
-    }
-
-    public boolean isEnabled() {
-        return manager.isModuleEnabled(moduleInstance);
-    }
-
-    public boolean hookOn(Object setting) {
-        return properties.getBoolean(setting, true);
     }
 
     public float offsetForHook() {
@@ -400,21 +341,21 @@ public class Displace extends Feature {
         if (checkHurtTime && ((EntityLivingBase) entity).hurtTime > 3) {
             return false;
         }
-        if (properties.getBoolean(playersOnlyProperty, false) && !(entity instanceof EntityPlayer)) {
+        if (playersOnly && !(entity instanceof EntityPlayer)) {
             return false;
         }
         int n = EnchantmentHelper.getKnockbackModifier(mc.thePlayer);
         if (!mc.thePlayer.isSprinting() && n == 0) {
             return false;
         }
-        if (properties.getBoolean(onlyKnockbackItemsProperty, true) && n == 0) {
+        if (onlyKnockbackItems && n == 0) {
             return false;
         }
         if (checkCooldown && Math.abs(System.currentTimeMillis() - lastAt)
-                < properties.getFloat(cooldownProperty, 0.5f) * 1000.0 - 20.0) {
+                < cooldown * 1000.0 - 20.0) {
             return false;
         }
-        if (mode() == MODE_VOID) {
+        if (mode == Mode.VOID) {
             side = lastSide = hellishVoidCheckNotRefractoringThisTemp(entity, lastSide);
             if (side == -1) {
                 return false;
@@ -425,13 +366,12 @@ public class Displace extends Feature {
     }
 
     private float offset() {
-        float f = properties.getFloat(angleProperty, 100.0f);
-        int mode = mode();
-        if (mode == MODE_SUIM) {
+        float f = angle;
+        if (mode == Mode.SUIM) {
             f = suimOffset();
             if (f != 0.0f) {
                 f += random.nextFloat() * 10.0f - 5.0f;
-                if (renderMode() != RENDER_NONE && lastTarget != null) {
+                if (render != Render.NONE && lastTarget != null) {
                     setArrow(lastTarget, f);
                 }
             }
@@ -442,11 +382,11 @@ public class Displace extends Feature {
                 f = -f;
             }
             side = -1;
-        } else if (mode == MODE_LEFT || mode == MODE_RANDOM && random.nextBoolean()) {
+        } else if (mode == Mode.LEFT || mode == Mode.RANDOM && random.nextBoolean()) {
             f = -f;
         }
         f += random.nextFloat() * 10.0f - 5.0f;
-        if (renderMode() != RENDER_NONE && lastTarget != null) {
+        if (render != Render.NONE && lastTarget != null) {
             setArrow(lastTarget, f);
         }
         return f;
@@ -490,7 +430,7 @@ public class Displace extends Feature {
                         bestScore = score;
                         float yawDelta = MathHelper.wrapAngleTo180_float(rayYaw - mc.thePlayer.rotationYaw);
                         // clamp the flick to the configured angle, keeping the sign
-                        float maxAngle = properties.getFloat(angleProperty, 100.0f);
+                        float maxAngle = angle;
                         if (Math.abs(yawDelta) > maxAngle) {
                             yawDelta = Math.signum(yawDelta) * maxAngle;
                         }
@@ -522,7 +462,7 @@ public class Displace extends Feature {
     }
 
     public void startBlink() {
-        if (properties.getBoolean(hideRotationsProperty, false)) {
+        if (hideRotations) {
             blinkTicks = 2;
             BlinkManager.getInstance().setBlinkState(true, BlinkManager.BlinkModule.DISPLACE);
         }
@@ -617,15 +557,15 @@ public class Displace extends Feature {
         arrowChar = f >= 0 ? ">" : "<";
         arrowAt = System.currentTimeMillis();
         arrow = true;
-        if (properties.getBoolean(debuggityProperty, false)) {
-            MyauLogger.log("DISPLACE", String.format("arrow set char=%s mode=%d pos=%.1f,%.1f,%.1f",
-                    arrowChar, renderMode(), arrowX, arrowY, arrowZ));
+        if (debuggity) {
+            MyauLogger.log("DISPLACE", String.format("arrow set char=%s mode=%s pos=%.1f,%.1f,%.1f",
+                    arrowChar, render, arrowX, arrowY, arrowZ));
         }
     }
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent e) {
-        if (!arrow || renderMode() == RENDER_NONE) {
+        if (!arrow || render == Render.NONE) {
             return;
         }
         if (!Utils.nullCheck()) {
@@ -641,8 +581,8 @@ public class Displace extends Feature {
         double y = arrowY - mc.getRenderManager().viewerPosY;
         double z = arrowZ - mc.getRenderManager().viewerPosZ;
 
-        int color = properties.getInt(renderColorProperty, 0xFF50C8DC);
-        float size = properties.getFloat(arrowSizeProperty, 1.0f);
+        int color = renderColor;
+        float size = arrowSize;
 
         // simple lerp fadeout over the last 150ms
         float alpha = 1.0f;

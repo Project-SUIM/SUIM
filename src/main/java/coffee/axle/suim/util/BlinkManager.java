@@ -1,6 +1,5 @@
 package coffee.axle.suim.util;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.Packet;
 import net.minecraft.network.handshake.client.C00Handshake;
@@ -14,9 +13,9 @@ import net.minecraft.network.status.client.C01PacketPing;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class BlinkManager {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final BlinkManager INSTANCE = new BlinkManager();
 
     public enum BlinkModule {

@@ -2,10 +2,8 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.tileentity.TileEntity;
@@ -14,7 +12,6 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
@@ -22,79 +19,40 @@ import org.lwjgl.opengl.GL11;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class SkullESP extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
-    private Object outlineProperty;
-    private Object tracersProperty;
-    private Object lineWidthProperty;
-    private Object skullTypeProperty;
+    public enum SkullType {
+        SKELETON, WITHER_SKELETON, ZOMBIE, PLAYER, CREEPER
+    }
+
+    @Setting(min = 1, max = 5) private float lineWidth = 2.0f;
+    @Setting(name = "type", names = { "SKELETON", "WITHER-SKELETON", "ZOMBIE", "PLAYER", "CREEPER" })
+    private SkullType skullType = SkullType.PLAYER;
+
+    @Setting private boolean outline = true;
+    @Setting private boolean tracers = true;
 
     private final java.util.List<Vec3> skullList = new CopyOnWriteArrayList<>();
     private final Color skullColor = new Color(255, 0, 255);
 
-    @SuppressWarnings("unused")
-    private static final int SKELETON = 0;
-    @SuppressWarnings("unused")
-    private static final int WITHER_SKELETON = 1;
-    @SuppressWarnings("unused")
-    private static final int ZOMBIE = 2;
-    private static final int PLAYER = 3;
-    @SuppressWarnings("unused")
-    private static final int CREEPER = 4;
-
     private int tickCounter = 0;
     private static final int SCAN_INTERVAL = 5;
 
-    @Override
-    public String getName() {
-        return "SkullESP";
+    public SkullESP() {
+        super("SkullESP", GuiCategory.RENDER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.RENDER;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, getClass());
-
-            outlineProperty = creator.createBooleanProperty("outline", true);
-            tracersProperty = creator.createBooleanProperty("tracers", true);
-            lineWidthProperty = creator.createFloatProperty("line-width", 2.0f, 1.0f, 5.0f);
-
-            String[] skullTypes = { "SKELETON", "WITHER-SKELETON", "ZOMBIE", "PLAYER", "CREEPER" };
-            skullTypeProperty = creator.createEnumProperty("type", 3, skullTypes);
-
-            creator.registerProperties(moduleInstance, outlineProperty, tracersProperty,
-                    lineWidthProperty, skullTypeProperty);
-
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
-    }
-
-    private void onEnable() {
+    protected void onEnable() {
         skullList.clear();
         tickCounter = 0;
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         skullList.clear();
     }
 
@@ -110,7 +68,7 @@ public class SkullESP extends Feature {
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.START)
             return;
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
@@ -124,16 +82,16 @@ public class SkullESP extends Feature {
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
-        if (!manager.isModuleEnabled(moduleInstance))
+        if (!isEnabled())
             return;
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
         if (skullList.isEmpty())
             return;
 
-        boolean renderOutline = properties.getBoolean(outlineProperty, true);
-        boolean renderTracers = properties.getBoolean(tracersProperty, true);
-        float lineWidth = properties.getFloat(lineWidthProperty, 2.0f);
+        boolean renderOutline = outline;
+        boolean renderTracers = tracers;
+        float lineWidth = this.lineWidth;
 
         Entity viewEntity = mc.getRenderViewEntity();
         if (viewEntity == null)
@@ -275,7 +233,7 @@ public class SkullESP extends Feature {
 
         skullList.clear();
 
-        int targetSkullType = properties.getInt(skullTypeProperty, PLAYER);
+        int targetSkullType = skullType.ordinal();
 
         for (TileEntity tileEntity : new ArrayList<>(mc.theWorld.loadedTileEntityList)) {
             if (!(tileEntity instanceof TileEntitySkull))

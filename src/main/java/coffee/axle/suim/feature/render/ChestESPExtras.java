@@ -1,9 +1,10 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.MyauLogger;
+import static coffee.axle.suim.ProjectSUIM.mc;
+import coffee.axle.suim.property.Setting;
+import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.init.Blocks;
@@ -15,7 +16,6 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
@@ -25,91 +25,59 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 public class ChestESPExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static ChestESPExtras instance;
 
-    private Object chestESP;
     private Object chests;
     private Object color;
     private Object opacity;
     private Object tracers;
-    private Object enderChests;
-    private Object enderColor;
-    private Object enderOpacity;
-    private Object enderTracers;
-    private Object trappedChests;
-    private Object trappedColor;
-    private Object trappedOpacity;
-    private Object trappedTracers;
-    private Object containers;
-    private Object containersColor;
-    private Object containersOpacity;
-    private Object containersTracers;
+    @Setting(name = "ender-chests", after = "chests") private boolean enderChests = true;
+    @Setting(name = "ender-chest-color", color = true, after = "ender-chests") private int enderColor = 0xAA00FF;
+    @Setting(name = "ender-chest-opacity", min = 0, max = 100, after = "ender-chest-color") private int enderOpacity = 100;
+    @Setting(name = "ender-chest-tracers", after = "ender-chest-opacity") private boolean enderTracers = false;
+
+    @Setting(name = "trapped-chests", after = "ender-chest-tracers") private boolean trappedChests = true;
+    @Setting(name = "trapped-chest-color", color = true, after = "trapped-chests") private int trappedColor = 0xFF5500;
+    @Setting(name = "trapped-chest-opacity", min = 0, max = 100, after = "trapped-chest-color") private int trappedOpacity = 100;
+    @Setting(name = "trapped-chest-tracers", after = "trapped-chest-opacity") private boolean trappedTracers = false;
+
+    @Setting(name = "containers", after = "trapped-chest-tracers") private boolean containers = false;
+    @Setting(name = "containers-color", color = true, after = "containers") private int containersColor = 0xAAAAAA;
+    @Setting(name = "containers-opacity", min = 0, max = 100, after = "containers-color") private int containersOpacity = 100;
+    @Setting(name = "containers-tracers", after = "containers-opacity") private boolean containersTracers = false;
     private Object tracerOpacity;
 
-    @Override
-    public String getName() {
-        return "ChestESP:Extras";
+    public ChestESPExtras() {
+        super("ChestESP:Extras");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            chestESP = manager.findModule("ChestESP");
-            if (chestESP == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-            color = manager.findProperty(chestESP, "color");
-            opacity = manager.findProperty(chestESP, "opacity");
-            tracers = manager.findProperty(chestESP, "tracers");
-            rename(color, "chest-color");
-            rename(opacity, "chest-opacity");
-            rename(tracers, "chest-tracers");
-            chests = creator.createBooleanProperty("chests", true);
-            enderChests = creator.createBooleanProperty("ender-chests", true);
-            enderColor = creator.createColorProperty("ender-chest-color", 0xAA00FF);
-            enderOpacity = creator.createIntegerProperty("ender-chest-opacity", 100, 0, 100);
-            enderTracers = creator.createBooleanProperty("ender-chest-tracers", false);
-            trappedChests = creator.createBooleanProperty("trapped-chests", true);
-            trappedColor = creator.createColorProperty("trapped-chest-color", 0xFF5500);
-            trappedOpacity = creator.createIntegerProperty("trapped-chest-opacity", 100, 0, 100);
-            trappedTracers = creator.createBooleanProperty("trapped-chest-tracers", false);
-            containers = creator.createBooleanProperty("containers", false);
-            containersColor = creator.createColorProperty("containers-color", 0xAAAAAA);
-            containersOpacity = creator.createIntegerProperty("containers-opacity", 100, 0, 100);
-            containersTracers = creator.createBooleanProperty("containers-tracers", false);
+    protected String targetModule() {
+        return "ChestESP";
+    }
 
-            creator.injectPropertyAfter(chestESP, chests, "chest-tracers");
-            creator.injectPropertyAfter(chestESP, enderChests, "chests");
-            creator.injectPropertyAfter(chestESP, enderColor, "ender-chests");
-            creator.injectPropertyAfter(chestESP, enderOpacity, "ender-chest-color");
-            creator.injectPropertyAfter(chestESP, enderTracers, "ender-chest-opacity");
-            creator.injectPropertyAfter(chestESP, trappedChests, "ender-chest-tracers");
-            creator.injectPropertyAfter(chestESP, trappedColor, "trapped-chests");
-            creator.injectPropertyAfter(chestESP, trappedOpacity, "trapped-chest-color");
-            creator.injectPropertyAfter(chestESP, trappedTracers, "trapped-chest-opacity");
-            creator.injectPropertyAfter(chestESP, containers, "trapped-chest-tracers");
-            creator.injectPropertyAfter(chestESP, containersColor, "containers");
-            creator.injectPropertyAfter(chestESP, containersOpacity, "containers-color");
-            creator.injectPropertyAfter(chestESP, containersTracers, "containers-opacity");
-            Object tracersModule = manager.findModule("Tracers");
-            tracerOpacity = tracersModule == null ? null : manager.findProperty(tracersModule, "opacity");
+    @Override
+    protected void init() throws Exception {
+        color = manager.findProperty(module, "color");
+        opacity = manager.findProperty(module, "opacity");
+        tracers = manager.findProperty(module, "tracers");
+        rename(color, "chest-color");
+        rename(opacity, "chest-opacity");
+        rename(tracers, "chest-tracers");
+        chests = creator.createBooleanProperty("chests", true);
+        creator.injectPropertyAfter(module, chests, "chest-tracers");
 
-            instance = this;
-            MinecraftForge.EVENT_BUS.register(this);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+        Object tracersModule = manager.findModule("Tracers");
+        tracerOpacity = tracersModule == null ? null : manager.findProperty(tracersModule, "opacity");
+
+        instance = this;
     }
 
     private void rename(Object property, String name) throws Exception {
         Class<?> type = property.getClass();
         while (type != null) {
             try {
-                Field field = type.getDeclaredField("W");
+                Field field = type.getDeclaredField(MyauMappings.FIELD_VALUE_NAME);
                 field.setAccessible(true);
                 field.set(property, name);
                 return;
@@ -125,9 +93,14 @@ public class ChestESPExtras extends Feature {
     }
 
     private boolean enabled(TileEntity tile) {
-        if (tile instanceof TileEntityEnderChest) return properties.getBoolean(enderChests, true);
+        if (tile instanceof TileEntityEnderChest) return enderChests;
         if (tile instanceof TileEntityChest) {
-            return properties.getBoolean(isTrapped(tile) ? trappedChests : chests, true);
+            if (isTrapped(tile)) return trappedChests;
+            try {
+                return (Boolean) properties.getPropertyValue(chests);
+            } catch (Exception e) {
+                return true;
+            }
         }
         return false;
     }
@@ -135,10 +108,10 @@ public class ChestESPExtras extends Feature {
     public static Color color(TileEntity tile, Color original) {
         if (instance == null) return original;
         if (tile instanceof TileEntityEnderChest) {
-            return new Color(instance.properties.getInt(instance.enderColor, 0xAA00FF));
+            return new Color(instance.enderColor);
         }
         if (isTrapped(tile)) {
-            return new Color(instance.properties.getInt(instance.trappedColor, 0xFF5500));
+            return new Color(instance.trappedColor);
         }
         return original;
     }
@@ -146,10 +119,10 @@ public class ChestESPExtras extends Feature {
     public static int opacity(TileEntity tile, int original) {
         if (instance == null) return original;
         if (tile instanceof TileEntityEnderChest) {
-            return (int) (instance.properties.getInt(instance.enderOpacity, 100) / 100.0F * 255.0F);
+            return (int) (instance.enderOpacity / 100.0F * 255.0F);
         }
         if (isTrapped(tile)) {
-            return (int) (instance.properties.getInt(instance.trappedOpacity, 100) / 100.0F * 255.0F);
+            return (int) (instance.trappedOpacity / 100.0F * 255.0F);
         }
         return original;
     }
@@ -158,10 +131,10 @@ public class ChestESPExtras extends Feature {
     public static float tracerAlpha(TileEntity tile, float original) {
         if (instance == null) return original;
         if (tile instanceof TileEntityEnderChest) {
-            return instance.properties.getBoolean(instance.enderTracers, false) ? original : 0.0F;
+            return instance.enderTracers ? original : 0.0F;
         }
         if (isTrapped(tile)) {
-            return instance.properties.getBoolean(instance.trappedTracers, false) ? original : 0.0F;
+            return instance.trappedTracers ? original : 0.0F;
         }
         return original;
     }
@@ -175,15 +148,15 @@ public class ChestESPExtras extends Feature {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (mc.theWorld == null || mc.thePlayer == null || mc.getRenderViewEntity() == null
-                || !manager.isModuleEnabled(chestESP)
-                || !properties.getBoolean(containers, false)) {
+                || !manager.isModuleEnabled(module)
+                || !containers) {
             return;
         }
 
-        Color tint = new Color(properties.getInt(containersColor, 0xAAAAAA));
-        float alpha = properties.getInt(containersOpacity, 100) / 100.0F;
+        Color tint = new Color(containersColor);
+        float alpha = containersOpacity / 100.0F;
         float tracerAlpha = properties.getInt(tracerOpacity, 100) / 100.0F;
-        boolean drawTracers = properties.getBoolean(containersTracers, false);
+        boolean drawTracers = containersTracers;
         float r = tint.getRed() / 255.0F;
         float g = tint.getGreen() / 255.0F;
         float b = tint.getBlue() / 255.0F;

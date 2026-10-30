@@ -1,15 +1,14 @@
 package coffee.axle.suim.clickgui.render;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.shader.Framebuffer;
 import org.lwjgl.opengl.EXTFramebufferObject;
 import org.lwjgl.opengl.GL11;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class StencilUtils {
     public static final StencilUtils INSTANCE = new StencilUtils();
 
-    private final Minecraft mc = Minecraft.getMinecraft();
 
     private StencilUtils() {
     }

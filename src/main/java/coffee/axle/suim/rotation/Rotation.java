@@ -3,8 +3,6 @@ package coffee.axle.suim.rotation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.MathHelper;
 
-import java.util.Random;
-
 /**
  * Abstract base for all rotation controllers.
  * MEOW
@@ -15,35 +13,9 @@ public abstract class Rotation {
 
     protected static final Minecraft mc = Minecraft.getMinecraft();
     protected final RotationState state;
-    protected final Random random = new Random();
 
     protected Rotation(RotationState state) {
         this.state = state;
-    }
-
-    // smallest angle increment MC can produce: f = sens * 0.6 + 0.2; gcd = f^3 * 8
-    protected float computeGCD() {
-        float sens = mc.gameSettings.mouseSensitivity;
-        float f = sens * 0.6f + 0.2f;
-        return f * f * f * 8.0f;
-    }
-
-    protected float applyGCD(float currentAngle, float targetAngle) {
-        float gcd = computeGCD();
-        float delta = targetAngle - currentAngle;
-        return currentAngle + delta - (delta % gcd);
-    }
-
-    protected float clampAngle(float angle, float maxAngle) {
-        maxAngle = Math.max(0.0f, Math.min(180.0f, maxAngle));
-        return MathHelper.clamp_float(angle, -maxAngle, maxAngle);
-    }
-
-    // slight randomization for human-like jitter
-    protected float smoothDelta(float delta, float smoothFactor) {
-        float jitter = (float) (random.nextGaussian() * 0.015);
-        return delta * (0.5f + 0.5f * (1.0f - MathHelper.clamp_float(
-                smoothFactor + jitter, 0.0f, 1.0f)));
     }
 
     // Myau-native step semantics (G.e(k7) + kB.l/kB.G/kB.r): speed CAPS the
@@ -74,8 +46,8 @@ public abstract class Rotation {
         yawDelta *= scale;
         pitchDelta *= scale;
 
-        float newYaw = gcdChain(baseYaw + yawDelta, baseYaw);
-        float newPitch = gcdChain(basePitch + pitchDelta, basePitch);
+        float newYaw = RotationMath.gcdQuantize(baseYaw + yawDelta, baseYaw);
+        float newPitch = RotationMath.gcdQuantize(basePitch + pitchDelta, basePitch);
         newPitch = MathHelper.clamp_float(newPitch, -90f, 90f);
 
         return new float[] { newYaw, newPitch };
@@ -92,16 +64,9 @@ public abstract class Rotation {
         return delta;
     }
 
-    protected float gcdChain(float smoothed, float baseAngle) {
-        float f = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
-        float gcd = f * f * f * 8.0f * 0.15f;
-        float delta = MathHelper.wrapAngleTo180_float(smoothed - baseAngle);
-        return baseAngle + (float) (Math.round(delta / gcd) * (double) gcd);
-    }
-
     public float[] snapToTarget(float targetYaw, float targetPitch) {
-        float yaw = gcdChain(targetYaw, mc.thePlayer.rotationYaw);
-        float pitch = gcdChain(targetPitch, mc.thePlayer.rotationPitch);
+        float yaw = RotationMath.gcdQuantize(targetYaw, mc.thePlayer.rotationYaw);
+        float pitch = RotationMath.gcdQuantize(targetPitch, mc.thePlayer.rotationPitch);
         pitch = MathHelper.clamp_float(pitch, -90f, 90f);
         return new float[] { yaw, pitch };
     }
@@ -116,12 +81,23 @@ public abstract class Rotation {
         if (Math.abs(forward) < 1.0E-4f && Math.abs(strafe) < 1.0E-4f)
             return;
 
-        float delta = (float) Math.toRadians(preSpoofYaw - postSpoofYaw);
+        float[] fixed = moveFix(forward, strafe, preSpoofYaw - postSpoofYaw);
+        mc.thePlayer.movementInput.moveForward = fixed[0];
+        mc.thePlayer.movementInput.moveStrafe = fixed[1];
+    }
+
+    /**
+     * Re-projects a forward/strafe pair onto the spoofed yaw frame.
+     * deltaDeg is client minus server, so a positive delta means the spoof
+     * turned the player left of what the server sees.
+     *
+     * @return {forward, strafe}
+     */
+    public static float[] moveFix(float forward, float strafe, float deltaDeg) {
+        float delta = (float) Math.toRadians(deltaDeg);
         float cos = MathHelper.cos(delta);
         float sin = MathHelper.sin(delta);
-
-        mc.thePlayer.movementInput.moveForward = forward * cos + strafe * sin;
-        mc.thePlayer.movementInput.moveStrafe = strafe * cos - forward * sin;
+        return new float[] { forward * cos + strafe * sin, strafe * cos - forward * sin };
     }
 
     protected boolean withinTolerance(float currentYaw, float currentPitch,
