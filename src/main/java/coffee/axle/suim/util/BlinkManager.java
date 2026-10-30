@@ -37,9 +37,9 @@ public class BlinkManager {
 
     public boolean tryBlink(Packet<?> packet) {
         if (!blinking) return false;
-        // Breeze's blink (eo) holds EVERY outbound packet while its queue is
-        // active - no keepalive/chat/transaction exemptions. only the other
-        // blink modules keep those safety exemptions.
+        // displace holds EVERY outbound packet while its queue is active, no
+        // keepalive/chat/transaction exemptions. the other blink modules do
+        // keep those safety exemptions.
         if (blinkModule != BlinkModule.DISPLACE) {
             if (packet instanceof C00PacketKeepAlive || packet instanceof C01PacketChatMessage) {
                 return false;
@@ -69,8 +69,8 @@ public class BlinkManager {
     }
 
     // batch a packet into the blink queue directly (Displace controlled sends).
-    // works regardless of the keepalive/chat exemptions - the caller controls
-    // exactly which packets get batched, like Breeze's eo DELAY release order
+    // works regardless of the keepalive/chat exemptions, the caller controls
+    // exactly which packets get batched
     public void queueDirect(Packet<?> packet) {
         blinkedPackets.offer(packet);
     }
@@ -98,8 +98,8 @@ public class BlinkManager {
         blinkModule = BlinkModule.NONE;
     }
 
-    // clear the queue without sending it - Breeze drops the delayed packets
-    // when the module is disabled mid-blink (a(ArrayList): !f() -> clear)
+    // clear the queue without sending it, the delayed packets are dropped
+    // when the module is disabled mid-blink
     public void drop() {
         blinkedPackets.clear();
         blinking = false;

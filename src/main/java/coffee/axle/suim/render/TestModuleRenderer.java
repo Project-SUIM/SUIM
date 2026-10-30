@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.AxisAlignedBB;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.util.Vec3;
 import org.lwjgl.opengl.GL11;
 
@@ -75,9 +76,10 @@ public class TestModuleRenderer {
         Entity player = mc.thePlayer;
         Vec3 lookVec = player.getLookVec();
 
-        double playerX = player.lastTickPosX + (player.posX - player.lastTickPosX) * partialTicks;
-        double playerY = player.lastTickPosY + (player.posY - player.lastTickPosY) * partialTicks;
-        double playerZ = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * partialTicks;
+        Vec3 playerPos = Utils.interpolate(player, partialTicks);
+        double playerX = playerPos.xCoord;
+        double playerY = playerPos.yCoord;
+        double playerZ = playerPos.zCoord;
 
         double boxX = playerX + lookVec.xCoord * 3.0;
         double boxY = playerY + lookVec.yCoord * 3.0 + player.getEyeHeight();

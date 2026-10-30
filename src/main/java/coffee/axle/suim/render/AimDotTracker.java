@@ -1,5 +1,6 @@
 package coffee.axle.suim.render;
 
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
@@ -62,10 +63,8 @@ public class AimDotTracker {
         if (hit != null) {
             dots.add(new AimDot(hit.hitVec.xCoord, hit.hitVec.yCoord, hit.hitVec.zCoord));
         } else {
-            double cx = (box.minX + box.maxX) / 2.0;
-            double cy = (box.minY + box.maxY) / 2.0;
-            double cz = (box.minZ + box.maxZ) / 2.0;
-            dots.add(new AimDot(cx, cy, cz));
+            Vec3 center = Utils.boxCenter(box);
+            dots.add(new AimDot(center.xCoord, center.yCoord, center.zCoord));
         }
     }
 

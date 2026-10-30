@@ -5,6 +5,7 @@ import coffee.axle.suim.feature.GuiCategory;
 
 import coffee.axle.suim.hooks.FreelookHooks;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -122,7 +123,7 @@ public class Freelook extends Feature {
             return;
         }
 
-        boolean down = Keyboard.isKeyDown(key);
+        boolean down = Utils.isKeyDown(key);
 
         if (down != prevKeyState) {
             handleToggle(down);

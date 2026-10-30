@@ -141,9 +141,10 @@ public class SkullESP extends Feature {
 
         float partialTicks = event.partialTicks;
 
-        double viewX = Utils.lerp(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
-        double viewY = Utils.lerp(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
-        double viewZ = Utils.lerp(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
+        Vec3 view = Utils.interpolate(viewEntity, partialTicks);
+        double viewX = view.xCoord;
+        double viewY = view.yCoord;
+        double viewZ = view.zCoord;
 
         GlStateManager.pushMatrix();
         GlStateManager.translate(-viewX, -viewY, -viewZ);
@@ -214,9 +215,10 @@ public class SkullESP extends Feature {
                             .toRadians(Utils.lerp(mc.thePlayer.cameraYaw, mc.thePlayer.prevCameraYaw, partialTicks)));
         }
 
-        double playerX = Utils.lerp(viewEntity.posX, viewEntity.lastTickPosX, partialTicks);
-        double playerY = Utils.lerp(viewEntity.posY, viewEntity.lastTickPosY, partialTicks);
-        double playerZ = Utils.lerp(viewEntity.posZ, viewEntity.lastTickPosZ, partialTicks);
+        Vec3 player = Utils.interpolate(viewEntity, partialTicks);
+        double playerX = player.xCoord;
+        double playerY = player.yCoord;
+        double playerZ = player.zCoord;
 
         return new Vec3(
                 position.xCoord + playerX,

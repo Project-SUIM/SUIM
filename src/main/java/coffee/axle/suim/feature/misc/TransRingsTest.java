@@ -3,6 +3,7 @@ package coffee.axle.suim.feature.misc;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
@@ -106,9 +107,10 @@ public class TransRingsTest extends Feature {
         Entity player = mc.thePlayer;
         Vec3 look = player.getLookVec();
 
-        double px = player.lastTickPosX + (player.posX - player.lastTickPosX) * partialTicks;
-        double py = player.lastTickPosY + (player.posY - player.lastTickPosY) * partialTicks;
-        double pz = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * partialTicks;
+        Vec3 p = Utils.interpolate(player, partialTicks);
+        double px = p.xCoord;
+        double py = p.yCoord;
+        double pz = p.zCoord;
 
         double yaw = Math.toRadians(player.rotationYaw);
         double dx = -Math.sin(yaw);
