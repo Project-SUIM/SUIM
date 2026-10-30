@@ -12,7 +12,6 @@ import net.minecraft.block.BlockSlab;
 import net.minecraft.block.BlockTrapDoor;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.player.EntityPlayer;
@@ -31,12 +30,12 @@ import net.minecraft.util.Vec3i;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Block, placement and rotation helpers for AutoBlockIn.
  */
 public final class BlockInUtils {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final Random RANDOM = new Random();
     private static final BlockPos.MutableBlockPos scratch = new BlockPos.MutableBlockPos();
 
@@ -215,18 +214,19 @@ public final class BlockInUtils {
 
     // ---- rotations ----
 
-    private static float clampPitch(float pitch) {
-        return MathHelper.clamp_float(pitch, -90.0f, 90.0f);
+    // getVectorForRotation is protected in Entity, and this is the same maths
+    private static Vec3 lookVector(float yaw, float pitch) {
+        float f = MathHelper.cos(-yaw * 0.017453292f - (float) Math.PI);
+        float f1 = MathHelper.sin(-yaw * 0.017453292f - (float) Math.PI);
+        float f2 = -MathHelper.cos(-pitch * 0.017453292f);
+        float f3 = MathHelper.sin(-pitch * 0.017453292f);
+        return new Vec3(f1 * f2, f3, f * f2);
     }
 
     public static float[] fixSensitivity(float yaw, float pitch, float lastYaw, float lastPitch) {
-        float dYaw = yaw - lastYaw;
-        float dPitch = pitch - lastPitch;
-        float f = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
-        double d = (double) (f * f * f) * 1.2;
-        float yawStep = (float) ((double) Math.round((double) dYaw / d) * d);
-        float pitchStep = (float) ((double) Math.round((double) dPitch / d) * d);
-        return new float[]{lastYaw + yawStep, clampPitch(lastPitch + pitchStep)};
+        return new float[]{
+                RotationMath.gcdQuantize(yaw, lastYaw),
+                MathHelper.clamp_float(RotationMath.gcdQuantize(pitch, lastPitch), -90.0f, 90.0f)};
     }
 
     // angles to a point, kept continuous with the current rotation so the
@@ -237,15 +237,9 @@ public final class BlockInUtils {
                 x - eye.xCoord, y - eye.yCoord, z - eye.zCoord);
         return new float[]{
                 curYaw + MathHelper.wrapAngleTo180_float(r[0] - curYaw),
-                clampPitch(curPitch + MathHelper.wrapAngleTo180_float(r[1] - curPitch))};
-    }
-
-    public static Vec3 getVectorForRotation(float yaw, float pitch) {
-        float f3 = MathHelper.cos((yaw *= -((float) Math.PI / 180)) - (float) Math.PI);
-        float f4 = MathHelper.sin(yaw - (float) Math.PI);
-        float f5 = -MathHelper.cos(pitch *= -((float) Math.PI / 180));
-        float f6 = MathHelper.sin(pitch);
-        return new Vec3(f4 * f5, f6, f3 * f5);
+                MathHelper.clamp_float(
+                        curPitch + MathHelper.wrapAngleTo180_float(r[1] - curPitch),
+                        -90.0f, 90.0f)};
     }
 
     public static AimPoint aimAtFace(BlockPos pos, EnumFacing facing, float curYaw, float curPitch) {
@@ -350,7 +344,7 @@ public final class BlockInUtils {
 
     public static MovingObjectPosition rayTraceFrom(double range, double x, double y, double z, float yaw, float pitch) {
         Vec3 from = new Vec3(x, y + (double) mc.thePlayer.getEyeHeight(), z);
-        Vec3 dir = getVectorForRotation(yaw, pitch);
+        Vec3 dir = lookVector(yaw, pitch);
         Vec3 to = from.addVector(dir.xCoord * range, dir.yCoord * range, dir.zCoord * range);
         return mc.theWorld.rayTraceBlocks(from, to, false, false, false);
     }
