@@ -86,6 +86,9 @@ public class ProjectSUIM {
             MinecraftForge.EVENT_BUS.register(new PlayerMotionHandler());
             MinecraftForge.EVENT_BUS.register(new coffee.axle.suim.eventbus.EventBusBootstrap());
             MinecraftForge.EVENT_BUS.register(this);
+            // has to be before the first server join, or the location reply is missed
+            coffee.axle.suim.hooks.HypixelModApiHook.getInstance().register();
+            coffee.axle.suim.util.GameLocation.init();
             MyauLogger.info("Registered event handlers");
         } catch (Throwable t) {
             MyauLogger.log("CRITICAL_ERROR");
