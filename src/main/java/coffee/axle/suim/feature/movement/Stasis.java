@@ -30,9 +30,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 /**
- * Three engines behind one module: SUIM is our old pulse freeze, RESTORE our old
- * freeze with motion back on disable, RAVEN the OpenB4 StasisModule port (Simple
- * Utils 2.3.1 lineage). RAVEN is the default, it's the one that actually holds.
+ * herp
+ * hypixel vs patching me
  */
 public class Stasis extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
@@ -41,6 +40,9 @@ public class Stasis extends Feature {
     private static final int MODE_SUIM = 0;
     private static final int MODE_RESTORE = 1;
     private static final int MODE_RAVEN = 2;
+    private static final int MODE_JADE = 3;
+
+    private static final int JADE_LOCK_TICKS = 2;
 
     private static final double MOTION_EPS = 1.0E-4;
     private static final double GRAVITY_MATCH_EPS = 0.02;
@@ -97,6 +99,17 @@ public class Stasis extends Feature {
     private boolean feetSampled;
     private int ticksSinceTeleport = 999;
 
+    private boolean jadeActive;
+    private boolean jadeOnGround;
+    private boolean jadeResync;
+    private boolean jadeKnockback;
+    private int jadeKnockbackTicks;
+    private int jadeSinceSync;
+    private int jadeLockTicks;
+    private double jadeX, jadeY, jadeZ;
+    private double jadeMotionX, jadeMotionY, jadeMotionZ;
+    private boolean jadeMotionSaved;
+
     @Override
     public String getName() {
         return "Stasis";
@@ -113,8 +126,8 @@ public class Stasis extends Feature {
             instance = this;
             moduleInstance = createModule();
             creator.injectModule(moduleInstance, Stasis.class);
-            modeProperty = creator.createEnumProperty("mode", MODE_RAVEN,
-                    new String[] { "SUIM", "RESTORE", "RAVEN" });
+            modeProperty = creator.createEnumProperty("mode", MODE_JADE,
+                    new String[] { "SUIM", "RESTORE", "RAVEN", "JADE" });
             flaglessProperty = creator.createBooleanProperty("flagless", false);
             cancelOnDeathProperty = creator.createBooleanProperty("cancel-on-death", false);
             pulseProperty = creator.createIntegerProperty("pulse", 60, 2, 85);
@@ -148,6 +161,8 @@ public class Stasis extends Feature {
     private void startEngine(int mode) {
         if (mode == MODE_RAVEN) {
             onEnable();
+        } else if (mode == MODE_JADE) {
+            jadeEnable();
         } else {
             allowNextC03 = false;
             pulseTick = 0;
@@ -158,6 +173,9 @@ public class Stasis extends Feature {
     private void stopEngine(int mode) {
         if (mode == MODE_RAVEN) {
             onDisable();
+        } else if (mode == MODE_JADE) {
+            jadeDisable();
+            frozen = false;
         } else {
             allowNextC03 = false;
             pulseTick = 0;
@@ -188,7 +206,8 @@ public class Stasis extends Feature {
 
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
-        if (getMode() == MODE_RAVEN) return;
+        int mode = getMode();
+        if (mode == MODE_RAVEN || mode == MODE_JADE) return;
         if (!manager.isModuleEnabled(moduleInstance)) return;
         if (!Utils.nullCheck()) return;
         pulseActive = getMode() == MODE_SUIM && pulseTick % 80L < 4L;
@@ -207,15 +226,42 @@ public class Stasis extends Feature {
             onPostPlayerInputAlways(e);
             return;
         }
+        if (getMode() == MODE_JADE) {
+            // always called: the 2 tick lock after a disable still needs to run
+            jadeMoveInput(e);
+            return;
+        }
         if (!manager.isModuleEnabled(moduleInstance)) return;
         e.setForward(0.0f);
         e.setStrafe(0.0f);
+    }
+
+    // EntityPlayerSP.onUpdate HEAD/RETURN, same two points Jade posts its
+    // PreUpdateEvent/PostUpdateEvent from
+    public static void jadePreUpdate(EntityPlayerSP p) {
+        if (instance != null && instance.getMode() == MODE_JADE && instance.isEnabled()) {
+            instance.jadePre(p);
+            instance.updateFrozen();
+        }
+    }
+
+    public static void jadePostUpdate(EntityPlayerSP p) {
+        if (instance != null && instance.getMode() == MODE_JADE && instance.isEnabled()) {
+            instance.jadePost(p);
+            instance.updateFrozen();
+        }
     }
 
     @SubscribeEvent
     public void onSendPacket(SendPacketEvent e) {
         if (getMode() == MODE_RAVEN) {
             if (!onSendPacketAlways(e.getPacket())) {
+                e.setCanceled(true);
+            }
+            return;
+        }
+        if (getMode() == MODE_JADE) {
+            if (manager.isModuleEnabled(moduleInstance) && !jadeSend(e.getPacket())) {
                 e.setCanceled(true);
             }
             return;
@@ -238,6 +284,12 @@ public class Stasis extends Feature {
         if (getMode() == MODE_RAVEN) {
             if (!onReceivePacketAlways(e.getPacket())) {
                 e.setCanceled(true);
+            }
+            return;
+        }
+        if (getMode() == MODE_JADE) {
+            if (manager.isModuleEnabled(moduleInstance) && !e.isCanceled()) {
+                jadeReceive(e.getPacket());
             }
             return;
         }
@@ -273,8 +325,11 @@ public class Stasis extends Feature {
 
     @SubscribeEvent
     public void onUnload(WorldEvent.Unload e) {
+        if (e.world == null || !e.world.isRemote) return;
+        // jade keeps running across a world change, it only drops held packets
+        if (getMode() == MODE_JADE) return;
         if (getMode() != MODE_RAVEN) return;
-        if (e.world != null && e.world.isRemote && manager.isModuleEnabled(moduleInstance)) {
+        if (manager.isModuleEnabled(moduleInstance)) {
             reset();
         }
     }
@@ -344,7 +399,8 @@ public class Stasis extends Feature {
     }
 
     private void updateFrozen() {
-        frozen = this.isEnabled() && this.isFrozen();
+        int mode = getMode();
+        frozen = this.isEnabled() && (mode == MODE_JADE ? this.jadeIsFrozen() : this.isFrozen());
     }
 
     public static void afterPlayerUpdate(EntityPlayerSP p) {
@@ -754,7 +810,7 @@ public class Stasis extends Feature {
         return true;
     }
 
-    /** openb4 hooks.postplayerinput */
+    // runs right after the input is applied, before the move packet
     private void onPostPlayerInputAlways(PrePlayerInputEvent e) {
         if (mc.thePlayer == null) {
             return;
@@ -1068,5 +1124,185 @@ public class Stasis extends Feature {
         double dy = y - p.posY;
         double dz = z - p.posZ;
         return dx * dx + dy * dy + dz * dz <= 100.0;
+    }
+
+    private boolean jadeIsFrozen() {
+        return this.jadeActive && !this.jadeResync && !this.jadeKnockback;
+    }
+
+    private void jadeEnable() {
+        EntityPlayerSP p = mc.thePlayer;
+        this.jadeActive = p != null;
+        this.jadeResync = false;
+        this.jadeKnockback = false;
+        this.jadeKnockbackTicks = 0;
+        this.jadeSinceSync = 0;
+        this.jadeLockTicks = 0;
+        this.jadeMotionSaved = false;
+        if (p == null) {
+            return;
+        }
+        this.jadeMotionX = p.motionX;
+        this.jadeMotionY = p.motionY;
+        this.jadeMotionZ = p.motionZ;
+        this.jadeMotionSaved = true;
+        this.jadeCapture(p);
+    }
+
+    private void jadeDisable() {
+        EntityPlayerSP p = mc.thePlayer;
+        boolean lock = this.jadeActive && Utils.nullCheck();
+        if (p != null && this.jadeMotionSaved) {
+            p.motionX = this.jadeMotionX;
+            p.motionY = this.jadeMotionY;
+            p.motionZ = this.jadeMotionZ;
+        }
+        this.jadeActive = false;
+        this.jadeMotionSaved = false;
+        this.jadeResync = false;
+        this.jadeKnockback = false;
+        this.jadeKnockbackTicks = 0;
+        this.jadeSinceSync = 0;
+        this.jadeLockTicks = lock ? JADE_LOCK_TICKS : 0;
+    }
+
+    private void jadePre(EntityPlayerSP p) {
+        if (!this.jadeActive) {
+            return;
+        }
+        if (!Utils.nullCheck()) {
+            this.jadeActive = false;
+            return;
+        }
+        // jade only runs on a loaded block, same guard it uses before posting
+        // its PreUpdateEvent
+        if (!p.worldObj.isBlockLoaded(new BlockPos(p.posX, 0.0, p.posZ))) {
+            return;
+        }
+        // knockback and lagback get to move the player, that's the point
+        if (this.jadeResync || this.jadeKnockback) {
+            return;
+        }
+        this.jadeFreeze(p);
+    }
+
+    private void jadePost(EntityPlayerSP p) {
+        if (!this.jadeActive) {
+            return;
+        }
+        if (!Utils.nullCheck()) {
+            this.jadeActive = false;
+            return;
+        }
+        if (!p.worldObj.isBlockLoaded(new BlockPos(p.posX, 0.0, p.posZ))) {
+            return;
+        }
+        if (this.jadeResync) {
+            this.jadeCapture(p);
+            this.jadeResync = false;
+        } else if (this.jadeKnockback) {
+            if (++this.jadeKnockbackTicks >= 2) {
+                this.jadeCapture(p);
+                this.jadeKnockback = false;
+                this.jadeKnockbackTicks = 0;
+                this.jadeFreeze(p);
+            }
+        } else {
+            this.jadeFreeze(p);
+        }
+    }
+
+    private void jadeMoveInput(PrePlayerInputEvent e) {
+        // the 2 tick lock after a disable is jade's, it stops the restored
+        // motion from being eaten by the input pass on the very next tick
+        if (this.jadeLockTicks > 0) {
+            this.jadeLockTicks--;
+        } else if (!this.jadeActive) {
+            return;
+        }
+        e.setForward(0.0f);
+        e.setStrafe(0.0f);
+        e.setJump(false);
+        // jade also clears sneak here. its default mode never shift-places, so
+        // it is always false outside hypixel mode
+        if (mc.thePlayer.movementInput != null) {
+            mc.thePlayer.movementInput.sneak = false;
+        }
+    }
+
+    private void jadeReceive(Packet<?> packet) {
+        if (!this.jadeActive) {
+            return;
+        }
+        if (packet instanceof S12PacketEntityVelocity) {
+            S12PacketEntityVelocity v = (S12PacketEntityVelocity) packet;
+            EntityPlayerSP p = mc.thePlayer;
+            if (p != null && v.getEntityID() == p.getEntityId()) {
+                this.jadeKnockback = true;
+                this.jadeKnockbackTicks = 0;
+            }
+        } else if (packet instanceof S08PacketPlayerPosLook) {
+            this.jadeResync = true;
+        }
+    }
+
+    private boolean jadeSend(Packet<?> packet) {
+        if (!this.jadeActive || !Utils.nullCheck() || this.jadeResync || this.jadeKnockback) {
+            return true;
+        }
+        if (!(packet instanceof C03PacketPlayer)) {
+            return true;
+        }
+        C03PacketPlayer c = (C03PacketPlayer) packet;
+        boolean moved = c instanceof C03PacketPlayer.C04PacketPlayerPosition
+                || c instanceof C03PacketPlayer.C06PacketPlayerPosLook;
+        if (this.jadeSinceSync >= 20) {
+            this.jadeSendPosition(c);
+            this.jadeSinceSync = 0;
+            return false;
+        }
+        if (!moved) {
+            this.jadeSinceSync++;
+            return true;
+        }
+        this.jadeSendStationary(c);
+        this.jadeSinceSync++;
+        return false;
+    }
+
+    private void jadeFreeze(EntityPlayerSP p) {
+        p.motionX = 0.0;
+        p.motionY = 0.0;
+        p.motionZ = 0.0;
+        p.fallDistance = 0.0f;
+        p.setPosition(this.jadeX, this.jadeY, this.jadeZ);
+        p.onGround = this.jadeOnGround;
+    }
+
+    private void jadeCapture(EntityPlayerSP p) {
+        this.jadeX = p.posX;
+        this.jadeY = p.getEntityBoundingBox().minY;
+        this.jadeZ = p.posZ;
+        this.jadeOnGround = p.onGround;
+    }
+
+    private void jadeSendPosition(C03PacketPlayer c) {
+        if (c.getRotating()) {
+            PacketUtils.sendPacketNoEvent(new C03PacketPlayer.C06PacketPlayerPosLook(
+                    this.jadeX, this.jadeY, this.jadeZ,
+                    c.getYaw(), c.getPitch(), this.jadeOnGround));
+        } else {
+            PacketUtils.sendPacketNoEvent(new C03PacketPlayer.C04PacketPlayerPosition(
+                    this.jadeX, this.jadeY, this.jadeZ, this.jadeOnGround));
+        }
+    }
+
+    private void jadeSendStationary(C03PacketPlayer c) {
+        if (c.getRotating()) {
+            PacketUtils.sendPacketNoEvent(new C03PacketPlayer.C05PacketPlayerLook(
+                    c.getYaw(), c.getPitch(), this.jadeOnGround));
+        } else {
+            PacketUtils.sendPacketNoEvent(new C03PacketPlayer(this.jadeOnGround));
+        }
     }
 }
