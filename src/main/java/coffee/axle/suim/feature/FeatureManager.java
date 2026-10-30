@@ -82,11 +82,14 @@ public class FeatureManager {
         registerFeature(new ChestESPExtras());
         registerFeature(new XrayExtras());
 
+        // Misc
+        registerFeature(new DarkMode());
+
         // World
         registerFeature(new AutoBlockIn());
         // registerFeature(new AutoBedDefense()); (bans)
         registerFeature(new AutoClutch());
-        // registerFeature(new EagleRequireSneak()); (doesnt work)
+        registerFeature(new ArmorInfo());
         registerFeature(new FastPlaceExtras());
         registerFeature(new BedwarsOnly());
 

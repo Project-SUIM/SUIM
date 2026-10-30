@@ -16,6 +16,17 @@ public final class RotationMath {
     private RotationMath() {
     }
 
+    // mouse lattice: f = sens*0.6+0.2, gcd = f^3 * 1.2 (f^3*8*0.15). quantizing
+    // the delta from base keeps every emitted step on an angle the mouse could
+    // actually produce
+    public static float gcdQuantize(float angle, float base) {
+        Minecraft mc = Minecraft.getMinecraft();
+        float f = mc.gameSettings.mouseSensitivity * 0.6f + 0.2f;
+        float gcd = f * f * f * 1.2f;
+        float delta = MathHelper.wrapAngleTo180_float(angle - base);
+        return base + (float) (Math.round(delta / gcd) * (double) gcd);
+    }
+
     public static float[] toRotations(Vec3 eye, double tx, double ty, double tz) {
         double dx = tx - eye.xCoord;
         double dy = ty - eye.yCoord;

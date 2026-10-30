@@ -7,14 +7,14 @@ import coffee.axle.suim.eventbus.DisplaceHook;
 import coffee.axle.suim.events.ReceivePacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.feature.movement.Stasis;
-import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.HudUtils;
+import coffee.axle.suim.util.HypixelUtils;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -49,45 +49,40 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Holds inbound packets while the target walks out of reach so the server
  * still thinks they're in range when you swing.
  */
-@SuppressWarnings({ "rawtypes", "unchecked" })
 public class Backtrack extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private static final int SHOW_NONE = 0;
-    @SuppressWarnings("unused")
-    private static final int SHOW_DEFAULT = 1;
-    private static final int SHOW_HUD = 2;
+    public enum Show {
+        NONE, DEFAULT, HUD
+    }
 
     // below this hurt time the target is still hittable
     private static final int HITTABLE_HURT_TIME = 3;
 
-    private Object moduleInstance;
-    private Object delayProperty;
-    private Object distanceMinProperty;
-    private Object distanceMaxProperty;
-    private Object cooldownProperty;
-    private Object fovProperty;
-    private Object adventureProperty;
-    private Object disableChaseProperty;
-    private Object flushDamageProperty;
-    private Object ignoreTeamProperty;
-    private Object showPositionProperty;
-    private Object onlyHittableProperty;
-    private Object onlyMovementProperty;
-    private Object weaponOnlyProperty;
+    @Setting(min = 50, max = 1500) private int delay = 150;
+    @Setting(min = 0, max = 8) private float distanceMin = 2.7f;
+    @Setting(min = 2, max = 8) private float distanceMax = 5.0f;
+    @Setting(min = 0, max = 8) private float cooldown = 0.0f;
+    @Setting(min = 20, max = 360) private float fov = 360.0f;
+    @Setting private Show showPosition = Show.NONE;
+    @Setting private boolean adventure = true;
+    @Setting private boolean disableChase = false;
+    @Setting private boolean flushDamage = true;
+    @Setting private boolean ignoreTeam = true;
+    @Setting private boolean onlyHittable = false;
+    @Setting private boolean onlyMovement = false;
+    @Setting private boolean weaponOnly = false;
 
     private final TreeMap<Integer, List<Packet<?>>> held = new TreeMap<Integer, List<Packet<?>>>();
     private final Object lock = new Object();
@@ -107,66 +102,17 @@ public class Backtrack extends Feature {
 
     private double minRange, maxRange, maxRangeSq, scanRangeSq;
 
-    // myau.kY + friend list reflection, shared with the aim assist filters
-    private static Method isBotMethod;
-    private static Method isTeamMethod;
-    private static Method teamColorMethod;
-    private static List<String> friendNames = new ArrayList<String>();
-    private static boolean myauFiltersTried;
-
-    @Override
-    public String getName() {
-        return "Backtrack";
+    public Backtrack() {
+        super("Backtrack", GuiCategory.COMBAT);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.COMBAT;
+    protected void init() throws Exception {
+        setSuffixDynamic(() -> new String[] { delay + "ms" });
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, Backtrack.class);
-            delayProperty = creator.createIntegerProperty("delay", 150, 50, 1500);
-            distanceMinProperty = creator.createFloatProperty("distance-min", 2.7f, 0.0f, 8.0f);
-            distanceMaxProperty = creator.createFloatProperty("distance-max", 5.0f, 2.0f, 8.0f);
-            cooldownProperty = creator.createFloatProperty("cooldown", 0.0f, 0.0f, 8.0f);
-            fovProperty = creator.createFloatProperty("fov", 360.0f, 20.0f, 360.0f);
-            adventureProperty = creator.createBooleanProperty("adventure", true);
-            disableChaseProperty = creator.createBooleanProperty("disable-chase", false);
-            flushDamageProperty = creator.createBooleanProperty("flush-damage", true);
-            ignoreTeamProperty = creator.createBooleanProperty("ignore-team", true);
-            showPositionProperty = creator.createEnumProperty("show-position", SHOW_NONE,
-                    new String[] { "NONE", "DEFAULT", "HUD" });
-            onlyHittableProperty = creator.createBooleanProperty("only-hittable", false);
-            onlyMovementProperty = creator.createBooleanProperty("only-movement", false);
-            weaponOnlyProperty = creator.createBooleanProperty("weapon-only", false);
-            creator.registerProperties(moduleInstance,
-                    delayProperty, distanceMinProperty, distanceMaxProperty,
-                    cooldownProperty, fovProperty, adventureProperty,
-                    disableChaseProperty, flushDamageProperty, ignoreTeamProperty,
-                    showPositionProperty, onlyHittableProperty, onlyMovementProperty,
-                    weaponOnlyProperty);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, () -> {
-            }, this::onDisable);
-            setSuffixDynamic(() -> new String[] { properties.getInt(delayProperty, 150) + "ms" });
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("Backtrack:init", e);
-            return false;
-        }
-    }
-
-    private boolean bool(Object prop, boolean def) {
-        return properties.getBoolean(prop, def);
-    }
-
-    private void onDisable() {
+    protected void onDisable() {
         flush();
     }
 
@@ -177,30 +123,19 @@ public class Backtrack extends Feature {
             return false;
         }
         // cooldown only kicks in once the user actually changed it
-        if (!isNotDefault(cooldownProperty)) {
+        if (!isNotDefault()) {
             return true;
         }
-        float cooldown = properties.getFloat(cooldownProperty, 0.0f);
-        return Math.abs(System.currentTimeMillis() - lastFlush) > cooldown * 1000.0f - 20.0f;
+        float c = cooldown;
+        return Math.abs(System.currentTimeMillis() - lastFlush) > c * 1000.0f - 20.0f;
     }
 
-    private boolean isNotDefault(Object prop) {
-        try {
-            Class<?> base = prop.getClass().getSuperclass();
-            Field def = base.getDeclaredField(MyauMappings.FIELD_VALUE_DEFAULT);
-            Field cur = base.getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            def.setAccessible(true);
-            cur.setAccessible(true);
-            Object d = def.get(prop);
-            Object c = cur.get(prop);
-            return d == null ? c != null : !d.equals(c);
-        } catch (Exception e) {
-            return false;
-        }
+    private boolean isNotDefault() {
+        return setting("cooldown") == null || setting("cooldown").isDefault();
     }
 
     private void start() {
-        delayTicks = Math.max(1, properties.getInt(delayProperty, 150) / 50);
+        delayTicks = Math.max(1, delay / 50);
         updateServerPos();
         holding = true;
     }
@@ -210,7 +145,7 @@ public class Backtrack extends Feature {
         if (e.phase != TickEvent.Phase.END) {
             return;
         }
-        if (!manager.isModuleEnabled(moduleInstance)) {
+        if (!isEnabled()) {
             return;
         }
         if (!Utils.nullCheck()) {
@@ -242,8 +177,8 @@ public class Backtrack extends Feature {
     }
 
     private void updateRanges() {
-        minRange = properties.getFloat(distanceMinProperty, 2.7f);
-        maxRange = properties.getFloat(distanceMaxProperty, 5.0f);
+        minRange = distanceMin;
+        maxRange = distanceMax;
         double d = maxRange + 1.2;
         double d2 = maxRange + 2.5;
         maxRangeSq = d * d;
@@ -255,10 +190,10 @@ public class Backtrack extends Feature {
     }
 
     private boolean valid(EntityLivingBase e) {
-        if (bool(onlyHittableProperty, false) && e.hurtTime > HITTABLE_HURT_TIME) {
+        if (onlyHittable && e.hurtTime > HITTABLE_HURT_TIME) {
             return false;
         }
-        return !bool(disableChaseProperty, false) || !awayFromPlayer(e);
+        return !disableChase || !awayFromPlayer(e);
     }
 
     private boolean targetValid() {
@@ -274,10 +209,10 @@ public class Backtrack extends Feature {
             return false;
         }
         if (mc.thePlayer.capabilities.allowFlying
-                || bool(adventureProperty, true) && !mc.thePlayer.capabilities.allowEdit) {
+                || adventure && !mc.thePlayer.capabilities.allowEdit) {
             return false;
         }
-        return !bool(weaponOnlyProperty, false) || holdingWeapon();
+        return !weaponOnly || holdingWeapon();
     }
 
     private static boolean holdingWeapon() {
@@ -295,18 +230,18 @@ public class Backtrack extends Feature {
         if (aa != null && valid(aa)) {
             return aa;
         }
-        double half = properties.getFloat(fovProperty, 360.0f) / 2.0;
+        double half = fov / 2.0;
         double best = 999.0;
         EntityPlayer found = null;
         for (EntityPlayer p : mc.theWorld.playerEntities) {
             if (p == mc.thePlayer || p.deathTime != 0) continue;
             if (!valid(p)) continue;
-            if (isBot(p)) continue;
+            if (HypixelUtils.isBot(p)) continue;
             if (mc.thePlayer.getDistanceSqToEntity(p) > scanRangeSq) continue;
             double yaw = Math.abs(yawDifference(p));
             if (yaw > half) continue;
-            if (isFriend(p)) continue;
-            if (bool(ignoreTeamProperty, true) && isTeammate(p)) continue;
+            if (HypixelUtils.isFriend(p)) continue;
+            if (ignoreTeam && HypixelUtils.isTeammate(p)) continue;
             if (yaw >= best) continue;
             best = yaw;
             found = p;
@@ -343,7 +278,7 @@ public class Backtrack extends Feature {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onReceivePacket(ReceivePacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) {
+        if (!isEnabled()) {
             return;
         }
         Packet<?> packet = e.getPacket();
@@ -357,7 +292,7 @@ public class Backtrack extends Feature {
 
         if (holding) {
             boolean flush = packet instanceof S08PacketPlayerPosLook || packet instanceof S40PacketDisconnect;
-            if (!flush && bool(flushDamageProperty, true) && packet instanceof S12PacketEntityVelocity
+            if (!flush && flushDamage && packet instanceof S12PacketEntityVelocity
                     && ((S12PacketEntityVelocity) packet).getEntityID() == mc.thePlayer.getEntityId()) {
                 flush = true;
             }
@@ -427,7 +362,7 @@ public class Backtrack extends Feature {
                 return;
             }
         }
-        if (holding && !(bool(onlyMovementProperty, false) ? !moves : passesThrough(packet))) {
+        if (holding && !(onlyMovement ? !moves : passesThrough(packet))) {
             hold(packet);
             e.setCanceled(true);
         }
@@ -499,6 +434,7 @@ public class Backtrack extends Feature {
         lastFlush = System.currentTimeMillis();
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private void process(List<Packet<?>> list) {
         if (list == null || list.isEmpty()) {
             return;
@@ -511,11 +447,10 @@ public class Backtrack extends Feature {
                 ReceivePacketEvent event = new ReceivePacketEvent(packet);
                 MinecraftForge.EVENT_BUS.post(event);
                 if (!event.isCanceled()) {
+                    // unsafe, we dont care
                     ((Packet) packet).processPacket(mc.getNetHandler());
                 }
             } catch (ThreadQuickExitException quickExit) {
-                // expected: off the main thread processPacket schedules onto
-                // the main thread and throws to abort, same as vanilla
             } catch (Throwable t) {
                 MyauLogger.error("Backtrack:process " + packet.getClass().getSimpleName(), new Exception(t));
             } finally {
@@ -527,17 +462,15 @@ public class Backtrack extends Feature {
 
     @SubscribeEvent
     public void onUnload(WorldEvent.Unload e) {
-        if (e.world != null && e.world.isRemote && manager.isModuleEnabled(moduleInstance)) {
+        if (e.world != null && e.world.isRemote && isEnabled()) {
             clearHeld();
         }
     }
 
-    // --- show-position box, lagrange style ---
-
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent e) {
-        int mode = properties.getInt(showPositionProperty, SHOW_NONE);
-        if (!holding || mode == SHOW_NONE || target == null) {
+        Show mode = showPosition;
+        if (!holding || mode == Show.NONE || target == null) {
             return;
         }
         if (previousPosition == null || currentPosition == null) {
@@ -546,9 +479,9 @@ public class Backtrack extends Feature {
         if (!Utils.nullCheck()) {
             return;
         }
-        Color color = mode == SHOW_HUD
+        Color color = mode == Show.HUD
                 ? HudUtils.getInstance().getHudColor()
-                : teamColor(target instanceof EntityPlayer ? (EntityPlayer) target : null);
+                : HypixelUtils.teamColor(target instanceof EntityPlayer ? (EntityPlayer) target : null);
         double x = Utils.lerp(currentPosition.xCoord, previousPosition.xCoord, e.partialTicks)
                 - mc.getRenderManager().viewerPosX;
         double y = Utils.lerp(currentPosition.yCoord, previousPosition.yCoord, e.partialTicks)
@@ -667,66 +600,5 @@ public class Backtrack extends Feature {
             return -1.0;
         }
         return from.squareDistanceTo(hit.hitVec);
-    }
-
-    static boolean isBot(EntityPlayer p) {
-        initMyauFilters();
-        try {
-            return isBotMethod != null && (Boolean) isBotMethod.invoke(null, p);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    static boolean isTeammate(EntityPlayer p) {
-        initMyauFilters();
-        try {
-            return isTeamMethod != null && (Boolean) isTeamMethod.invoke(null, p);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static Color teamColor(EntityPlayer p) {
-        initMyauFilters();
-        try {
-            if (teamColorMethod != null && p != null) {
-                return (Color) teamColorMethod.invoke(null, p, 1.0f);
-            }
-        } catch (Exception ignored) {
-        }
-        return new Color(-1);
-    }
-
-    static boolean isFriend(EntityPlayer p) {
-        initMyauFilters();
-        return friendNames.contains(p.getName());
-    }
-
-    private static void initMyauFilters() {
-        if (myauFiltersTried) {
-            return;
-        }
-        myauFiltersTried = true;
-        try {
-            Class<?> util = Class.forName(MyauMappings.CLASS_TEAM_UTIL);
-            isBotMethod = util.getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_BOT, EntityPlayer.class);
-            isTeamMethod = util.getMethod(MyauMappings.METHOD_TEAM_UTIL_IS_TEAM, EntityPlayer.class);
-            teamColorMethod = util.getMethod("T", EntityPlayer.class, float.class);
-        } catch (Exception e) {
-            MyauLogger.error("Backtrack:kY", e);
-        }
-        try {
-            Class<?> myauClass = Class.forName(MyauMappings.CLASS_MAIN);
-            Field friendManagerField = myauClass.getDeclaredField(MyauMappings.FIELD_FRIEND_MANAGER);
-            friendManagerField.setAccessible(true);
-            Object friendManager = friendManagerField.get(null);
-            Field playersField = friendManager.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_PLAYER_LIST);
-            playersField.setAccessible(true);
-            friendNames = (List<String>) playersField.get(friendManager);
-        } catch (Exception e) {
-            MyauLogger.error("Backtrack:friends", e);
-        }
     }
 }

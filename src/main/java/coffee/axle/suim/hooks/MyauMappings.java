@@ -81,6 +81,8 @@ public class MyauMappings {
     public static final String CLASS_KILL_AURA = "myau.Jh";
     public static final String CLASS_AUTO_CLICKER = "myau.w";
     public static final String CLASS_LEFT_CLICK_EVENT = "myau.J0";
+    public static final String METHOD_LEFT_CLICK_IS_CANCELED = "J";      // ()Z
+    public static final String METHOD_LEFT_CLICK_CANCEL = "w";           // (Z)V
     public static final String CLASS_NO_SLOW = "myau.Jd";
     public static final String CLASS_FAST_PLACE = "myau.JQ";
 
@@ -274,7 +276,7 @@ public class MyauMappings {
     public static final String CLASS_HIT_SELECT = "myau.Jo";          // new module
     public static final String CLASS_PACKET_EVENT_DELAYED = "myau.kR"; // used by Velocity DELAY
     public static final String CLASS_BLOCK_HIT_MANAGER = "myau.kE";    // auto-block timing
-    public static final String CLASS_AUTO_COMPLETE_UTIL = "myau.f";    // chat auto-completion
+    public static final String CLASS_AUTO_COMPLETE_UTIL = "myau.f";    // chat auto-completion, also EnchantmentText.labels = n(ItemStack)ArrayList<String> (bytecode-verified)
     public static final String CLASS_ANGLE_UTIL = "myau.z";            // static angle/math utils
 
     // FastPlace (myau.JQ) - : onTick takes HitBlockEvent (kC)
@@ -306,11 +308,20 @@ public class MyauMappings {
     public static final String METHOD_AIM_ASSIST_IS_VALID_TARGET = "t";
     public static final String METHOD_AIM_ASSIST_IS_IN_REACH = "r"; // 260729 fallback - folded into native j(long)
     public static final String METHOD_AIM_ASSIST_IS_LOOKING_AT_BLOCK = "j";
+    // native half of myau.G.s() - key hashed off the FIELD below, not the class name
+    public static final String FIELD_AIM_ASSIST_NATIVE_KEY = "c";
+    public static final String METHOD_AIM_ASSIST_NATIVE_TARGET = "B"; // (J)Lnet/minecraft/entity/EntityLivingBase;
+    public static final String FIELD_AIM_ASSIST_NATIVE_OUTPUT = "P"; // float[] - native out rot
+    public static final String FIELD_AIM_ASSIST_NATIVE_INTEGRATED = "S"; // float[] - integrated rot
 
     // TeamUtil (myau.kY) - public static bot/team checks shared by AimAssist, KillAura, Tracers, NameTags
+    // NameTags (myau.JY): render handler Z(myau.k9), shouldRenderNameTag l(EntityLivingBase);
+    // RenderUtil (myau.kl): drawItemWithEnchantments j(ItemStack,II)V -> myau.f.n labels;
+    // EnchantmentData label entry (myau.e): c=abbreviation, G=maxLevel
     public static final String CLASS_TEAM_UTIL = "myau.kY";
     public static final String METHOD_TEAM_UTIL_IS_BOT = "w";  // (EntityPlayer)Z - Hypixel NPC detection (UUID v2, ping, name marker)
     public static final String METHOD_TEAM_UTIL_IS_TEAM = "Q"; // (EntityPlayer)Z - scoreboard team check
+    public static final String METHOD_TEAM_UTIL_GET_COLOR = "T"; // (EntityPlayer,F)Ljava/awt/Color; - team colour for Bedplates/Tracers
 
     // KillAura (myau.Jh) - fields + methods  (interactAttack = best guess)
     public static final String FIELD_KILL_AURA_TARGET = "c";
@@ -338,6 +349,19 @@ public class MyauMappings {
     public static final String METHOD_KILL_AURA_IS_VALID_TARGET = "B";
     public static final String SIG_KILL_AURA_IS_VALID_TARGET = "(JLnet/minecraft/entity/EntityLivingBase;)Z"; // param order (long, EntityLivingBase)
     public static final String METHOD_KILL_AURA_IS_PLAYER_TARGET = "v"; // (EntityLivingBase,J)Z - EntityPlayer-only check
+    public static final String FIELD_KILL_AURA_CLOCK = "t";            // attack clock, compared against the resolver output
+    public static final String FIELD_KILL_AURA_CLOCK_KEY = "bb";       // static key the clock resolver is hashed against
+    public static final String FIELD_KILL_AURA_SERVER_BLOCKING = "D";  // boolean - server thinks we're blocking
+    public static final String FIELD_KILL_AURA_MOVE_FIX = "p";         // movefix mode property
+    public static final String FIELD_KILL_AURA_RANGE = "TV";           // 
+    public static final String METHOD_KILL_AURA_CLOCK_RESOLVER = "e";  // (IJ)J - clock delta, needs the deobf key
+
+    // KillAura target record (the type of FIELD_KILL_AURA_TARGET)
+    public static final String FIELD_KILL_AURA_TARGET_YAW = "R";
+    public static final String FIELD_KILL_AURA_TARGET_PITCH = "S";
+    public static final String FIELD_KILL_AURA_TARGET_DISTANCE = "t";
+    public static final String FIELD_KILL_AURA_TARGET_USABLE = "q";
+    public static final String FIELD_KILL_AURA_TARGET_ENTITY = "j";
 
     // BedBreaker (myau.D) - bed-nuker target + state fields ( 260729)
     public static final String CLASS_BED_BREAKER = "myau.D";
@@ -346,6 +370,10 @@ public class MyauMappings {
     public static final String FIELD_BED_BREAKER_READY_TO_BREAK = "t";    // boolean - ready to break
     public static final String FIELD_BED_BREAKER_IS_BED = "G";            // boolean - current target is a bed
     public static final String FIELD_BED_BREAKER_WAITING_FOR_START = "J"; // boolean - waiting for start
+
+    // Xray module - two CopyOnWriteArraySet caches, located by field type
+    public static final String FIELD_XRAY_TRACKED_BLOCKS = "G";
+    public static final String FIELD_XRAY_PENDING_BLOCKS = "d";
 
     // Value base (myau.T) - 
     public static final String FIELD_VALUE_CURRENT = "Q";
@@ -421,6 +449,8 @@ public class MyauMappings {
     public static final String METHOD_UPDATE_EVENT_SET_ROTATION = "q";
     public static final String SIG_UPDATE_EVENT_SET_ROTATION = "(FFI)V"; // unchanged
     public static final String TARGET_UPDATE_EVENT_SET_ROTATION = "Lmyau/kQ;q(FFI)V";
+    public static final String METHOD_UPDATE_EVENT_SET_MOVEMENT_YAW = "p";
+    public static final String SIG_UPDATE_EVENT_SET_MOVEMENT_YAW = "(FI)V";
     public static final String METHOD_UPDATE_EVENT_GET_YAW = "N";
     public static final String METHOD_UPDATE_EVENT_GET_PITCH = "l";
 

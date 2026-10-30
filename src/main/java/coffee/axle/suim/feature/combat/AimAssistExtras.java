@@ -1,11 +1,9 @@
 package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.rotation.AimAssistRotation;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.eventbus.AimAssistHook;
-
-import java.lang.reflect.Method;
 
 /**
  * Injects aim modes tthat are in my personal opinion useful $$$$
@@ -13,159 +11,58 @@ import java.lang.reflect.Method;
  */
 public class AimAssistExtras extends Feature {
 
-    private static Object aimAssistModule;
+    // static, aim assist's own code is pulled in from hooks that have no feature instance
+    @Setting(after = "allow-tools")
+    private static AimAssistRotation.AimMode aimMode = AimAssistRotation.AimMode.DEFAULT;
 
-    private static Object aimModeProp;
-    private static Object hitboxBoundsProp;
-    private static Object headBiasProp;
-    private static Object extrapolationProp;
-    private static Object pingCompProp;
-    private static Object contractionMinProp;
-    private static Object contractionMaxProp;
+    @Setting(min = 0.05, max = 1.5) private static float hitboxBounds = 0.95f;
+    @Setting(min = 0, max = 1) private static float headBias = 0.3f;
+    @Setting(name = "contraction-min", min = 0.01, max = 0.15) private static float contractionMin = 0.03f;
+    @Setting(name = "contraction-max", min = 0.10, max = 0.30) private static float contractionMax = 0.22f;
+    @Setting private static boolean extrapolation = false;
+    @Setting private static boolean pingComp = false;
 
-    private static Method propertyGetValue;
+    private static AimAssistExtras instance;
 
-    private static volatile boolean featureActive = false;
-
-    @Override
-    public String getName() {
-        return "AimAssistExtras";
+    public AimAssistExtras() {
+        super("AimAssistExtras");
+        instance = this;
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            propertyGetValue = manager.getPropertyGetValueMethod();
-            if (propertyGetValue == null) {
-                MyauLogger.log(getName(), "PROPERTY_METHOD_NULL");
-                return false;
-            }
-
-            aimAssistModule = manager.findModule("AimAssist");
-            if (aimAssistModule != null) {
-                aimModeProp = creator.createEnumProperty("aim-mode", 0,
-                        AimAssistRotation.MODE_NAMES);
-                hitboxBoundsProp = creator.createFloatProperty(
-                        "hitbox-bounds", 0.95f, 0.05f, 1.5f);
-
-                if (!creator.injectPropertyAfter(aimAssistModule, aimModeProp, "allow-tools")) {
-                    creator.registerProperties(aimAssistModule, aimModeProp);
-                }
-                creator.registerProperties(aimAssistModule, hitboxBoundsProp);
-
-                headBiasProp = creator.createFloatProperty("head-bias", 0.3f, 0.0f, 1.0f);
-                extrapolationProp = creator.createBooleanProperty("extrapolation", false);
-                pingCompProp = creator.createBooleanProperty("ping-comp", false);
-                contractionMinProp = creator.createFloatProperty("contraction-min", 0.03f, 0.01f, 0.15f);
-                contractionMaxProp = creator.createFloatProperty("contraction-max", 0.22f, 0.10f, 0.30f);
-
-                creator.registerProperties(aimAssistModule,
-                        headBiasProp, extrapolationProp, pingCompProp,
-                        contractionMinProp, contractionMaxProp);
-
-                MyauLogger.log(getName(), "god developer axle.coffee comes with insane bypass");
-            } else {
-                MyauLogger.log(getName(), "AimAssist module not found");
-            }
-
-            featureActive = true;
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "AimAssist";
     }
 
     public static boolean isActive() {
-        return featureActive;
+        return instance != null && instance.isEnabled();
     }
 
     public static int getAimModeOrdinal() {
-        if (!featureActive)
-            return 0;
-        return getIntPropValue(aimModeProp, 0);
+        return aimMode.ordinal();
     }
 
     public static float getHitboxBounds() {
-        if (!featureActive)
-            return 0.95f;
-        return getFloatPropValue(hitboxBoundsProp, 0.95f);
+        return hitboxBounds;
     }
 
     public static float getHeadBias() {
-        if (!featureActive)
-            return 0.3f;
-        return getFloatPropValue(headBiasProp, 0.3f);
+        return headBias;
     }
 
     public static boolean isExtrapolationEnabled() {
-        if (!featureActive)
-            return false;
-        return getBoolPropValue(extrapolationProp, false);
+        return extrapolation;
     }
 
     public static boolean isPingCompEnabled() {
-        if (!featureActive)
-            return false;
-        return getBoolPropValue(pingCompProp, false);
+        return pingComp;
     }
 
     public static float getContractionMin() {
-        if (!featureActive)
-            return 0.03f;
-        return getFloatPropValue(contractionMinProp, 0.03f);
+        return contractionMin;
     }
 
     public static float getContractionMax() {
-        if (!featureActive)
-            return 0.22f;
-        return getFloatPropValue(contractionMaxProp, 0.22f);
-    }
-
-    private static int getIntPropValue(Object prop, int defaultVal) {
-        try {
-            if (prop == null || propertyGetValue == null)
-                return defaultVal;
-            Object val = propertyGetValue.invoke(prop);
-            return val instanceof Number ? ((Number) val).intValue() : defaultVal;
-        } catch (Exception e) {
-            return defaultVal;
-        }
-    }
-
-    private static float getFloatPropValue(Object prop, float defaultVal) {
-        try {
-            if (prop == null || propertyGetValue == null)
-                return defaultVal;
-            Object val = propertyGetValue.invoke(prop);
-            return val instanceof Number ? ((Number) val).floatValue() : defaultVal;
-        } catch (Exception e) {
-            return defaultVal;
-        }
-    }
-
-    private static boolean getBoolPropValue(Object prop, boolean defaultVal) {
-        try {
-            if (prop == null || propertyGetValue == null)
-                return defaultVal;
-            Object val = propertyGetValue.invoke(prop);
-            return val instanceof Boolean ? (Boolean) val : defaultVal;
-        } catch (Exception e) {
-            return defaultVal;
-        }
-    }
-
-    @Override
-    public void disable() {
-        featureActive = false;
-        aimAssistModule = null;
-        aimModeProp = null;
-        hitboxBoundsProp = null;
-        headBiasProp = null;
-        extrapolationProp = null;
-        pingCompProp = null;
-        contractionMinProp = null;
-        contractionMaxProp = null;
+        return contractionMax;
     }
 }

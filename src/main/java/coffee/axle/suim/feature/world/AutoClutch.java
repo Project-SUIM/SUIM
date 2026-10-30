@@ -2,18 +2,17 @@ package coffee.axle.suim.feature.world;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * AutoClutch - automatic fall-clutch via Scaffold.
@@ -24,17 +23,17 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
  * https://discord.com/channels/1334598495625154620/1455702511099973726/1461376350064738354
  */
 public class AutoClutch extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
+    public enum DisableMode {
+        MOVE, FORWARD, NONE
+    }
 
-    // Properties
-    private Object hurtTimeProperty;
-    private Object turnOffModeProperty;
-    private Object enableDelayProperty;
-    private Object disableDelayProperty;
-    private Object sprintReEnableProperty;
-    private Object minFallDistProperty;
+    @Setting(min = 0, max = 100) private int enableDelay = 0;
+    @Setting(min = 0, max = 100) private int disableDelay = 50;
+    @Setting(min = 0, max = 500) private int sprintReEnable = 150;
+    @Setting(min = 0, max = 10) private int minFallDistance = 0;
+    @Setting private DisableMode disableMode = DisableMode.MOVE;
+    @Setting private boolean hurtTime = false;
 
     // Foreign modules
     private Object scaffoldModule;
@@ -59,67 +58,25 @@ public class AutoClutch extends Feature {
     private static final long CHAIN_WINDOW_MS = 750;
     private static final long HURT_WINDOW_MS = 1000;
 
-    @Override
-    public String getName() {
-        return "AutoClutch";
+    public AutoClutch() {
+        super("AutoClutch", GuiCategory.WORLD);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.WORLD;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            scaffoldModule = manager.findModule("Scaffold");
-            if (scaffoldModule == null) {
-                MyauLogger.log(getName(), "Scaffold module not found");
-                return false;
-            }
-
-            sprintModule = manager.findModule("Sprint");
-
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, AutoClutch.class);
-
-            hurtTimeProperty = creator.createBooleanProperty("hurt-time", false);
-            turnOffModeProperty = creator.createEnumProperty(
-                    "disable-mode", 0,
-                    new String[] { "MOVE", "FORWARD", "NONE" });
-            enableDelayProperty = creator.createIntegerProperty("enable-delay", 0, 0, 100);
-            disableDelayProperty = creator.createIntegerProperty("disable-delay", 0, 0, 100);
-            sprintReEnableProperty = creator.createIntegerProperty("sprint-re-enable", 150, 0, 500);
-            minFallDistProperty = creator.createIntegerProperty("min-fall-distance", 0, 0, 10);
-
-            creator.registerProperties(
-                    moduleInstance,
-                    hurtTimeProperty,
-                    turnOffModeProperty,
-                    enableDelayProperty,
-                    disableDelayProperty,
-                    sprintReEnableProperty,
-                    minFallDistProperty);
-
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(
-                    moduleInstance,
-                    this::onModuleEnabled,
-                    this::onModuleDisabled);
-
-            MyauLogger.log(getName(), "FEATURE_MEOWW");
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_NO_TUNA", e);
-            return false;
+    protected void init() throws Exception {
+        scaffoldModule = manager.findModule("Scaffold");
+        if (scaffoldModule == null) {
+            // old gate: no Scaffold, no AutoClutch module at all
+            throw new ModuleSetupException("Scaffold module not found");
         }
+
+        sprintModule = manager.findModule("Sprint");
+
+        MyauLogger.log(getName(), "FEATURE_READY");
     }
 
-    private void onModuleEnabled() {
+    @Override
+    protected void onEnable() {
         falling = false;
         suppressed = false;
         needsSprint = false;
@@ -135,7 +92,8 @@ public class AutoClutch extends Feature {
         lastHurtAt = 0;
     }
 
-    private void onModuleDisabled() {
+    @Override
+    protected void onDisable() {
         if (falling) {
             disableScaffold();
         }
@@ -157,7 +115,7 @@ public class AutoClutch extends Feature {
             return;
 
         try {
-            if (!manager.isModuleEnabled(moduleInstance))
+            if (!isEnabled() || scaffoldModule == null)
                 return;
             if (mc.thePlayer == null || mc.theWorld == null)
                 return;
@@ -295,19 +253,18 @@ public class AutoClutch extends Feature {
         if (clutchStartTime != 0 && now - clutchStartTime < grace)
             return;
 
-        int turnOffMode = getTurnOffMode();
-        switch (turnOffMode) {
-            case 0: // MOVE
+        switch (disableMode) {
+            case MOVE:
                 if (isMoving() || isAnyMovementKeyDown()) {
                     stopClutch(now, true);
                 }
                 break;
-            case 1: // FORWARD
+            case FORWARD:
                 if (mc.gameSettings.keyBindForward.isKeyDown()) {
                     stopClutch(now, true);
                 }
                 break;
-            case 2: // NONE
+            case NONE:
                 break;
         }
     }
@@ -388,55 +345,22 @@ public class AutoClutch extends Feature {
     }
 
     private boolean getHurtTimeEnabled() {
-        try {
-            return (Boolean) properties.getPropertyValue(hurtTimeProperty);
-        } catch (Exception e) {
-            return true;
-        }
-    }
-
-    private int getTurnOffMode() {
-        try {
-            return ((Number) properties.getPropertyValue(turnOffModeProperty))
-                    .intValue();
-        } catch (Exception e) {
-            return 0;
-        }
+        return hurtTime;
     }
 
     private long getEnableDelay() {
-        try {
-            return ((Number) properties.getPropertyValue(enableDelayProperty))
-                    .longValue();
-        } catch (Exception e) {
-            return 0;
-        }
+        return enableDelay;
     }
 
     private long getDisableDelay() {
-        try {
-            return ((Number) properties.getPropertyValue(disableDelayProperty))
-                    .longValue();
-        } catch (Exception e) {
-            return 50;
-        }
+        return disableDelay;
     }
 
     private long getSprintReEnable() {
-        try {
-            return ((Number) properties.getPropertyValue(sprintReEnableProperty))
-                    .longValue();
-        } catch (Exception e) {
-            return 150;
-        }
+        return sprintReEnable;
     }
 
     private int getMinFallDist() {
-        try {
-            return ((Number) properties.getPropertyValue(minFallDistProperty))
-                    .intValue();
-        } catch (Exception e) {
-            return 0;
-        }
+        return minFallDistance;
     }
 }

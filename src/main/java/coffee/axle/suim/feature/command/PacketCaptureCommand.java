@@ -1,7 +1,6 @@
 package coffee.axle.suim.feature.command;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketCapture;
 
 import java.util.ArrayList;
@@ -9,21 +8,14 @@ import java.util.Arrays;
 
 public class PacketCaptureCommand extends Feature {
 
-    @Override
-    public String getName() {
-        return "Command:PacketCapture";
+    public PacketCaptureCommand() {
+        super("Command:PacketCapture");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            creator.registerCommand(new ArrayList<>(Arrays.asList("packetcapture", "pcap")), this::handleCommand);
-            PacketCapture.getInstance().register();
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        creator.registerCommand(new ArrayList<>(Arrays.asList("packetcapture", "pcap")), this::handleCommand);
+        PacketCapture.getInstance().register();
     }
 
     private void handleCommand(ArrayList<String> args) {

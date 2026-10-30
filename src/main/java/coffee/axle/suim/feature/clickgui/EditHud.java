@@ -12,49 +12,23 @@ import java.util.ArrayList;
  */
 public class EditHud extends Feature {
 
-    private Object moduleInstance;
-
-    @Override
-    public String getName() {
-        return "EditHud";
+    public EditHud() {
+        super("EditHud", GuiCategory.SETTINGS);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.SETTINGS;
+    protected void init() throws Exception {
+        ArrayList<String> cmdNames = new ArrayList<>();
+        cmdNames.add("edithud");
+        creator.registerCommand(cmdNames, this::handleCommand);
+
+        MyauLogger.info("EditHud initialized");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, EditHud.class);
-
-            manager.registerModuleCallbacks(
-                    moduleInstance,
-                    this::onMyauEnable,
-                    this::onMyauDisable);
-
-            ArrayList<String> cmdNames = new ArrayList<>();
-            cmdNames.add("edithud");
-            creator.registerCommand(cmdNames, this::handleCommand);
-
-            manager.reloadModuleCommand();
-
-            MyauLogger.info("EditHud initialized");
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("EditHud:init", e);
-            return false;
-        }
-    }
-
-    private void onMyauEnable() {
+    protected void onEnable() {
         manager.sendMessage(
                 "&7EditHud is a stub \u2014 full implementation pending");
-    }
-
-    private void onMyauDisable() {
     }
 
     private void handleCommand(ArrayList<String> args) {

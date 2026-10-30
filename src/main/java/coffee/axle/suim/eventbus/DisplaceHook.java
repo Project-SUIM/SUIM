@@ -3,7 +3,6 @@ package coffee.axle.suim.eventbus;
 import coffee.axle.suim.feature.combat.Displace;
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.client.C03PacketPlayer;
@@ -12,9 +11,9 @@ import net.minecraft.util.MovingObjectPosition;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public final class DisplaceHook {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static Object autoClicker;
     private static Field acEnabled;
@@ -60,7 +59,7 @@ public final class DisplaceHook {
     public static boolean isACActive() {
         if (autoClicker == null || acEnabled == null) return false;
         Displace d = Displace.instance;
-        if (d == null || !d.isEnabled() || !d.hookOn(d.autoClickerProperty)) return false;
+        if (d == null || !d.isEnabled() || !d.autoClicker) return false;
         try {
             return acEnabled.getBoolean(autoClicker);
         } catch (Exception e) {
@@ -81,8 +80,8 @@ public final class DisplaceHook {
                     .getDeclaredField(MyauMappings.FIELD_MODULE_ENABLED);
             acEnabled.setAccessible(true);
             Class<?> eventClass = Class.forName(MyauMappings.CLASS_LEFT_CLICK_EVENT);
-            canceled = eventClass.getMethod("J");
-            cancel = eventClass.getMethod("w", boolean.class);
+            canceled = eventClass.getMethod(MyauMappings.METHOD_LEFT_CLICK_IS_CANCELED);
+            cancel = eventClass.getMethod(MyauMappings.METHOD_LEFT_CLICK_CANCEL, boolean.class);
             return MyauEventBusHook.registerAfter(
                     MyauMappings.CLASS_LEFT_CLICK_EVENT,
                     new DisplaceHook(),
@@ -105,23 +104,24 @@ public final class DisplaceHook {
             kaEnabled = killAura.getClass().getSuperclass()
                     .getDeclaredField(MyauMappings.FIELD_MODULE_ENABLED);
             kaEnabled.setAccessible(true);
-            killTarget = field(killAura, "c");
-            attackClock = field(killAura, "t");
-            Method clockResolver = killAura.getClass().getDeclaredMethod("e", int.class, long.class);
+            killTarget = field(killAura, MyauMappings.FIELD_KILL_AURA_TARGET);
+            attackClock = field(killAura, MyauMappings.FIELD_KILL_AURA_CLOCK);
+            Method clockResolver = killAura.getClass().getDeclaredMethod(
+                    MyauMappings.METHOD_KILL_AURA_CLOCK_RESOLVER, int.class, long.class);
             clockResolver.setAccessible(true);
-            Field clockKey = field(killAura.getClass(), "bb");
+            Field clockKey = field(killAura.getClass(), MyauMappings.FIELD_KILL_AURA_CLOCK_KEY);
             clockKey.setAccessible(true);
             long key = clockKey.getLong(null) ^ 0x343bec35323607L;
             clockDelta = ((Number) clockResolver.invoke(null, 24814, key)).longValue();
-            blocking = field(killAura, "u");
-            serverBlocking = field(killAura, "D");
-            moveFix = field(killAura, "p");
+            blocking = field(killAura, MyauMappings.FIELD_KILL_AURA_IS_BLOCKING);
+            serverBlocking = field(killAura, MyauMappings.FIELD_KILL_AURA_SERVER_BLOCKING);
+            moveFix = field(killAura, MyauMappings.FIELD_KILL_AURA_MOVE_FIX);
             Class<?> targetClass = killTarget.getType();
-            targetYaw = field(targetClass, "R");
-            targetPitch = field(targetClass, "S");
-            targetDistance = field(targetClass, "t");
-            targetUsable = field(targetClass, "q");
-            targetEntity = field(targetClass, "j");
+            targetYaw = field(targetClass, MyauMappings.FIELD_KILL_AURA_TARGET_YAW);
+            targetPitch = field(targetClass, MyauMappings.FIELD_KILL_AURA_TARGET_PITCH);
+            targetDistance = field(targetClass, MyauMappings.FIELD_KILL_AURA_TARGET_DISTANCE);
+            targetUsable = field(targetClass, MyauMappings.FIELD_KILL_AURA_TARGET_USABLE);
+            targetEntity = field(targetClass, MyauMappings.FIELD_KILL_AURA_TARGET_ENTITY);
             return MyauEventBusHook.registerBefore(
                     MyauMappings.CLASS_UPDATE_EVENT,
                     new DisplaceHook(),
@@ -161,7 +161,7 @@ public final class DisplaceHook {
     public void onKaUpdate(Object event) {
         Displace d = Displace.instance;
         try {
-            if (d == null || !d.isEnabled() || !d.hookOn(d.killAuraProperty)
+            if (d == null || !d.isEnabled() || !d.killAura
                     || killAura == null || mc.thePlayer == null
                     || !kaEnabled.getBoolean(killAura)) {
                 return;
@@ -178,10 +178,12 @@ public final class DisplaceHook {
                 if (target == null || !targetUsable.getBoolean(target)) return;
                 float normalYaw = targetYaw.getFloat(target);
                 float normalPitch = targetPitch.getFloat(target);
-                event.getClass().getMethod("q", float.class, float.class, int.class)
+                event.getClass().getMethod(MyauMappings.METHOD_UPDATE_EVENT_SET_ROTATION,
+                        float.class, float.class, int.class)
                         .invoke(event, normalYaw, normalPitch, 2);
                 if (propertyInt(moveFix.get(killAura), 0) == 1) {
-                    event.getClass().getMethod("p", float.class, int.class)
+                    event.getClass().getMethod(MyauMappings.METHOD_UPDATE_EVENT_SET_MOVEMENT_YAW,
+                            float.class, int.class)
                             .invoke(event, normalYaw, 2);
                 }
                 return;
@@ -216,10 +218,12 @@ public final class DisplaceHook {
             d.lastAt = System.currentTimeMillis();
             d.startBlink();
 
-            event.getClass().getMethod("q", float.class, float.class, int.class)
+            event.getClass().getMethod(MyauMappings.METHOD_UPDATE_EVENT_SET_ROTATION,
+                    float.class, float.class, int.class)
                     .invoke(event, flickYaw, kaPitch, 2);
             if (propertyInt(moveFix.get(killAura), 0) == 1) {
-                event.getClass().getMethod("p", float.class, int.class)
+                event.getClass().getMethod(MyauMappings.METHOD_UPDATE_EVENT_SET_MOVEMENT_YAW,
+                        float.class, int.class)
                         .invoke(event, flickYaw, 2);
             }
 
@@ -234,7 +238,7 @@ public final class DisplaceHook {
 
     public void onLeftClick(Object event) {
         Displace displace = Displace.instance;
-        if (displace == null || !displace.isEnabled() || !displace.hookOn(displace.autoClickerProperty)
+        if (displace == null || !displace.isEnabled() || !displace.autoClicker
                 || !isACActive() || isCanceled(event) || mc.thePlayer == null
                 || mc.thePlayer.isUsingItem() || mc.gameSettings.keyBindUseItem.isKeyDown()) {
             return;
@@ -286,8 +290,9 @@ public final class DisplaceHook {
 
     private static double range() {
         try {
-            Field property = field(killAura, "TV");
-            Object value = property.get(killAura).getClass().getMethod("S")
+            Field property = field(killAura, MyauMappings.FIELD_KILL_AURA_RANGE);
+            Object value = property.get(killAura).getClass()
+                    .getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE)
                     .invoke(property.get(killAura));
             return ((Number) value).doubleValue();
         } catch (Exception e) {
@@ -297,7 +302,8 @@ public final class DisplaceHook {
 
     private static int propertyInt(Object property, int fallback) {
         try {
-            Object value = property.getClass().getMethod("S").invoke(property);
+            Object value = property.getClass().getMethod(MyauMappings.METHOD_PROPERTY_GET_VALUE)
+                    .invoke(property);
             return value instanceof Number ? ((Number) value).intValue() : fallback;
         } catch (Exception e) {
             return fallback;

@@ -2,65 +2,41 @@ package coffee.axle.suim.feature.player;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Swaps to another block stack once the one you are placing with runs low.
  */
 public class AutoSwap extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
-    private Object swapAtProperty;
-    private Object lookingDownProperty;
-    private Object movingBackwardsProperty;
+    @Setting(min = 1, max = 64) private int swapAt = 1;
+    @Setting(name = "hate-evil-pumpkins") private boolean evilPumpkins = true;
+    @Setting private boolean lookingDown = false;
+    @Setting private boolean movingBackwards = false;
 
     private boolean lastHeldBlocks;
-    private Object evilPumpkinsProperty;
     private int lastSlot = -1;
 
-    @Override
-    public String getName() {
-        return "AutoSwap";
+    public AutoSwap() {
+        super("AutoSwap", GuiCategory.PLAYER);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.PLAYER;
+    protected void onEnable() {
+        reset();
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, AutoSwap.class);
-
-            swapAtProperty = creator.createIntegerProperty("swap-at", 1, 1, 64);
-            lookingDownProperty = creator.createBooleanProperty("looking-down", false);
-            evilPumpkinsProperty = creator.createBooleanProperty("hate-evil-pumpkins", true);
-            movingBackwardsProperty = creator.createBooleanProperty("moving-backwards", false);
-
-            creator.registerProperties(moduleInstance, swapAtProperty,
-                    lookingDownProperty, evilPumpkinsProperty, movingBackwardsProperty);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, this::reset, this::reset);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("AutoSwap:init", e);
-            return false;
-        }
+    protected void onDisable() {
+        reset();
     }
 
     private void reset() {
@@ -73,7 +49,7 @@ public class AutoSwap extends Feature {
     public void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return;
 
-        if (!manager.isModuleEnabled(moduleInstance) || !Utils.nullCheck()
+        if (!isEnabled() || !Utils.nullCheck()
                 || mc.currentScreen != null) {
             reset();
             return;
@@ -85,7 +61,7 @@ public class AutoSwap extends Feature {
 
         if (slot == lastSlot && lastHeldBlocks
                 && mc.gameSettings.keyBindUseItem.isKeyDown()
-                && (!blocks || held.stackSize <= properties.getInt(swapAtProperty, 1))
+                && (!blocks || held.stackSize <= swapAt)
                 && conditionsMet()) {
             swapToBest();
             blocks = isFullBlock(mc.thePlayer.getHeldItem());
@@ -96,11 +72,11 @@ public class AutoSwap extends Feature {
     }
 
     private boolean conditionsMet() {
-        if (properties.getBoolean(lookingDownProperty, false)
+        if (lookingDown
                 && mc.thePlayer.rotationPitch < 70.0f) {
             return false;
         }
-        return !properties.getBoolean(movingBackwardsProperty, false)
+        return !movingBackwards
                 || mc.gameSettings.keyBindBack.isKeyDown();
     }
 
@@ -108,7 +84,6 @@ public class AutoSwap extends Feature {
         int current = mc.thePlayer.inventory.currentItem;
         int best = -1;
         int bestCount = 1;
-        boolean evilPumpkins = properties.getBoolean(evilPumpkinsProperty, true);
 
         for (int i = 0; i < 9; i++) {
             if (i == current) continue;

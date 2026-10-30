@@ -13,6 +13,7 @@ import net.minecraft.util.IChatComponent;
 import net.minecraftforge.client.ClientCommandHandler;
 
 import java.util.regex.Pattern;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * A collection of utility functions for creating and sending or displaying chat
@@ -30,7 +31,6 @@ public final class ChatUtils {
 
     public static final ChatUtils INSTANCE = new ChatUtils();
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     // Color string constants
     public static final String BLACK = EnumChatFormatting.BLACK.toString();
@@ -186,20 +186,6 @@ public final class ChatUtils {
         if (mc.thePlayer != null) {
             mc.thePlayer.addChatMessage(iChatComponent);
         }
-    }
-
-    /**
-     * Print a developer message in chat (disabled; dev settings removed).
-     */
-    public static void devMessage(Object msg) {
-        // Dev mode has been removed - no-op
-    }
-
-    /**
-     * Print a debug message in chat (disabled; debug settings removed).
-     */
-    public static void debugMessage(Object msg) {
-        // Debug mode has been removed - no-op
     }
 
     /**

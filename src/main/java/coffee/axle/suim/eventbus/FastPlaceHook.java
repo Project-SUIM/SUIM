@@ -2,12 +2,12 @@ package coffee.axle.suim.eventbus;
 
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 
 import java.lang.reflect.Field;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Event-bus replacement for MixinFastPlace.
@@ -30,7 +30,6 @@ import java.lang.reflect.Field;
  */
 public class FastPlaceHook {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static boolean loggedInit = false;
 
     // Reflection caches

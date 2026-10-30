@@ -4,22 +4,22 @@ import coffee.axle.suim.events.PrePlayerInputEvent;
 import coffee.axle.suim.events.SendPacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemPotion;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemSword;
 import net.minecraft.item.EnumAction;
 import net.minecraft.network.play.client.C08PacketPlayerBlockPlacement;
 import net.minecraft.util.MovingObjectPosition;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Injects KOL's AIR_MOTION mode into myau's NoSlow (myau.Jd) sword/food modes
@@ -40,19 +40,15 @@ import java.lang.reflect.Modifier;
  * before the use starts.
  */
 public class NoSlowExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static final int SWORD_AIR_MOTION = 2;
     private static final int FOOD_AIR_MOTION = 3;
 
-    private Object noSlowModule;
-    private Object swordModeProperty;
-    private Object foodModeProperty;
-    private Object foodAutoJumpProperty;
-    private Object swordMotionProperty;
-    private Object foodMotionProperty;
-
-    private Field enabledField;
+    @Setting(existing = true) private int swordMode;
+    @Setting(existing = true) private int foodMode;
+    @Setting(existing = true) private int swordMotion;
+    @Setting(existing = true) private int foodMotion;
+    @Setting private boolean foodAutoJump = false;
 
     // use packet hold state
     private long sinceUse = 100;
@@ -60,53 +56,26 @@ public class NoSlowExtras extends Feature {
     private int holdTicks;
     private boolean jumped;
 
-    @Override
-    public String getName() {
-        return "NoSlow:Extras";
+    public NoSlowExtras() {
+        super("NoSlow:Extras");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            noSlowModule = manager.findModule("NoSlow");
-            if (noSlowModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            enabledField = noSlowModule.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_MODULE_ENABLED);
-            enabledField.setAccessible(true);
-
-            swordModeProperty = manager.findProperty(noSlowModule, "sword-mode");
-            foodModeProperty = manager.findProperty(noSlowModule, "food-mode");
-            if (swordModeProperty == null || foodModeProperty == null) {
-                MyauLogger.log(getName(), "MODE_PROPERTIES_NOT_FOUND");
-                return false;
-            }
-
-            extendEnum(swordModeProperty, new String[] { "NONE", "VANILLA", "AIR_MOTION" });
-            extendEnum(foodModeProperty, new String[] { "NONE", "VANILLA", "FLOAT", "AIR_MOTION" });
-
-            swordMotionProperty = manager.findProperty(noSlowModule, "sword-motion");
-            foodMotionProperty = manager.findProperty(noSlowModule, "food-motion");
-
-            foodAutoJumpProperty = creator.createBooleanProperty("food-auto-jump", false);
-            creator.registerProperties(noSlowModule, foodAutoJumpProperty);
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            MyauLogger.log(getName(), "air-motion ready");
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "NoSlow";
     }
 
-    // myau.x stores its mode names in the final String[] P field. java 8 lets us
-    // swap the array itself via the modifiers hack, the clickgui reads it through
-    // V() which clones so the new options show up everywhere
+    @Override
+    protected void init() throws Exception {
+        extendEnum(findProperty("sword-mode"), new String[] { "NONE", "VANILLA", "AIR_MOTION" });
+        extendEnum(findProperty("food-mode"), new String[] { "NONE", "VANILLA", "FLOAT", "AIR_MOTION" });
+
+        MyauLogger.log(getName(), "air-motion ready");
+    }
+
+    // the enum options array is final, java 8 lets us swap the array itself via
+    // the modifiers hack. the clickgui reads it through a clone, so the new
+    // options show up everywhere
     private void extendEnum(Object enumProperty, String[] newValues) throws Exception {
         Field valuesField = enumProperty.getClass()
                 .getDeclaredField(MyauMappings.FIELD_ENUM_VALUES_ARRAY);
@@ -120,26 +89,16 @@ public class NoSlowExtras extends Feature {
     }
 
     private boolean isAirMotion() {
-        if (!enabled() || mc.thePlayer == null) {
+        if (!isEnabled() || mc.thePlayer == null) {
             return false;
         }
-        int sword = intProp(swordModeProperty);
-        int food = intProp(foodModeProperty);
         ItemStack held = mc.thePlayer.getHeldItem();
-        return sword == SWORD_AIR_MOTION && held != null && held.getItem() instanceof ItemSword
-                || food == FOOD_AIR_MOTION && isConsumable(held);
+        return swordMode == SWORD_AIR_MOTION && held != null && held.getItem() instanceof ItemSword
+                || foodMode == FOOD_AIR_MOTION && isConsumable(held);
     }
 
     private boolean isFoodAirMotion() {
-        return enabled() && intProp(foodModeProperty) == FOOD_AIR_MOTION;
-    }
-
-    private boolean enabled() {
-        try {
-            return enabledField.getBoolean(noSlowModule);
-        } catch (Exception e) {
-            return false;
-        }
+        return isEnabled() && foodMode == FOOD_AIR_MOTION;
     }
 
     // mirrors myau k4.S(): EAT or DRINK action, non-splash potion
@@ -152,15 +111,6 @@ public class NoSlowExtras extends Feature {
         }
         EnumAction action = stack.getItemUseAction();
         return action == EnumAction.EAT || action == EnumAction.DRINK;
-    }
-
-    private int intProp(Object property) {
-        try {
-            Object value = properties.getPropertyValue(property);
-            return value instanceof Number ? ((Number) value).intValue() : -1;
-        } catch (Exception e) {
-            return -1;
-        }
     }
 
     @SubscribeEvent
@@ -203,8 +153,7 @@ public class NoSlowExtras extends Feature {
             unpinMotion();
         }
 
-        if (foodAutoJumpProperty != null
-                && properties.getBoolean(foodAutoJumpProperty, false)
+        if (foodAutoJump
                 && isFoodAirMotion()
                 && mc.thePlayer.isUsingItem()
                 && mc.thePlayer.onGround) {
@@ -294,41 +243,24 @@ public class NoSlowExtras extends Feature {
     private int pinnedFoodMotion = -1;
 
     private void pinMotion(int value) {
-        if (swordMotionProperty != null) {
-            if (pinnedSwordMotion == -1) {
-                pinnedSwordMotion = intProp(swordMotionProperty);
-            }
-            setProp(swordMotionProperty, value);
+        if (pinnedSwordMotion == -1) {
+            pinnedSwordMotion = swordMotion;
         }
-        if (foodMotionProperty != null) {
-            if (pinnedFoodMotion == -1) {
-                pinnedFoodMotion = intProp(foodMotionProperty);
-            }
-            setProp(foodMotionProperty, value);
+        set("swordMotion", value);
+        if (pinnedFoodMotion == -1) {
+            pinnedFoodMotion = foodMotion;
         }
+        set("foodMotion", value);
     }
 
     private void unpinMotion() {
-        if (pinnedSwordMotion != -1 && swordMotionProperty != null) {
-            setProp(swordMotionProperty, pinnedSwordMotion);
+        if (pinnedSwordMotion != -1) {
+            set("swordMotion", pinnedSwordMotion);
             pinnedSwordMotion = -1;
         }
-        if (pinnedFoodMotion != -1 && foodMotionProperty != null) {
-            setProp(foodMotionProperty, pinnedFoodMotion);
+        if (pinnedFoodMotion != -1) {
+            set("foodMotion", pinnedFoodMotion);
             pinnedFoodMotion = -1;
-        }
-    }
-
-    private void setProp(Object property, int value) {
-        try {
-            // write Q directly - manager.setPropertyValue fires a config save
-            // on every call and we flip this multiple times a second
-            Field valueField = property.getClass().getSuperclass()
-                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            valueField.setAccessible(true);
-            valueField.set(property, value);
-        } catch (Exception e) {
-            MyauLogger.error("NoSlow:Extras set", e);
         }
     }
 

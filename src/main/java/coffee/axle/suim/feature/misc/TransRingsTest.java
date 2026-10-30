@@ -4,7 +4,6 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldRenderer;
@@ -12,13 +11,13 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Test module - renders a trans flag (5 horizontal ring layers) 2 blocks in
@@ -28,7 +27,6 @@ import java.util.Collections;
  */
 public class TransRingsTest extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static final Color CYAN = new Color(91, 206, 250);
     private static final Color PINK = new Color(245, 169, 184);
@@ -38,54 +36,36 @@ public class TransRingsTest extends Feature {
     private static final float FLAG_HEIGHT = 1.5f;
     private static final float DISTANCE = 2.0f;
 
-    private Object moduleInstance;
     private boolean enabled = false;
 
-    @Override
-    public String getName() {
-        return "TransRingsTest";
+    public TransRingsTest() {
+        super("TransRingsTest", GuiCategory.MISC);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.MISC;
+    protected void init() throws Exception {
+        ArrayList<String> commandNames = new ArrayList<>(Collections.singletonList("transringstest"));
+        creator.registerCommand(commandNames, this::handleCommand);
+
+        MyauLogger.info("TransRingsTest initialized");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            this.moduleInstance = createModule();
-            creator.injectModule(this.moduleInstance, TransRingsTest.class);
-            manager.reloadModuleCommand();
+    protected void onEnable() {
+        enabled = true;
+        MyauLogger.info("TransRingsTest enabled");
+    }
 
-            ArrayList<String> commandNames = new ArrayList<>(Collections.singletonList("transringstest"));
-            creator.registerCommand(commandNames, this::handleCommand);
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(
-                    this.moduleInstance,
-                    () -> {
-                        enabled = true;
-                        MyauLogger.info("TransRingsTest enabled");
-                    },
-                    () -> {
-                        enabled = false;
-                        MyauLogger.info("TransRingsTest disabled");
-                    });
-
-            MyauLogger.info("TransRingsTest initialized");
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("TransRingsTest:init", e);
-            return false;
-        }
+    @Override
+    protected void onDisable() {
+        enabled = false;
+        MyauLogger.info("TransRingsTest disabled");
     }
 
     private void handleCommand(ArrayList<String> args) {
         try {
-            if (moduleInstance != null) {
-                manager.toggleModule(moduleInstance);
+            if (getModuleInstance() != null) {
+                manager.toggleModule(getModuleInstance());
             }
         } catch (Exception e) {
             MyauLogger.error("TransRingsTest:command", e);
@@ -105,6 +85,7 @@ public class TransRingsTest extends Feature {
         float partialTicks = event.partialTicks;
 
         Entity player = mc.thePlayer;
+        @SuppressWarnings("unused")
         Vec3 look = player.getLookVec();
 
         Vec3 p = Utils.interpolate(player, partialTicks);
@@ -178,10 +159,9 @@ public class TransRingsTest extends Feature {
     @Override
     public void disable() {
         try {
-            MinecraftForge.EVENT_BUS.unregister(this);
             enabled = false;
-            if (moduleInstance != null) {
-                manager.setModuleEnabled(moduleInstance, false);
+            if (getModuleInstance() != null) {
+                manager.setModuleEnabled(getModuleInstance(), false);
             }
         } catch (Exception e) {
             MyauLogger.error("TransRingsTest:disable", e);

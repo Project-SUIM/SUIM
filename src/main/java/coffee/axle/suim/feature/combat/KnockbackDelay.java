@@ -3,85 +3,52 @@ package coffee.axle.suim.feature.combat;
 import coffee.axle.suim.events.ReceivePacketEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S08PacketPlayerPosLook;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class KnockbackDelay extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object moduleInstance;
-    private Object distanceProperty;
-    private Object chanceProperty;
-    private Object maxDelayProperty;
-    private Object inAirProperty;
-    private Object onlyGroundProperty;
+    @Setting(min = 3, max = 12) private float distance = 6.0f;
+    @Setting(min = 0, max = 100) private int chance = 100;
+    @Setting(name = "max-delay-ms", min = 50, max = 1000) private int maxDelay = 200;
+    @Setting private boolean inAir = true;
+    @Setting private boolean onlyGround = false;
 
     private final Deque<BufferedPacket> bufferedPackets = new ArrayDeque<>();
     // backtrack gates its start on this
     public static boolean active = false;
 
-    @Override
-    public String getName() {
-        return "KnockbackDelay";
+    public KnockbackDelay() {
+        super("KnockbackDelay", GuiCategory.COMBAT);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.COMBAT;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, KnockbackDelay.class);
-
-            distanceProperty = creator.createFloatProperty("distance", 6.0f, 3.0f, 12.0f);
-            chanceProperty = creator.createIntegerProperty("chance", 100, 0, 100);
-            maxDelayProperty = creator.createIntegerProperty("max-delay-ms", 200, 50, 1000);
-            inAirProperty = creator.createBooleanProperty("in-air", true);
-            onlyGroundProperty = creator.createBooleanProperty("only-ground", false);
-
-            creator.registerProperties(moduleInstance, distanceProperty, chanceProperty,
-                    maxDelayProperty, inAirProperty, onlyGroundProperty);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("KnockbackDelay:init", e);
-            return false;
-        }
-    }
-
-    private void onEnable() {
+    protected void onEnable() {
         active = false;
         bufferedPackets.clear();
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         flushAll();
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onReceivePacket(ReceivePacketEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!Utils.nullCheck()) return;
         // released by another holder (backtrack), let it through
         if (e.getPacket() == PacketUtils.reprocessing) return;
@@ -98,8 +65,8 @@ public class KnockbackDelay extends Feature {
 
         if (!passesConditions()) return;
 
-        int chance = properties.getInt(chanceProperty, 100);
-        if (chance < 100 && Math.random() * 100.0 >= chance) return;
+        int c = chance;
+        if (c < 100 && Math.random() * 100.0 >= c) return;
 
         if (active) return;
 
@@ -111,7 +78,7 @@ public class KnockbackDelay extends Feature {
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.START) return;
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
         if (!Utils.nullCheck() || mc.thePlayer.isDead) {
             flushAll();
             return;
@@ -124,14 +91,14 @@ public class KnockbackDelay extends Feature {
             return;
         }
 
-        int maxDelay = properties.getInt(maxDelayProperty, 200);
+        int delay = maxDelay;
         long now = System.currentTimeMillis();
         @SuppressWarnings("unused")
         boolean flushed = false;
 
         while (!bufferedPackets.isEmpty()) {
             BufferedPacket bp = bufferedPackets.peek();
-            if (now - bp.timestamp >= maxDelay) {
+            if (now - bp.timestamp >= delay) {
                 bufferedPackets.poll();
                 processPacket(bp.packet);
                 flushed = true;
@@ -146,7 +113,7 @@ public class KnockbackDelay extends Feature {
     }
 
     private boolean passesConditions() {
-        double dist = properties.getFloat(distanceProperty, 6.0f);
+        double dist = distance;
         double distSq = dist * dist;
         boolean foundTarget = false;
 
@@ -159,10 +126,8 @@ public class KnockbackDelay extends Feature {
         }
         if (!foundTarget) return false;
 
-        boolean inAir = properties.getBoolean(inAirProperty, true);
         if (inAir && mc.thePlayer.onGround) return false;
 
-        boolean onlyGround = properties.getBoolean(onlyGroundProperty, false);
         if (onlyGround && !mc.thePlayer.onGround) return false;
 
         return true;

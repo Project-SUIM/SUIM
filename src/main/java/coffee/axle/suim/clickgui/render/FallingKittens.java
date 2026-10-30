@@ -1,6 +1,5 @@
 package coffee.axle.suim.clickgui.render;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
@@ -9,9 +8,9 @@ import net.minecraft.util.ResourceLocation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class FallingKittens {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final String RESOURCE_DOMAIN = "suim";
 
     private final List<Kitten> kittens;

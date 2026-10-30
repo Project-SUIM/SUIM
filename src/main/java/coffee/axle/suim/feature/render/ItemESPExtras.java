@@ -1,9 +1,8 @@
 package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.property.Setting;
 import net.minecraft.block.Block;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -15,7 +14,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.awt.Color;
@@ -25,54 +23,31 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class ItemESPExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final Frustum frustum = new Frustum();
 
-    private Object itemESP;
-    private Object nameTags;
-    private Object autoScale;
-    private Object emeralds;
-    private Object diamonds;
-    private Object gold;
-    private Object iron;
+    @Setting(existing = true) private boolean autoScale = true;
+    @Setting(existing = true) private boolean emeralds = true;
+    @Setting(existing = true) private boolean diamonds = true;
+    @Setting(existing = true) private boolean gold = true;
+    @Setting(existing = true) private boolean iron = true;
+    @Setting(after = "item-count") private boolean nameTags = false;
 
-    @Override
-    public String getName() {
-        return "ItemESP:NameTags";
+    public ItemESPExtras() {
+        super("ItemESP:NameTags");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            itemESP = manager.findModule("ItemESP");
-            if (itemESP == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-            autoScale = manager.findProperty(itemESP, "auto-scale");
-            emeralds = manager.findProperty(itemESP, "emeralds");
-            diamonds = manager.findProperty(itemESP, "diamonds");
-            gold = manager.findProperty(itemESP, "gold");
-            iron = manager.findProperty(itemESP, "iron");
-            nameTags = creator.createBooleanProperty("name-tags", false);
-            if (!creator.injectPropertyAfter(itemESP, nameTags, "item-count")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-            MinecraftForge.EVENT_BUS.register(this);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "ItemESP";
     }
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (mc.theWorld == null || mc.getRenderViewEntity() == null
-                || !manager.isModuleEnabled(itemESP) || !properties.getBoolean(nameTags, false)) {
+                || !isEnabled() || !nameTags) {
             return;
         }
         LinkedHashMap<Group, ItemStack> items = new LinkedHashMap<>();
@@ -101,16 +76,16 @@ public class ItemESPExtras extends Feature {
     }
 
     private boolean show(int id) {
-        return properties.getBoolean(emeralds, true) && isEmerald(id)
-                || properties.getBoolean(diamonds, true) && isDiamond(id)
-                || properties.getBoolean(gold, true) && isGold(id)
-                || properties.getBoolean(iron, true) && isIron(id);
+        return emeralds && isEmerald(id)
+                || diamonds && isDiamond(id)
+                || gold && isGold(id)
+                || iron && isIron(id);
     }
 
     private void drawNameTag(Group group, ItemStack stack) {
         Entity view = mc.getRenderViewEntity();
         double distance = view.getDistance(group.x, group.y, group.z);
-        double scaleDistance = Math.max(6.0, properties.getBoolean(autoScale, true) ? distance : 6.0);
+        double scaleDistance = Math.max(6.0, autoScale ? distance : 6.0);
         double size = 0.5 + 0.375 * ((scaleDistance - 6.0) / 28.0);
         double x = group.x - mc.getRenderManager().viewerPosX;
         double y = group.y - mc.getRenderManager().viewerPosY;
@@ -133,7 +108,7 @@ public class ItemESPExtras extends Feature {
         int width = font.getStringWidth(label);
         float textX = -(width / 2.0F - 0.5F);
         float textY = -(font.FONT_HEIGHT / 2 - 0.5F);
-        // same outline trick Myau uses: four black copies behind the real text
+        // four black copies behind the real text as the outline
         font.drawString(label, textX + 1.0F, textY, 0, false);
         font.drawString(label, textX - 1.0F, textY, 0, false);
         font.drawString(label, textX, textY + 1.0F, 0, false);

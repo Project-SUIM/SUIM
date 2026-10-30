@@ -1,35 +1,25 @@
 package coffee.axle.suim.feature.command;
 
 import coffee.axle.suim.feature.Feature;
-import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.BlockPos;
 import net.minecraft.world.chunk.Chunk;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class FindCommand extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    @Override
-    public String getName() {
-        return "Command:Find";
+    public FindCommand() {
+        super("Command:Find");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("find", "locate"));
-            creator.registerCommand(commandNames, this::handleCommand);
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected void init() throws Exception {
+        ArrayList<String> commandNames = new ArrayList<>(Arrays.asList("find", "locate"));
+        creator.registerCommand(commandNames, this::handleCommand);
     }
 
     private void handleCommand(ArrayList<String> args) {

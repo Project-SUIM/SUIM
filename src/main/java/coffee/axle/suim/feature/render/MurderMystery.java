@@ -2,10 +2,9 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.GameLocation;
-import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityItem;
@@ -21,7 +20,6 @@ import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -31,10 +29,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class MurderMystery extends Feature {
 
-    private static final Minecraft mc = Minecraft.getMinecraft();
     // just all the bullshit atp
     private static final String[] KNIFE_ITEMS = {
             "iron_sword", "stone_sword", "iron_shovel", "stick", "wooden_axe", "wooden_sword",
@@ -53,65 +51,31 @@ public class MurderMystery extends Feature {
     private int heroTicks = -1;
     private int alertCooldown = 0;
 
-    private Object moduleInstance;
-    private Object alertProperty;
-    private Object espProperty;
-    private Object tracersProperty;
-    private Object bowTracersProperty;
-    private Object revealNamesProperty;
-    private Object tracersInnocentsProperty;
+    @Setting private Innocents tracersInnocents = Innocents.MURDERER;
+    @Setting private boolean alert = true;
+    @Setting private boolean esp = true;
+    @Setting private boolean tracers = true;
+    @Setting private boolean bowTracers = true;
+    @Setting private boolean revealNames = true;
+
+    public enum Innocents {
+        NONE, MURDERER, ALWAYS
+    }
 
     private static MurderMystery instance;
 
-    private static final int INNOCENTS_NONE = 0;
-    private static final int INNOCENTS_MURDERER = 1;
-    private static final int INNOCENTS_ALWAYS = 2;
-
-    @Override
-    public String getName() {
-        return "MurderMystery";
+    public MurderMystery() {
+        super("MurderMystery", GuiCategory.RENDER);
+        instance = this;
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.RENDER;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            instance = this;
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, getClass());
-
-            alertProperty = creator.createBooleanProperty("alert", true);
-            espProperty = creator.createBooleanProperty("esp", true);
-            tracersProperty = creator.createBooleanProperty("tracers", true);
-            bowTracersProperty = creator.createBooleanProperty("bow-tracers", true);
-            revealNamesProperty = creator.createBooleanProperty("reveal-names", true);
-
-            String[] innocentsModes = { "NONE", "MURDERER", "ALWAYS" };
-            tracersInnocentsProperty = creator.createEnumProperty("tracers-innocents", INNOCENTS_MURDERER, innocentsModes);
-
-            creator.registerProperties(moduleInstance, alertProperty, espProperty,
-                    tracersProperty, bowTracersProperty, revealNamesProperty, tracersInnocentsProperty);
-
-            manager.registerModuleCallbacks(moduleInstance, this::onEnable, this::onDisable);
-            manager.reloadModuleCommand();
-
-            MinecraftForge.EVENT_BUS.register(this);
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
-    }
-
-    private void onEnable() {
+    protected void onEnable() {
         reset();
     }
 
-    private void onDisable() {
+    @Override
+    protected void onDisable() {
         reset();
     }
 
@@ -133,7 +97,7 @@ public class MurderMystery extends Feature {
         if (event.phase != TickEvent.Phase.START) return;
         if (mc.thePlayer == null || mc.theWorld == null) return;
         if (alertCooldown > 0) alertCooldown--;
-        if (!manager.isModuleEnabled(moduleInstance)) return;
+        if (!isEnabled()) return;
 
         inGame = isMurderGame();
         if (!inGame) {
@@ -213,7 +177,7 @@ public class MurderMystery extends Feature {
 
     @SubscribeEvent
     public void onChat(ClientChatReceivedEvent e) {
-        if (!inGame || !manager.isModuleEnabled(moduleInstance)) return;
+        if (!inGame || !isEnabled()) return;
         String msg = e.message.getUnformattedText();
         if (msg.contains("You are the murderer!") || msg.contains("You are the MURDERER!")) {
             reset();
@@ -225,12 +189,12 @@ public class MurderMystery extends Feature {
     // render ESP/tracers for the murderer (and the dropped bow)
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
-        if (!inGame || !manager.isModuleEnabled(moduleInstance)) return;
+        if (!inGame || !isEnabled()) return;
         if (mc.thePlayer == null || mc.theWorld == null) return;
 
-        boolean esp = properties.getBoolean(espProperty, true);
-        boolean tracers = properties.getBoolean(tracersProperty, true);
-        boolean bowTracers = properties.getBoolean(bowTracersProperty, true);
+        boolean esp = this.esp;
+        boolean tracers = this.tracers;
+        boolean bowTracers = this.bowTracers;
         if (!esp && !tracers && !bowTracers) return;
 
         boolean hero = isHero();
@@ -354,16 +318,16 @@ public class MurderMystery extends Feature {
     public static Boolean tracerVerdict(EntityPlayer p) {
         MurderMystery m = instance;
         if (m == null || !m.inGame || p == null || mc.thePlayer == null) return null;
-        if (!m.manager.isModuleEnabled(m.moduleInstance)) return null;
+        if (!m.isEnabled()) return null;
 
         if (m.murderers.contains(p.getUniqueID()) || m.detectives.contains(p.getUniqueID())) {
             // we draw our own colored lines for these when tracers is on
-            return m.properties.getBoolean(m.tracersProperty, true) ? Boolean.FALSE : null;
+            return m.tracers ? Boolean.FALSE : null;
         }
 
-        int mode = m.properties.getInt(m.tracersInnocentsProperty, INNOCENTS_MURDERER);
-        if (mode == INNOCENTS_NONE) return Boolean.FALSE;
-        if (mode == INNOCENTS_MURDERER) {
+        Innocents mode = m.tracersInnocents;
+        if (mode == Innocents.NONE) return Boolean.FALSE;
+        if (mode == Innocents.MURDERER) {
             // innocents only once we got the sword or picked up a murder item
             return (m.murderers.contains(mc.thePlayer.getUniqueID()) || m.isHero()) ? null : Boolean.FALSE;
         }
@@ -374,7 +338,7 @@ public class MurderMystery extends Feature {
         if (GameLocation.isKnown()) {
             return GameLocation.inGame("MURDER_MYSTERY");
         }
-        // sidebar fallback for when the location packet has not landed yet
+        // the humble slop fallback we dont "need" but we may need
         Scoreboard sb = mc.theWorld.getScoreboard();
         if (sb == null) return false;
         ScoreObjective obj = sb.getObjectiveInDisplaySlot(1);
@@ -399,7 +363,7 @@ public class MurderMystery extends Feature {
     // reveal-names: force murderer/detective team tags visible so myau
     // nametags and vanilla tab show a colored prefix
     void revealTeams() {
-        boolean reveal = properties.getBoolean(revealNamesProperty, true);
+        boolean reveal = revealNames;
         for (Object o : mc.theWorld.playerEntities) {
             if (!(o instanceof EntityPlayer)) continue;
             EntityPlayer p = (EntityPlayer) o;
@@ -414,7 +378,7 @@ public class MurderMystery extends Feature {
     }
 
     private void alert(String text) {
-        if (!properties.getBoolean(alertProperty, true)) return;
+        if (!alert) return;
         manager.sendMessage("&7MurderMystery: &r" + text);
     }
 

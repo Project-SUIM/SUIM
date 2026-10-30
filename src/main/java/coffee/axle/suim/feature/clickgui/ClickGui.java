@@ -12,6 +12,8 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.hooks.ModulePropertyManager;
 import coffee.axle.suim.hooks.MyauModuleManager;
+import coffee.axle.suim.property.Property;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 
@@ -31,92 +33,56 @@ import java.util.List;
  */
 public class ClickGui extends Feature {
 
-    private Object moduleInstance;
     private boolean closingGui = false;
 
-    private Object blurProp;
-    private Object guiModeProp;
-    private Object designProp;
-    private Object customFontProp;
-    private Object clientNameProp;
-    private Object prefixStyleProp;
-    private Object customPrefixProp;
-    private Object colorProp;
-    private Object showUsageInfoProp;
-    private Object autosaveProp;
+    @Setting(name = "name") private String clientName = "Project SUIM";
+    @Setting private String customPrefix = "\u00A70\u00A7l[\u00A74\u00A7lProject SUIM\u00A70\u00A7l]\u00A7r";
+    @Setting private String color = toHex(getDefaultHudColor());
+    @Setting private boolean blur = false;
+    @Setting private boolean customFont = false;
+    @Setting private boolean showUsageInfo = true;
 
-    @Override
-    public String getName() {
-        return "ClickGUI";
+    // option lists come from the registries, so these stay runtime properties
+    private Property<Integer> guiModeProp;
+    private Property<Integer> designProp;
+    private Property<Integer> prefixStyleProp;
+    private Property<Integer> autosaveProp;
+
+    public ClickGui() {
+        super("ClickGUI", GuiCategory.SETTINGS);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.SETTINGS;
+    protected void init() throws Exception {
+        ClickGuiModeRegistry.registerDefaults();
+
+        guiModeProp = Property.integer("click-gui", 0, 0, ClickGuiModeRegistry.getModeIds().length - 1)
+                .place(creator, manager, properties, getModuleInstance(), null);
+        designProp = Property.integer("design", 1, 0, 1)
+                .place(creator, manager, properties, getModuleInstance(), null);
+
+        prefixStyleProp = Property.integer("prefix-style", 0, 0, 2)
+                .place(creator, manager, properties, getModuleInstance(), null);
+        autosaveProp = Property.integer("autosave", 0, 0, 2)
+                .place(creator, manager, properties, getModuleInstance(), null);
+
+        ArrayList<String> cmdNames = new ArrayList<>();
+        cmdNames.add("gui");
+        creator.registerCommand(cmdNames, this::handleGuiCommand);
+
+        HudUtils.getInstance().initialize();
+        MyauLogger.info("ClickGui initialized");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, ClickGui.class);
+    protected void onEnable() {
+        openClickGui();
+    }
 
-            ClickGuiModeRegistry.registerDefaults();
-
-            blurProp = creator.createBooleanProperty("blur", false);
-            customFontProp = creator.createBooleanProperty(
-                    "custom-font", false);
-            showUsageInfoProp = creator.createBooleanProperty(
-                    "show-usage-info", true);
-
-            String[] guiModes = ClickGuiModeRegistry.getModeIds();
-            guiModeProp = creator.createEnumProperty(
-                    "click-gui", 0, guiModes);
-
-            String[] designs = { "JellyLike", "New" };
-            designProp = creator.createEnumProperty("design", 1, designs);
-
-            clientNameProp = creator.createStringProperty(
-                    "name", "Project SUIM");
-
-            String[] prefixStyles = { "Long", "Short", "Custom" };
-            prefixStyleProp = creator.createEnumProperty(
-                    "prefix-style", 0, prefixStyles);
-
-            customPrefixProp = creator.createStringProperty("custom-prefix",
-                    "\u00A70\u00A7l[\u00A74\u00A7lProject SUIM\u00A70\u00A7l]\u00A7r");
-
-            HudUtils.getInstance().initialize();
-            colorProp = creator.createStringProperty(
-                    "color", toHex(getDefaultHudColor()));
-
-            autosaveProp = creator.createEnumProperty(
-                    "autosave", 0,
-                    new String[] { "GUI", "GLOBAL", "NONE" });
-
-            creator.registerProperties(moduleInstance,
-                    blurProp, customFontProp,
-                    showUsageInfoProp,
-                    guiModeProp, designProp,
-                    clientNameProp, prefixStyleProp, customPrefixProp,
-                    colorProp, autosaveProp);
-
-            ArrayList<String> cmdNames = new ArrayList<>();
-            cmdNames.add("gui");
-            creator.registerCommand(cmdNames, this::handleGuiCommand);
-
-            manager.registerModuleCallbacks(
-                    moduleInstance,
-                    this::onMyauEnable,
-                    this::onMyauDisable);
-
-            manager.reloadModuleCommand();
-
-            MyauLogger.info("ClickGui initialized");
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("ClickGui:init", e);
-            return false;
+    @Override
+    protected void onDisable() {
+        if (!closingGui) {
+            closeGuiScreen();
         }
     }
 
@@ -128,53 +94,53 @@ public class ClickGui extends Feature {
 
         settings.add(new BooleanModuleSetting(
                 "Blur", "Toggles background blur",
-                blurProp, mgr, propMgr));
+                setting("blur").handle(), mgr, propMgr));;
 
         settings.add(new BooleanModuleSetting(
                 "Custom Font", "Use custom font rendering",
-                customFontProp, mgr, propMgr));
+                setting("custom-font").handle(), mgr, propMgr));;
 
         settings.add(new BooleanModuleSetting(
                 "Usage Information", "Show GUI usage overlay",
-                showUsageInfoProp, mgr, propMgr,
+                setting("show-usage-info").handle(), mgr, propMgr,
                 SettingVisibility.ADVANCED_ONLY));
 
         settings.add(new EnumModuleSetting(
                 "ClickGui", "GUI style",
-                guiModeProp, mgr, propMgr,
+                guiModeProp.handle(), mgr, propMgr,
                 Arrays.asList(ClickGuiModeRegistry.getModeIds())));
 
         settings.add(new EnumModuleSetting(
                 "Design", "Design theme",
-                designProp, mgr, propMgr,
+                designProp.handle(), mgr, propMgr,
                 Arrays.asList("JellyLike", "New"))
                 .withVisibilityCondition(this::isDesignSupported));
 
         settings.add(new StringModuleSetting(
                 "Name", "Client name shown in GUI",
-                clientNameProp, mgr, propMgr, 15, "Client Name"));
+                setting("name").handle(), mgr, propMgr, 15, "Client Name"));;
 
         settings.add(new EnumModuleSetting(
                 "Prefix Style", "Chat prefix style",
-                prefixStyleProp, mgr, propMgr,
+                prefixStyleProp.handle(), mgr, propMgr,
                 Arrays.asList("Long", "Short", "Custom")));
 
         settings.add(new StringModuleSetting(
                 "Custom Prefix", "Custom chat prefix",
-                customPrefixProp, mgr, propMgr, 40, "Prefix")
+                setting("custom-prefix").handle(), mgr, propMgr, 40, "Prefix")
                 .withVisibilityCondition(() -> getPrefixStyleIndex() == 2));
 
         settings.add(new ColorModuleSetting(
                 "Color", "GUI accent color",
-                colorProp, mgr, propMgr, false, false));
+                setting("color").handle(), mgr, propMgr, false, false));;
 
         settings.add(new EnumModuleSetting(
                 "Autosave", "Config autosave behavior",
-                autosaveProp, mgr, propMgr,
+                autosaveProp.handle(), mgr, propMgr,
                 Arrays.asList("GUI", "GLOBAL", "NONE")));
 
         return new GuiModule(getName(), getGuiCategory(), this,
-                moduleInstance, mgr, settings);
+                getModuleInstance(), mgr, settings);
     }
 
     private void handleGuiCommand(ArrayList<String> args) {
@@ -186,15 +152,6 @@ public class ClickGui extends Feature {
                 "&7Use .clickgui <setting> <value> to change settings");
     }
 
-    private void onMyauEnable() {
-        openClickGui();
-    }
-
-    private void onMyauDisable() {
-        if (!closingGui) {
-            closeGuiScreen();
-        }
-    }
 
     private void closeGuiScreen() {
         Minecraft mc = Minecraft.getMinecraft();
@@ -214,46 +171,40 @@ public class ClickGui extends Feature {
         }
     }
 
-    @Override
-    public Object getModuleInstance() {
-        return moduleInstance;
-    }
-
     public boolean isBlurEnabled() {
-        return properties.getBoolean(blurProp, false);
+        return blur;
     }
 
     public boolean isCustomFontEnabled() {
-        return properties.getBoolean(customFontProp, false);
+        return customFont;
     }
 
     public boolean isShowUsageInfo() {
-        return properties.getBoolean(showUsageInfoProp, true);
+        return showUsageInfo;
     }
 
     public int getGuiModeIndex() {
-        return properties.getInt(guiModeProp, 0);
+        return guiModeProp.get();
     }
 
     public int getDesignIndex() {
-        return properties.getInt(designProp, 1);
+        return designProp.get();
     }
 
     public String getClientName() {
-        return properties.getString(clientNameProp, "Project SUIM");
+        return clientName;
     }
 
     public int getPrefixStyleIndex() {
-        return properties.getInt(prefixStyleProp, 0);
+        return prefixStyleProp.get();
     }
 
     public String getCustomPrefix() {
-        return properties.getString(customPrefixProp,
-                "\u00A70\u00A7l[\u00A74\u00A7lProject SUIM\u00A70\u00A7l]\u00A7r");
+        return customPrefix;
     }
 
     public Color getGuiColor() {
-        String hex = properties.getString(colorProp, toHex(getDefaultHudColor()));
+        String hex = color;
         return parseHex(hex);
     }
 
@@ -261,14 +212,11 @@ public class ClickGui extends Feature {
         String hex = String.format("%02X%02X%02X%02X",
                 color.getRed(), color.getGreen(), color.getBlue(),
                 color.getAlpha());
-        try {
-            manager.setPropertyValue(colorProp, hex);
-        } catch (Exception ignored) {
-        }
+        setSaved("color", hex);
     }
 
     public ClickGuiAutosaveMode getAutosaveMode() {
-        int idx = properties.getInt(autosaveProp, 0);
+        int idx = autosaveProp.get();
         if (idx == 1) {
             return ClickGuiAutosaveMode.GLOBAL;
         }
@@ -308,8 +256,8 @@ public class ClickGui extends Feature {
 
     private void ensureModuleEnabled() {
         try {
-            if (moduleInstance != null && !manager.isModuleEnabled(moduleInstance)) {
-                manager.setModuleEnabled(moduleInstance, true);
+            if (getModuleInstance() != null && !isEnabled()) {
+                manager.setModuleEnabled(getModuleInstance(), true);
             }
         } catch (Exception ignored) {
         }
@@ -317,8 +265,8 @@ public class ClickGui extends Feature {
 
     private void disableModuleIfOpen() {
         try {
-            if (moduleInstance != null && manager.isModuleEnabled(moduleInstance)) {
-                manager.setModuleEnabled(moduleInstance, false);
+            if (getModuleInstance() != null && isEnabled()) {
+                manager.setModuleEnabled(getModuleInstance(), false);
             }
         } catch (Exception ignored) {
         }

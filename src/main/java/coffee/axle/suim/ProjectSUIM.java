@@ -3,7 +3,6 @@ package coffee.axle.suim;
 import coffee.axle.suim.feature.FeatureManager;
 import coffee.axle.suim.clickgui.module.GuiModuleManager;
 import coffee.axle.suim.handlers.PlayerMotionHandler;
-import coffee.axle.suim.clickgui.util.FontUtil;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
@@ -22,6 +21,8 @@ import java.util.List;
 
 @Mod(modid = "suim", useMetadata = true)
 public class ProjectSUIM {
+
+    public static final Minecraft mc = Minecraft.getMinecraft();
 
     private static volatile GuiScreen pendingDisplay = null;
     private static volatile ProjectSUIM instance;
@@ -56,8 +57,6 @@ public class ProjectSUIM {
         }
         return configPath;
     }
-
-    private final Minecraft mc = Minecraft.getMinecraft();
 
     private volatile FeatureManager featureManager;
     private volatile boolean initialized = false;

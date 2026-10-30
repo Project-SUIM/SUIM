@@ -4,15 +4,14 @@ import coffee.axle.suim.rotation.RotationMath;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
 import net.minecraft.block.BlockEnderChest;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityArmorStand;
 import net.minecraft.entity.passive.EntityVillager;
 import net.minecraft.util.BlockPos;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class ShopDetectionUtils {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
     private static final String[] SHOP_LABELS = {
             "RIGHT CLICK", "ITEM SHOP", "UPGRADES", "BANKER", "STREAK POWERS"

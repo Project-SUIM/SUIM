@@ -7,7 +7,6 @@ import coffee.axle.suim.util.BedLocationAPI;
 import coffee.axle.suim.util.GameLocation;
 import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.util.BlockPos;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -19,7 +18,6 @@ import java.lang.reflect.Field;
  */
 public class BedESPTeamColor extends Feature {
     private static BedESPTeamColor instance;
-    private Object bedESPModule;
     private Object colorProperty;
     private Field currentValueField;
     @SuppressWarnings("unused")
@@ -31,52 +29,40 @@ public class BedESPTeamColor extends Feature {
     @SuppressWarnings("unused")
     private String lastMap = null;
 
-    @Override
-    public String getName() {
-        return "BedESPTeamColor";
+    public BedESPTeamColor() {
+        super("BedESPTeamColor");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            instance = this;
-            BedLocationAPI.fetchData();
+    protected String targetModule() {
+        return "BedESP";
+    }
 
-            bedESPModule = manager.findModule("BedESP");
-            if (bedESPModule == null) {
-                MyauLogger.error("FEATURE_FAIL", new RuntimeException("BedESP module not found"));
-                return false;
-            }
+    @Override
+    protected void init() throws Exception {
+        instance = this;
+        BedLocationAPI.fetchData();
 
-            bedsField = manager.getCachedField(bedESPModule.getClass(), MyauMappings.FIELD_BED_ESP_BEDS);
+        bedsField = manager.getCachedField(module.getClass(), MyauMappings.FIELD_BED_ESP_BEDS);
 
-            colorProperty = manager.findProperty(bedESPModule, "color");
-            if (colorProperty == null) {
-                MyauLogger.error("FEATURE_FAIL", new RuntimeException("Could not find BedESP color property"));
-                return false;
-            }
-
-            Field uField = colorProperty.getClass().getDeclaredField(MyauMappings.FIELD_ENUM_VALUES_ARRAY);
-            uField.setAccessible(true);
-            String[] modes = (String[]) uField.get(colorProperty);
-
-            String[] newModes = new String[modes.length + 1];
-            System.arraycopy(modes, 0, newModes, 0, modes.length);
-            newModes[modes.length] = "TEAM";
-            uField.set(colorProperty, newModes);
-
-            Class<?> valueBase = manager.getCachedClass(MyauMappings.CLASS_VALUE_BASE);
-            currentValueField = valueBase.getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
-            currentValueField.setAccessible(true);
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
-        } catch (Exception t) {
-            MyauLogger.error("FEATURE_FAIL", t);
-            return false;
+        colorProperty = manager.findProperty(module, "color");
+        if (colorProperty == null) {
+            MyauLogger.error("FEATURE_FAIL", new RuntimeException("Could not find BedESP color property"));
+            return;
         }
+
+        Field uField = colorProperty.getClass().getDeclaredField(MyauMappings.FIELD_ENUM_VALUES_ARRAY);
+        uField.setAccessible(true);
+        String[] modes = (String[]) uField.get(colorProperty);
+
+        String[] newModes = new String[modes.length + 1];
+        System.arraycopy(modes, 0, newModes, 0, modes.length);
+        newModes[modes.length] = "TEAM";
+        uField.set(colorProperty, newModes);
+
+        Class<?> valueBase = manager.getCachedClass(MyauMappings.CLASS_VALUE_BASE);
+        currentValueField = valueBase.getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
+        currentValueField.setAccessible(true);
     }
 
     public static BedESPTeamColor getInstance() {

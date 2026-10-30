@@ -2,10 +2,9 @@ package coffee.axle.suim.feature.player;
 
 import coffee.axle.suim.feature.Feature;
 
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.hooks.MyauMappings;
 
-import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.inventory.ContainerPlayer;
 import net.minecraft.item.*;
@@ -16,19 +15,15 @@ import org.apache.commons.lang3.RandomUtils;
 import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Set;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Invmanager drop-tools & drop-trash-except
  */
 public class InvManagerExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object invManagerModule;
-    private Object dropTrashProperty;
-    private Object dropTrashExceptProperty;
-    private Object dropToolsProperty;
-    private Object minDelayProperty;
-    private Object maxDelayProperty;
+    @Setting(after = "drop-trash") private String dropTrashExcept = "none";
+    @Setting(after = "drop-trash-except") private boolean dropTools = false;
 
     private Set<String> exceptionItems = new HashSet<>();
     private String lastExceptionString = "";
@@ -37,51 +32,18 @@ public class InvManagerExtras extends Feature {
     private int tickCounter = 0;
     private int lastInvManagerClickTick = 0;
 
-    @Override
-    public String getName() {
-        return "InvManager:Extras";
+    public InvManagerExtras() {
+        super("InvManager:Extras");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            invManagerModule = manager.findModule("InvManager");
-            if (invManagerModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
+    protected String targetModule() {
+        return "InvManager";
+    }
 
-            dropTrashProperty = manager.findProperty(invManagerModule, "drop-trash");
-            if (dropTrashProperty == null) {
-                MyauLogger.log(getName(), "PROPERTY_NOT_FOUND");
-                return false;
-            }
-
-            minDelayProperty = manager.findProperty(invManagerModule, "min-delay");
-            maxDelayProperty = manager.findProperty(invManagerModule, "max-delay");
-
-            dropTrashExceptProperty = creator.createStringProperty("drop-trash-except", "none");
-            if (!creator.injectPropertyAfter(invManagerModule, dropTrashExceptProperty, "drop-trash")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-
-            dropToolsProperty = creator.createBooleanProperty("drop-tools", false);
-            if (!creator.injectPropertyAfter(invManagerModule, dropToolsProperty, "drop-trash-except")) {
-                MyauLogger.log(getName(), "PROPERTY_INJECT_FAIL");
-                return false;
-            }
-
-            creator.registerEventHandler(MyauMappings.CLASS_WINDOW_CLICK_EVENT, this::onWindowClick, (byte) 0);
-
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    @Override
+    protected void init() throws Exception {
+        creator.registerEventHandler(MyauMappings.CLASS_WINDOW_CLICK_EVENT, this::onWindowClick, (byte) 0);
     }
 
     @SubscribeEvent
@@ -99,13 +61,12 @@ public class InvManagerExtras extends Feature {
     private void onWindowClick(Object eventObj) {
         try {
             lastInvManagerClickTick = tickCounter;
-            if (!manager.isModuleEnabled(invManagerModule))
+            if (!manager.isModuleEnabled(module))
                 return;
-            Boolean dropTrash = (Boolean) properties.getPropertyValue(dropTrashProperty);
+            Boolean dropTrash = isBool("drop-trash");
             if (dropTrash == null || !dropTrash)
                 return;
             updateExceptionList();
-
             Class<?> eventClass = eventObj.getClass();
             Field modeField = eventClass.getDeclaredField(MyauMappings.FIELD_WINDOW_CLICK_MODE);
             modeField.setAccessible(true);
@@ -144,14 +105,13 @@ public class InvManagerExtras extends Feature {
 
     private void tryDropTools() {
         try {
-            Boolean dropTools = (Boolean) properties.getPropertyValue(dropToolsProperty);
-            if (dropTools == null || !dropTools)
+            if (!dropTools)
                 return;
 
-            if (!manager.isModuleEnabled(invManagerModule))
+            if (!manager.isModuleEnabled(module))
                 return;
 
-            Boolean dropTrash = (Boolean) properties.getPropertyValue(dropTrashProperty);
+            Boolean dropTrash = isBool("drop-trash");
             if (dropTrash == null || !dropTrash)
                 return;
 
@@ -180,8 +140,8 @@ public class InvManagerExtras extends Feature {
                             4,
                             mc.thePlayer);
 
-                    int minDelay = getDelayValue(minDelayProperty, 1);
-                    int maxDelay = getDelayValue(maxDelayProperty, 2);
+                    int minDelay = getDelayValue("min-delay", 1);
+                    int maxDelay = getDelayValue("max-delay", 2);
                     toolDropCooldown = RandomUtils.nextInt(minDelay + 1, maxDelay + 2);
 
                     return;
@@ -192,12 +152,13 @@ public class InvManagerExtras extends Feature {
         }
     }
 
-    private int getDelayValue(Object property, int defaultValue) {
+    private int getDelayValue(String name, int defaultValue) {
         try {
+            Object property = manager.findProperty(module, name);
             if (property != null) {
-                Integer value = (Integer) properties.getPropertyValue(property);
-                if (value != null)
-                    return value;
+                Object value = properties.getPropertyValue(property);
+                if (value instanceof Integer)
+                    return (Integer) value;
             }
         } catch (Exception ignored) {
         }
@@ -211,9 +172,20 @@ public class InvManagerExtras extends Feature {
         return item instanceof ItemTool && !(item instanceof ItemSword);
     }
 
+    private Boolean isBool(String name) {
+        try {
+            Object property = manager.findProperty(module, name);
+            if (property == null) return null;
+            Object value = properties.getPropertyValue(property);
+            return value instanceof Boolean ? (Boolean) value : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private void updateExceptionList() {
         try {
-            String exceptionsValue = (String) properties.getPropertyValue(dropTrashExceptProperty);
+            String exceptionsValue = dropTrashExcept;
             if (exceptionsValue == null)
                 exceptionsValue = "none";
 

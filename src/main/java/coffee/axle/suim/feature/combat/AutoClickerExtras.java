@@ -1,10 +1,8 @@
 package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
-
 import coffee.axle.suim.hooks.MyauMappings;
-import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
+import coffee.axle.suim.property.Setting;
 import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.inventory.ContainerChest;
 import net.minecraft.inventory.Slot;
@@ -12,68 +10,39 @@ import net.minecraft.item.ItemStack;
 
 import java.lang.reflect.Method;
 import java.util.Random;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 
 public class AutoClickerExtras extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object autoClickerModule;
-    private Object inventoryFillProperty;
-    private Object requirePressProperty;
-    private Object leftCpsMinProperty;
-    private Object leftCpsMaxProperty;
+    @Setting(existing = true, min = 1, max = 20) private int minCps = 8;
+    @Setting(existing = true, min = 1, max = 20) private int maxCps = 12;
+    @Setting private boolean inventoryFill = false;
+    @Setting private boolean requirePress = true;
 
     private long lastClickTime = 0;
     private final Random random = new Random();
 
-    @Override
-    public String getName() {
-        return "AutoClicker:Extras";
+    public AutoClickerExtras() {
+        super("AutoClicker:Extras");
     }
 
     @Override
-    public boolean initialize() {
-        try {
-            autoClickerModule = manager.findModule("AutoClicker");
-            if (autoClickerModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            inventoryFillProperty = creator.createBooleanProperty("inventory-fill", false);
-            requirePressProperty = creator.createBooleanProperty("require-press", true);
-
-            creator.registerProperties(autoClickerModule, inventoryFillProperty, requirePressProperty);
-
-            leftCpsMinProperty = manager.findProperty(autoClickerModule, "min-cps");
-            leftCpsMaxProperty = manager.findProperty(autoClickerModule, "max-cps");
-
-            initializeEventHook();
-
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
-        }
+    protected String targetModule() {
+        return "AutoClicker";
     }
 
-    private void initializeEventHook() {
-        try {
-            creator.registerEventHandler(MyauMappings.CLASS_TICK_EVENT, this::onMyauTickPre, (byte) 1);
-        } catch (Exception e) {
-            MyauLogger.error("Failed to init event hook", e);
-        }
+    @Override
+    protected void init() throws Exception {
+        creator.registerEventHandler(MyauMappings.CLASS_TICK_EVENT, this::onMyauTickPre, (byte) 1);
     }
 
     private void onMyauTickPre(Object eventObj) {
         try {
-            if (!manager.isModuleEnabled(autoClickerModule))
+            if (!isEnabled())
                 return;
 
-            boolean invFill = getBooleanProperty(inventoryFillProperty, false);
-            boolean requirePress = getBooleanProperty(requirePressProperty, true);
-
-            if (!invFill)
+            if (!inventoryFill)
                 return;
 
             if (!(mc.currentScreen instanceof GuiChest))
@@ -140,47 +109,10 @@ public class AutoClickerExtras extends Feature {
     }
 
     private long getClickDelay() {
-        try {
-            int minCps = 8;
-            int maxCps = 12;
-
-            if (leftCpsMinProperty != null) {
-                Object val = properties.getPropertyValue(leftCpsMinProperty);
-                if (val instanceof Number) {
-                    minCps = ((Number) val).intValue();
-                }
-            }
-
-            if (leftCpsMaxProperty != null) {
-                Object val = properties.getPropertyValue(leftCpsMaxProperty);
-                if (val instanceof Number) {
-                    maxCps = ((Number) val).intValue();
-                }
-            }
-
-            if (minCps > maxCps) {
-                int temp = minCps;
-                minCps = maxCps;
-                maxCps = temp;
-            }
-
-            int cps = minCps + random.nextInt(Math.max(1, maxCps - minCps + 1));
-            return 1000L / Math.max(1, cps);
-
-        } catch (Exception e) {
-            return 100L;
-        }
-    }
-
-    private boolean getBooleanProperty(Object property, boolean defaultValue) {
-        try {
-            Object val = properties.getPropertyValue(property);
-            if (val instanceof Boolean) {
-                return (Boolean) val;
-            }
-        } catch (Exception e) {
-        }
-        return defaultValue;
+        int lo = Math.min(minCps, maxCps);
+        int hi = Math.max(minCps, maxCps);
+        int cps = lo + random.nextInt(Math.max(1, hi - lo + 1));
+        return 1000L / Math.max(1, cps);
     }
 
     @Override

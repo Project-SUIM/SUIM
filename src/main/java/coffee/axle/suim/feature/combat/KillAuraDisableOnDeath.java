@@ -1,58 +1,36 @@
 package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
-
-import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
+import coffee.axle.suim.property.Setting;
 import net.minecraft.client.gui.GuiIngame;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.lang.reflect.Field;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class KillAuraDisableOnDeath extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private Object killAuraModule;
-    private Object disableOnDeathProperty;
+    @Setting(after = "mode") private boolean disableOnDeath = false;
 
     private Field displayedTitleField;
     private boolean hasTriggered = false;
 
-    @Override
-    public String getName() {
-        return "KillAura:DisableOnDeath";
+    public KillAuraDisableOnDeath() {
+        super("KillAura:DisableOnDeath");
     }
 
     @Override
-    public boolean initialize() {
+    protected String targetModule() {
+        return "KillAura";
+    }
+
+    @Override
+    protected void init() throws Exception {
         try {
-            killAuraModule = manager.findModule("KillAura");
-            if (killAuraModule == null) {
-                MyauLogger.log(getName(), "MODULE_NOT_FOUND");
-                return false;
-            }
-
-            disableOnDeathProperty = creator.createBooleanProperty("disable-on-death", false);
-            if (!creator.injectPropertyAfter(killAuraModule, disableOnDeathProperty, "mode")) {
-                return false;
-            }
-
-            try {
-                displayedTitleField = GuiIngame.class.getDeclaredField("field_175201_x");
-            } catch (NoSuchFieldException e) {
-                displayedTitleField = GuiIngame.class.getDeclaredField("displayedTitle");
-            }
-            displayedTitleField.setAccessible(true);
-
-            MinecraftForge.EVENT_BUS.register(this);
-
-            return true;
-
-        } catch (Exception e) {
-            MyauLogger.error("FEATURE_FAIL", e);
-            return false;
+            displayedTitleField = field(GuiIngame.class, "field_175201_x");
+        } catch (MappingException e) {
+            displayedTitleField = field(GuiIngame.class, "displayedTitle");
         }
     }
 
@@ -67,8 +45,7 @@ public class KillAuraDisableOnDeath extends Feature {
                 return;
             }
 
-            Boolean disableOnDeath = (Boolean) properties.getPropertyValue(disableOnDeathProperty);
-            if (disableOnDeath == null || !disableOnDeath) {
+            if (!disableOnDeath) {
                 hasTriggered = false;
                 return;
             }
@@ -79,8 +56,8 @@ public class KillAuraDisableOnDeath extends Feature {
                 String cleanTitle = currentTitle.replaceAll("§.", "").toUpperCase();
 
                 if (cleanTitle.contains("YOU DIED")) {
-                    if (manager.isModuleEnabled(killAuraModule)) {
-                        manager.setModuleEnabled(killAuraModule, false);
+                    if (isEnabled()) {
+                        manager.setModuleEnabled(getModuleInstance(), false);
                         hasTriggered = true;
                     }
                 }

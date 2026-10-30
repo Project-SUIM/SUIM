@@ -34,7 +34,12 @@ public class MyauLogger {
         ERROR_TO_MSG.put("HOOK_FAIL", "Hook initialization failed");
         ERROR_TO_MSG.put("MODULE_NOT_FOUND", "Module not found");
         ERROR_TO_MSG.put("MODULE_FAIL", "Module initialization failed");
+        ERROR_TO_MSG.put("MODULE_ENABLED", "Module enabled");
+        ERROR_TO_MSG.put("MODULE_DISABLED", "Module disabled");
         ERROR_TO_MSG.put("PROPERTY_NOT_FOUND", "Property not found");
+        ERROR_TO_MSG.put("PROPERTY_METHOD_NULL", "Property method not found");
+        ERROR_TO_MSG.put("MODE_PROPERTIES_NOT_FOUND", "Mode properties not found");
+        ERROR_TO_MSG.put("FEATURE_READY", "Feature ready");
         ERROR_TO_MSG.put("FEATURE_FAIL", "Feature initialization failed");
         ERROR_TO_MSG.put("PROPERTY_INJECT_FAIL", "Property injection failed");
         ERROR_TO_MSG.put("PROPERTY_INJECT_SUCCESS", "Property injected!");
@@ -46,6 +51,14 @@ public class MyauLogger {
         ERROR_TO_MSG.put("CRITICAL_ERROR", "Critical error!");
         ERROR_TO_MSG.put("CALLBACK_FAIL", "Callback execution failed");
         ERROR_TO_MSG.put("ALL_GOOD", "All good!");
+        ERROR_TO_MSG.put("CONFIG_PATH", "Config path resolution failed");
+        ERROR_TO_MSG.put("GUI_DRAW", "GUI draw failed");
+        ERROR_TO_MSG.put("DISPLAY_GUI", "GUI display failed");
+        ERROR_TO_MSG.put("FM_CREATE", "FeatureManager construction failed");
+        ERROR_TO_MSG.put("FM_INIT", "FeatureManager init failed");
+        ERROR_TO_MSG.put("GUI_MOD_MGR", "GuiModuleManager setup failed");
+        ERROR_TO_MSG.put("TICK_HANDLER", "Tick handler failed");
+        ERROR_TO_MSG.put("HANDLER_FAIL", "Event handler failed");
     }
 
     public static void log(String code, Object... args) {

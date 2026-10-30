@@ -2,7 +2,6 @@ package coffee.axle.suim.clickgui.render;
 
 import coffee.axle.suim.clickgui.util.ColorUtil;
 import coffee.axle.suim.clickgui.util.FontUtil;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.*;
@@ -20,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static net.minecraftforge.fml.client.config.GuiUtils.drawGradientRect;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * A Collection of methods for rendering 2D Objects in orthographic projection
@@ -48,7 +48,6 @@ public class HUDRenderUtils {
     @Deprecated
     public static final HUDRenderUtils INSTANCE = new HUDRenderUtils();
 
-    private final Minecraft mc = Minecraft.getMinecraft();
     private static final double CLICK_GUI_SCALE = 2.0;
 
     private final Tessellator tessellator = Tessellator.getInstance();

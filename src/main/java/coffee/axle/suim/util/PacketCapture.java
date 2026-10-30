@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import coffee.axle.suim.events.ReceivePacketEvent;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.Packet;
@@ -24,6 +23,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Runtime packet capture for reverse engineering (.packetcapture).
@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PacketCapture {
 
     private static final PacketCapture INSTANCE = new PacketCapture();
-    private static final Minecraft mc = Minecraft.getMinecraft();
     private static final int MAX_ENTRIES = 20000;
 
     public static PacketCapture getInstance() {

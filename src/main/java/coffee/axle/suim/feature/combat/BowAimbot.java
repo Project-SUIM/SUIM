@@ -2,50 +2,46 @@ package coffee.axle.suim.feature.combat;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.property.Setting;
 import coffee.axle.suim.rotation.BowAimbotRotation;
 import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.rotation.RotationState;
-import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.HypixelUtils;
 import coffee.axle.suim.util.Utils;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBow;
 import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.MathHelper;
-import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.common.MinecraftForge;
 
 import java.util.HashSet;
 import java.util.Set;
+import static coffee.axle.suim.ProjectSUIM.mc;
 
 public class BowAimbot extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
 
-    private static final int MODE_YAW = 0;
-    private static final int MODE_PITCH = 1;
-    private static final int MODE_BOTH = 2;
+    public enum AimMode {
+        YAW, PITCH, BOTH
+    }
 
-    private static final int PRIORITY_DISTANCE = 0;
-    private static final int PRIORITY_ANGLE = 1;
-    private static final int PRIORITY_HEALTH = 2;
-    private static final int PRIORITY_FOV = 3;
+    public enum Priority {
+        DISTANCE, ANGLE, HEALTH, FOV
+    }
 
     private static final int TRAJECTORY_TICKS = 40;
 
     private static final double ARROW_DRAG = 0.99;
 
-    private Object moduleInstance;
-    private Object aimModeProperty;
-    private Object modeProperty;
-    private Object reachableProperty;
-    private Object rangeProperty;
-    private Object fovProperty;
-    private Object smoothingProperty;
-    private Object horizontalSpeedProperty;
-    private Object verticalSpeedProperty;
-    private Object predictMsProperty;
+    @Setting(min = 1, max = 200) private int range = 50;
+    @Setting(min = 0, max = 360) private int fov = 50;
+    @Setting(min = 0, max = 1) private float smoothing = 0.2f;
+    @Setting(name = "horizontal-speed", min = 1, max = 10) private float horizontalSpeed = 7.5f;
+    @Setting(name = "vertical-speed", min = 1, max = 10) private float verticalSpeed = 7.5f;
+    @Setting(name = "predict-ms", min = 0, max = 2000) private int predictMs = 1000;
+    @Setting(name = "aim-mode") private AimMode aimMode = AimMode.BOTH;
+    @Setting(name = "mode") private Priority priority = Priority.DISTANCE;
+    @Setting private boolean reachable = true;
 
     private BowAimbotRotation rotation;
 
@@ -54,60 +50,20 @@ public class BowAimbot extends Feature {
     private double pointX, pointY, pointZ;
     private double spawnX, spawnY, spawnZ;
 
-    @Override
-    public String getName() {
-        return "BowAimbot";
+    public BowAimbot() {
+        super("BowAimbot", GuiCategory.COMBAT);
     }
 
     @Override
-    public GuiCategory getGuiCategory() {
-        return GuiCategory.COMBAT;
-    }
-
-    @Override
-    public boolean initialize() {
-        try {
-            moduleInstance = createModule();
-            creator.injectModule(moduleInstance, BowAimbot.class);
-
-            aimModeProperty = creator.createEnumProperty("aim-mode", MODE_BOTH,
-                    new String[] { "YAW", "PITCH", "BOTH" });
-            modeProperty = creator.createEnumProperty("mode", PRIORITY_DISTANCE,
-                    new String[] { "DISTANCE", "ANGLE", "HEALTH", "FOV" });
-            reachableProperty = creator.createBooleanProperty("reachable", true);
-            rangeProperty = creator.createIntegerProperty("range", 50, 1, 200);
-            fovProperty = creator.createIntegerProperty("fov", 50, 0, 360);
-            smoothingProperty = creator.createFloatProperty("smoothing", 0.2f, 0.0f, 1.0f);
-            horizontalSpeedProperty = creator.createFloatProperty("horizontal-speed", 7.5f, 1.0f, 10.0f);
-            verticalSpeedProperty = creator.createFloatProperty("vertical-speed", 7.5f, 1.0f, 10.0f);
-            predictMsProperty = creator.createIntegerProperty("predict-ms", 1000, 0, 2000);
-
-            creator.registerProperties(moduleInstance, aimModeProperty, modeProperty,
-                    reachableProperty, rangeProperty, fovProperty, smoothingProperty,
-                    horizontalSpeedProperty, verticalSpeedProperty, predictMsProperty);
-            manager.reloadModuleCommand();
-
-            RotationState.getInstance().register();
-            rotation = new BowAimbotRotation(RotationState.getInstance());
-
-            MinecraftForge.EVENT_BUS.register(this);
-            manager.registerModuleCallbacks(moduleInstance, () -> {
-            }, () -> { });
-            return true;
-        } catch (Exception e) {
-            MyauLogger.error("BowAimbot:init", e);
-            return false;
-        }
-    }
-
-    private int aimMode() {
-        return properties.getInt(aimModeProperty, MODE_BOTH);
+    protected void init() throws Exception {
+        RotationState.getInstance().register();
+        rotation = new BowAimbotRotation(RotationState.getInstance());
     }
 
     // how far ahead we are allowed to simulate the target, 0 means aim at where
     // they are right now
     private int maxTicks() {
-        int ms = properties.getInt(predictMsProperty, 1000);
+        int ms = predictMs;
         if (ms <= 0) {
             return 1;
         }
@@ -121,10 +77,9 @@ public class BowAimbot extends Feature {
         spawnZ = mc.thePlayer.posZ - Math.sin(yaw) * 0.16;
     }
 
-    @SuppressWarnings("unused")
     @net.minecraftforge.fml.common.eventhandler.SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent e) {
-        if (!manager.isModuleEnabled(moduleInstance) || !Utils.nullCheck()) {
+        if (!isEnabled() || !Utils.nullCheck()) {
             return;
         }
         if (mc.currentScreen != null
@@ -138,7 +93,7 @@ public class BowAimbot extends Feature {
         while (target != null) {
             setSpawn();
             angles = solveArc(predict(target, maxTicks()));
-            if (angles != null || !properties.getBoolean(reachableProperty, true)) {
+            if (angles != null || !reachable) {
                 break;
             }
             skipped.add(target);
@@ -150,16 +105,16 @@ public class BowAimbot extends Feature {
         }
 
         float[] next = rotation.aim(angles[0], angles[1],
-                properties.getFloat(smoothingProperty, 0.2f),
-                properties.getFloat(horizontalSpeedProperty, 7.5f),
-                properties.getFloat(verticalSpeedProperty, 7.5f));
+                smoothing,
+                horizontalSpeed,
+                verticalSpeed);
 
-        if (aimMode() != MODE_PITCH) {
+        if (aimMode != AimMode.PITCH) {
             float before = mc.thePlayer.rotationYaw;
             mc.thePlayer.rotationYaw = next[0];
             mc.thePlayer.prevRotationYaw += mc.thePlayer.rotationYaw - before;
         }
-        if (aimMode() != MODE_YAW) {
+        if (aimMode != AimMode.YAW) {
             float before = mc.thePlayer.rotationPitch;
             mc.thePlayer.rotationPitch = next[1];
             mc.thePlayer.prevRotationPitch += mc.thePlayer.rotationPitch - before;
@@ -169,26 +124,25 @@ public class BowAimbot extends Feature {
     private EntityPlayer findTarget() {
         EntityPlayer best = null;
         double bestScore = Double.MAX_VALUE;
-        double halfFov = properties.getInt(fovProperty, 50) / 2.0;
-        double range = properties.getInt(rangeProperty, 50);
-        int priority = properties.getInt(modeProperty, PRIORITY_DISTANCE);
+        double halfFov = fov / 2.0;
+        double r = range;
         for (EntityPlayer p : mc.theWorld.playerEntities) {
             if (p == mc.thePlayer || p.deathTime != 0) continue;
             if (skipped.contains(p)) continue;
-            if (Backtrack.isBot(p) || Backtrack.isFriend(p) || Backtrack.isTeammate(p)) continue;
-            if (mc.thePlayer.getDistanceSqToEntity(p) > range * range) continue;
+            if (HypixelUtils.isBot(p) || HypixelUtils.isFriend(p) || HypixelUtils.isTeammate(p)) continue;
+            if (mc.thePlayer.getDistanceSqToEntity(p) > r * r) continue;
             double dist = mc.thePlayer.getDistanceToEntity(p);
             Vec3 center = Utils.boxCenter(p.getEntityBoundingBox()).addVector(0.0, 0.3, 0.0);
             float[] aim = angy(center, mc.thePlayer);
             float angleDiff = Math.abs(MathHelper.wrapAngleTo180_float(aim[0] - mc.thePlayer.rotationYaw));
             if (angleDiff > halfFov) continue;
             double score;
-            if (priority == PRIORITY_FOV) {
+            if (priority == Priority.FOV) {
                 double dp = MathHelper.wrapAngleTo180_float(aim[1] - mc.thePlayer.rotationPitch);
                 score = Math.sqrt(angleDiff * angleDiff + dp * dp);
-            } else if (priority == PRIORITY_ANGLE) {
+            } else if (priority == Priority.ANGLE) {
                 score = angleDiff;
-            } else if (priority == PRIORITY_HEALTH) {
+            } else if (priority == Priority.HEALTH) {
                 score = p.getHealth();
             } else {
                 score = dist;
@@ -458,6 +412,7 @@ public class BowAimbot extends Feature {
     // order and step, zero motion on collision
     private AxisAlignedBB colilision(AxisAlignedBB box, EntityPlayer target,
             double x, double y, double z, Motion out) {
+        @SuppressWarnings("unused")
         Vec3 center = Utils.boxCenter(box);
         if (mc.theWorld.isMaterialInBB(box.expand(-0.1f, -0.4f, -0.1f), net.minecraft.block.material.Material.web)) {
             x *= 0.25;
