@@ -89,12 +89,6 @@ public class AimAssistHook {
                 MyauLogger.log("AimAssist:Hook", "event-bus handler active");
             }
 
-            // Register suffix display
-            if (!suffixRegistered) {
-                suffixRegistered = true;
-                registerSuffix();
-            }
-
             updateWorld();
             if (mc.thePlayer == null || mc.theWorld == null) {
                 lastAimingTarget = null;
@@ -103,6 +97,14 @@ public class AimAssistHook {
             }
 
             Object aaInstance = getAimAssistInstance();
+
+            // keyed on the myau.G instance, not this hook - the HUD looks
+            // the suffix up by module object
+            if (!suffixRegistered && aaInstance != null) {
+                suffixRegistered = true;
+                registerSuffix(aaInstance);
+            }
+
             if (!isAimAssistEnabled(aaInstance)) {
                 lastAimingTarget = null;
                 pendingSnapTarget = null;
@@ -499,8 +501,8 @@ public class AimAssistHook {
         return isTeamMethod;
     }
 
-    private void registerSuffix() {
-        SuffixRegistry.register(this, () -> {
+    private static void registerSuffix(Object module) {
+        SuffixRegistry.register(module, () -> {
             if (!AimAssistExtras.isActive()) return null;
             int ord = AimAssistExtras.getAimModeOrdinal();
             if (ord <= 0 || ord >= AimAssistRotation.MODE_NAMES.length) return null;

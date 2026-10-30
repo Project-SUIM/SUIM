@@ -142,9 +142,8 @@ public final class DisplaceHook {
     //   restore clock so f attacks. C02 goes out. server rotation is still
     //   flick from tick N's C03, so knockback is displaced. C03 restores.
 
-    // killaura's current target for other modules (backtrack scan). raven's
-    // hasTarget: record exists and entity is still in the world, no enabled
-    // or usable-aim check
+    // killaura's current target for other modules (backtrack scan). record
+    // exists and the entity is still in the world, no enabled/usable check
     public static Entity kaTarget() {
         try {
             if (killAura == null || mc.thePlayer == null) return null;
@@ -270,7 +269,6 @@ public final class DisplaceHook {
         if (!c03.getRotating()) {
             return;
         }
-        // skidded from kol, much love
         if (Math.abs(MathHelper.wrapAngleTo180_float(c03.getYaw() - flickYawSent)) < 0.01f) {
             flickDelivered = true;
         }

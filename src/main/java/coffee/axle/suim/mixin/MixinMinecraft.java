@@ -20,9 +20,9 @@ public class MixinMinecraft {
         FreelookHooks.modifyThirdPerson(settings, value);
     }
 
-    // input-level click cancel, like Breeze's cX event dispatch at clickMouse
-    // HEAD: a cancelled click never builds the swing/attack packets and never
-    // runs the client-side attack prediction (hit-slowdown, sprint drop, crit)
+    // input-level click cancel. HEAD means a cancelled click never builds the
+    // swing/attack packets and never runs the client-side attack prediction
+    // (hit-slowdown, sprint drop, crit)
     @Inject(method = "clickMouse", at = @At("HEAD"), cancellable = true)
     private void onClickMouse(CallbackInfo ci) {
         ClickEvent event = new ClickEvent();
