@@ -63,12 +63,12 @@ public class MyauLogger {
     public static void log(String component, String code, Object... args) {
         String msg = ERROR_TO_MSG.get(code);
         if (msg == null) {
-            LOGGER.info(PREFIX + " [" + component + "] " + code);
+            LOGGER.info("{} [{}] {}", PREFIX, component, code);
         } else {
             if (args.length > 0) {
                 msg = String.format(msg, args);
             }
-            LOGGER.info(PREFIX + " [" + component + "] " + msg);
+            LOGGER.info("{} [{}] {}", PREFIX, component, msg);
         }
     }
 

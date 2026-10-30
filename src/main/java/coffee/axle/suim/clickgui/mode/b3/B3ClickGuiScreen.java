@@ -12,6 +12,7 @@ import coffee.axle.suim.clickgui.settings.impl.ColorModuleSetting;
 import coffee.axle.suim.clickgui.settings.impl.EnumModuleSetting;
 import coffee.axle.suim.clickgui.settings.impl.NumberModuleSetting;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
@@ -32,7 +33,7 @@ import java.util.Map;
 
 /**
  * Panel ClickGUI in the Raven B3 style. Port of the B4 ClickGUI script
- * (jarstore/raven-scripts/ClickGUI.java) onto SUIM's GuiModule model.
+ * onto SUIM's GuiModule model.
  * Accent color inherits the HUD color like AimAssist's show-target.
  */
 public class B3ClickGuiScreen extends GuiScreen {
@@ -203,9 +204,7 @@ public class B3ClickGuiScreen extends GuiScreen {
             }
         }
         int code = bind.getKeyCode();
-        if (code > 0) return Keyboard.isKeyDown(code);
-        if (code < 0) return Mouse.isButtonDown(code + 100);
-        return false;
+        return code != 0 && Utils.isKeyDown(code);
     }
 
     private void updateMovementKeys() {

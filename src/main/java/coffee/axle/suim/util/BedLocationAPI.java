@@ -57,6 +57,10 @@ public class BedLocationAPI {
         }).start();
     }
 
+    public static boolean isLoaded() {
+        return loaded;
+    }
+
     public static String[] getBedOrderForMap(String mapName, String mode) {
         if (bedData == null)
             return getDefaultOrder();
