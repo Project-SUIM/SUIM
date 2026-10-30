@@ -6,7 +6,6 @@ import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -15,25 +14,29 @@ import java.lang.reflect.Field;
 /**
  * Injects KOL's prediction-air mode into myau's KeepSprint (myau.J5).
  *
- * KOL cw.b: the soft attack slowdown only applies when mode==0 (NORMAL).
- * In PREDICTION_AIR both attack paths go vanilla (motion*0.6 +
- * setSprinting(false)), and bn's own handlers re-force sprint while airborne.
- * raven's name for it is "sprint in air", the disable-while-jumping setting
- * inverted: the server predicted you sprinting when you left the ground, so
- * re-sprinting mid-air matches its prediction instead of contradicting it.
+ * KOL 261015 (a.bh) semantics, verified from the running jar's mixins:
+ * MixinEntityPlayer gates the soft slowdown + sprint-keep on enabled && o(),
+ * where o() is the native mode gate. User ground truth: PREDICTION_AIR means
+ * keep sprint ONLY while airborne AND sprinting - on the ground the module
+ * has no effect (pure vanilla attack reset).
  *
- * The re-force holds until landing or until vanilla sprint conditions fail -
- * never a fixed tick window, that fights myau's sprint module and flags.
+ * myau's a.W gate chain: ground-only && onGround -> vanilla branch;
+ * ground-only && airborne -> soft branch (sprint kept). So pinning
+ * ground-only=true while airborne gives exactly the air-only behavior, and
+ * un-pinning on landing restores the no-effect ground state. The pin flips
+ * per tick based on onGround, not per attack.
  */
 public class KeepSprintExtras extends Feature {
     private static final Minecraft mc = Minecraft.getMinecraft();
 
     private Object keepSprintModule;
     private Object modeProperty;
+    private Object groundOnlyProperty;
 
     private Field enabledField;
 
-    private boolean sprintPending;
+    private boolean pinned;
+    private boolean savedGroundOnly;
 
     @Override
     public String getName() {
@@ -56,6 +59,8 @@ public class KeepSprintExtras extends Feature {
             modeProperty = creator.createEnumProperty("mode", 0,
                     new String[] { "NORMAL", "PREDICTION_AIR" });
             creator.registerProperties(keepSprintModule, modeProperty);
+
+            groundOnlyProperty = manager.findProperty(keepSprintModule, "ground-only");
 
             MinecraftForge.EVENT_BUS.register(this);
 
@@ -82,49 +87,59 @@ public class KeepSprintExtras extends Feature {
         }
     }
 
+    // ClientTick START runs before any attack this tick, and a.W/mixin f
+    // read the flag live at attack time, so a pre-tick pin covers everything.
+    // The pin is AIRBORNE-ONLY: on the ground the module must have no effect,
+    // so ground-only stays at the user's saved value (false = soft branch
+    // would apply on ground attacks - that's NORMAL mode's job, not ours).
+    // We only force ground-only=true while actually in the air.
     @SubscribeEvent
-    public void onAttack(AttackEntityEvent event) {
-        if (!isPredictionAir() || !Utils.nullCheck()) {
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.START || !Utils.nullCheck()) {
             return;
         }
-        // airborne attacks only - on the ground myau's normal keepsprint
-        // path already handles it
-        if (!mc.thePlayer.onGround) {
-            sprintPending = true;
+        if (!isPredictionAir()) {
+            restore();
+            return;
+        }
+        // PREDICTION_AIR: only in air, only while sprinting. on ground the
+        // module has no effect - vanilla attack reset happens untouched
+        boolean airborne = !mc.thePlayer.onGround && mc.thePlayer.isSprinting();
+        if (airborne) {
+            if (!pinned && groundOnlyProperty != null) {
+                savedGroundOnly = properties.getBoolean(groundOnlyProperty, false);
+                pinned = true;
+            }
+            if (groundOnlyProperty != null) {
+                setBool(groundOnlyProperty, true);
+            }
+        } else {
+            restore();
         }
     }
 
-    // PlayerTick START runs before this tick's onLivingUpdate sprint logic,
-    // so the re-force lands after the attack reset and sticks
-    @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START || event.player != mc.thePlayer) {
-            return;
+    private void restore() {
+        if (pinned && groundOnlyProperty != null) {
+            setBool(groundOnlyProperty, savedGroundOnly);
         }
-        if (!sprintPending) {
-            return;
+        pinned = false;
+    }
+
+    private void setBool(Object property, boolean value) {
+        try {
+            // write Q directly - manager.setPropertyValue fires a config
+            // save on every call and we flip this every mode change
+            Field valueField = property.getClass().getSuperclass()
+                    .getDeclaredField(MyauMappings.FIELD_VALUE_CURRENT);
+            valueField.setAccessible(true);
+            valueField.set(property, value);
+        } catch (Exception e) {
+            MyauLogger.error("KeepSprint:Extras set", e);
         }
-        if (!isPredictionAir() || !Utils.nullCheck() || mc.thePlayer.onGround) {
-            sprintPending = false;
-            return;
-        }
-        // same gates vanilla's own sprint re-acquire uses (EntityPlayerSP
-        // onLivingUpdate): moving forward, food, not sneaking/using/riding
-        if (mc.thePlayer.movementInput.moveForward <= 0.0f
-                || mc.thePlayer.getFoodStats().getFoodLevel() <= 6
-                || mc.thePlayer.isSneaking()
-                || mc.thePlayer.isUsingItem()
-                || mc.thePlayer.isRiding()) {
-            sprintPending = false;
-            return;
-        }
-        mc.thePlayer.setSprinting(true);
-        // hold until a gate fails or we land; setSprinting when already
-        // sprinting sends nothing (vanilla only emits C0B on state change)
     }
 
     @Override
     public void disable() {
-        sprintPending = false;
+        restore();
     }
 }
