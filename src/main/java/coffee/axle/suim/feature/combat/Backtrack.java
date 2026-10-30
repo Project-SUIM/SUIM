@@ -9,6 +9,7 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.feature.movement.Stasis;
 import coffee.axle.suim.hooks.MyauMappings;
+import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.PacketUtils;
@@ -58,10 +59,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * OpenB4 Backtrack port. Holds inbound packets while the target walks out of
- * your reach so the server still thinks they're in range when you swing.
- * show-position is myau LagRange's impl (ksyz style) instead of raven's ghost
- * player: interpolated box, team color or HUD color, alpha 63 fill.
+ * Holds inbound packets while the target walks out of reach so the server
+ * still thinks they're in range when you swing.
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class Backtrack extends Feature {
@@ -72,7 +71,7 @@ public class Backtrack extends Feature {
     private static final int SHOW_DEFAULT = 1;
     private static final int SHOW_HUD = 2;
 
-    // raven used SettingsModule.hittableHurtTime, we just bake it
+    // below this hurt time the target is still hittable
     private static final int HITTABLE_HURT_TIME = 3;
 
     private Object moduleInstance;
@@ -102,7 +101,7 @@ public class Backtrack extends Feature {
     private volatile Packet<?> processing;
     private volatile long lastFlush;
 
-    // lagrange style render history of the target's server position
+    // last two server positions of the target, interpolated for the box
     private Vec3 previousPosition;
     private Vec3 currentPosition;
 
@@ -172,12 +171,12 @@ public class Backtrack extends Feature {
     }
 
     private boolean canStart() {
-        // raven gates on their freeze + antiknockback delay, stasis and
-        // knockback delay are the suim equivalents
+        // stasis and knockback delay both move the player server side, holding
+        // packets during either would stack
         if (Stasis.frozen || KnockbackDelay.active) {
             return false;
         }
-        // raven quirk: cooldown only applies once the user changed it from default
+        // cooldown only kicks in once the user actually changed it
         if (!isNotDefault(cooldownProperty)) {
             return true;
         }
@@ -235,7 +234,6 @@ public class Backtrack extends Feature {
             ready = target != null && targetValid();
         }
 
-        // lagrange: previous becomes current, current becomes the latest server pos
         if (target != null) {
             Vec3 pos = serverPos;
             previousPosition = currentPosition == null ? pos : currentPosition;
@@ -283,7 +281,6 @@ public class Backtrack extends Feature {
     }
 
     private static boolean holdingWeapon() {
-        // raven also counts axe/hoe/shovel but those global toggles default off
         return mc.thePlayer.getHeldItem() != null
                 && mc.thePlayer.getHeldItem().getItem() instanceof ItemSword;
     }
@@ -535,7 +532,7 @@ public class Backtrack extends Feature {
         }
     }
 
-    // --- myau lagrange show-position, 1:1 style ---
+    // --- show-position box, lagrange style ---
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent e) {
@@ -613,8 +610,7 @@ public class Backtrack extends Feature {
         GlStateManager.popMatrix();
     }
 
-    // --- raven math helpers, toBox aims at the closest point on the box ---
-
+    // toBox aims at the closest point on the box
     private static float[] toBox(Entity entity, AxisAlignedBB box) {
         Vec3 eyes = mc.thePlayer.getPositionEyes(1.0f);
         float f = entity.getCollisionBorderSize();
@@ -622,8 +618,8 @@ public class Backtrack extends Feature {
         if (box.isVecInside(eyes)) {
             return new float[] { mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch };
         }
-        // raven aimPoint: blend between the 0.825-height center and the closest
-        // point to the eyes, their aim-closest-point slider defaults to 90 so t = 0.9
+        // blend between the 0.825 height center and the closest point to the
+        // eyes, t = 0.9 matches the stock aim-closest-point setting
         double cx = (box.minX + box.maxX) / 2.0;
         double cy = box.minY + (box.maxY - box.minY) * 0.825;
         double cz = (box.minZ + box.maxZ) / 2.0;
@@ -632,16 +628,9 @@ public class Backtrack extends Feature {
         double py = MathHelper.clamp_double(eyes.yCoord, box.minY + m, box.maxY - m);
         double pz = MathHelper.clamp_double(eyes.zCoord, box.minZ + m, box.maxZ - m);
         double t = 0.9;
-        return fromDelta(cx + (px - cx) * t - eyes.xCoord,
+        return RotationMath.toRotationsFromDelta(cx + (px - cx) * t - eyes.xCoord,
                 cy + (py - cy) * t - eyes.yCoord,
                 cz + (pz - cz) * t - eyes.zCoord);
-    }
-
-    private static float[] fromDelta(double dx, double dy, double dz) {
-        double h = Math.sqrt(dx * dx + dz * dz);
-        return new float[] {
-                (float) (Math.atan2(dz, dx) * 57.29577951308232) - 90.0f,
-                (float) (-(Math.atan2(dy, h) * 57.29577951308232)) };
     }
 
     private static Vec3 lookVec(float yaw, float pitch) {
@@ -679,8 +668,6 @@ public class Backtrack extends Feature {
         }
         return from.squareDistanceTo(hit.hitVec);
     }
-
-    // --- myau filters (kY bot/team/teamColor + friend list), shared with bowaim ---
 
     static boolean isBot(EntityPlayer p) {
         initMyauFilters();
