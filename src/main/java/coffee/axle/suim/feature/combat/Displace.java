@@ -261,7 +261,7 @@ public class Displace extends Feature {
             rotate = false;
             awaitingRestore = true;
             e.setCanceled(true);
-            emit(copyRot(c03, flickYaw, flickPitch));
+            emit(PacketUtils.withRotation(c03, flickYaw, flickPitch));
             RotationState.getInstance().setServerAngles(flickYaw, flickPitch);
             mc.thePlayer.rotationYawHead = flickYaw;
             if (properties.getBoolean(debuggityProperty, false)) {
@@ -281,7 +281,7 @@ public class Displace extends Feature {
                 MyauLogger.log("DISPLACE", "RESTORE");
             }
             e.setCanceled(true);
-            emit(copyRot(c03, mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch));
+            emit(PacketUtils.withRotation(c03, mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch));
             RotationState.getInstance().setServerAngles(mc.thePlayer.rotationYaw, mc.thePlayer.rotationPitch);
             awaitingRestore = false;
         }
@@ -549,21 +549,6 @@ public class Displace extends Feature {
         }
     }
 
-    private static Packet<?> copyRot(C03PacketPlayer orig, float yaw, float pitch) {
-        if (orig instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
-            C03PacketPlayer.C06PacketPlayerPosLook pos = (C03PacketPlayer.C06PacketPlayerPosLook) orig;
-            return new C03PacketPlayer.C06PacketPlayerPosLook(
-                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
-                    yaw, pitch, orig.isOnGround());
-        }
-        if (orig instanceof C03PacketPlayer.C04PacketPlayerPosition) {
-            C03PacketPlayer.C04PacketPlayerPosition pos = (C03PacketPlayer.C04PacketPlayerPosition) orig;
-            return new C03PacketPlayer.C06PacketPlayerPosLook(
-                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
-                    yaw, pitch, orig.isOnGround());
-        }
-        return new C03PacketPlayer.C05PacketPlayerLook(yaw, pitch, orig.isOnGround());
-    }
 
     private int hellishVoidCheckNotRefractoringThisTemp(Entity entity, int previous) {
         double dx = entity.posX - mc.thePlayer.posX;

@@ -4,6 +4,7 @@ import coffee.axle.suim.util.MyauLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.network.Packet;
+import net.minecraft.network.play.client.C03PacketPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,24 @@ public class PacketUtils {
         }
         skipSendEvent.add(packet);
         mc.thePlayer.sendQueue.addToSendQueue(packet);
+    }
+
+    // same C03 with the rotation swapped, keeping whatever position fields the
+    // original carried
+    public static Packet<?> withRotation(C03PacketPlayer orig, float yaw, float pitch) {
+        if (orig instanceof C03PacketPlayer.C06PacketPlayerPosLook) {
+            C03PacketPlayer.C06PacketPlayerPosLook pos = (C03PacketPlayer.C06PacketPlayerPosLook) orig;
+            return new C03PacketPlayer.C06PacketPlayerPosLook(
+                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
+                    yaw, pitch, orig.isOnGround());
+        }
+        if (orig instanceof C03PacketPlayer.C04PacketPlayerPosition) {
+            C03PacketPlayer.C04PacketPlayerPosition pos = (C03PacketPlayer.C04PacketPlayerPosition) orig;
+            return new C03PacketPlayer.C06PacketPlayerPosLook(
+                    pos.getPositionX(), pos.getPositionY(), pos.getPositionZ(),
+                    yaw, pitch, orig.isOnGround());
+        }
+        return new C03PacketPlayer.C05PacketPlayerLook(yaw, pitch, orig.isOnGround());
     }
 }
 
