@@ -9,6 +9,7 @@
     "MixinChestESP",
     "MixinEntityPlayerSP",
     "MixinEntityRenderer",
+    "MixinEnchantmentText",
     "MixinFriendCommand",
     "MixinGuiContainer",
     "MixinMinecraft",
