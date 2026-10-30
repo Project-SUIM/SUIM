@@ -2,6 +2,7 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
+import coffee.axle.suim.util.GameLocation;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
@@ -15,6 +16,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.scoreboard.Score;
 import net.minecraft.scoreboard.ScoreObjective;
 import net.minecraft.scoreboard.ScorePlayerTeam;
+import net.minecraft.scoreboard.Team;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
@@ -28,6 +30,7 @@ import org.lwjgl.opengl.GL11;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class MurderMystery extends Feature {
 
@@ -115,6 +118,7 @@ public class MurderMystery extends Feature {
     private void reset() {
         inGame = false;
         heroTicks = -1;
+        alertCooldown = 0;
         murderers.clear();
         detectives.clear();
     }
@@ -254,21 +258,21 @@ public class MurderMystery extends Feature {
                 if (esp) drawBox(p, partialTicks, 1.0f, 0.2f, 0.2f);
                 if (tracers) drawTracer(start, p, partialTicks, 1.0f, 0.2f, 0.2f);
             } else if (detectives.contains(p.getUniqueID())) {
-                // hero sees the bow, detective can't shoot them with it anyway
+                // a detective cannot be shot with their own bow, so the hero
+                // does not need them flagged
                 if (!hero && (esp || tracers)) {
                     if (esp) drawBox(p, partialTicks, 0.2f, 0.5f, 1.0f);
                     if (tracers) drawTracer(start, p, partialTicks, 0.2f, 0.5f, 1.0f);
                 }
             }
+        }
 
-            if (bowTracers && !hero) {
-                for (Object oi : mc.theWorld.loadedEntityList) {
-                    if (!(oi instanceof EntityItem)) continue;
-                    EntityItem drop = (EntityItem) oi;
-                    ItemStack stack = drop.getEntityItem();
-                    if (stack == null || stack.getItem() != Items.bow) continue;
-                    drawTracer(start, drop.posX, drop.posY + 0.5, drop.posZ, 1.0f, 0.85f, 0.0f);
-                }
+        if (bowTracers && !hero) {
+            for (Object oi : mc.theWorld.loadedEntityList) {
+                if (!(oi instanceof EntityItem)) continue;
+                EntityItem drop = (EntityItem) oi;
+                if (drop.getEntityItem() == null || drop.getEntityItem().getItem() != Items.bow) continue;
+                drawTracer(start, drop.posX, drop.posY + 0.5, drop.posZ, 1.0f, 0.85f, 0.0f);
             }
         }
 
@@ -279,9 +283,10 @@ public class MurderMystery extends Feature {
     }
 
     private void drawBox(EntityPlayer p, float partialTicks, float r, float g, float b) {
-        double x = Utils.lerp(p.posX, p.lastTickPosX, partialTicks);
-        double y = Utils.lerp(p.posY, p.lastTickPosY, partialTicks);
-        double z = Utils.lerp(p.posZ, p.lastTickPosZ, partialTicks);
+        Vec3 pos = Utils.interpolate(p, partialTicks);
+        double x = pos.xCoord;
+        double y = pos.yCoord;
+        double z = pos.zCoord;
         float h = p.height;
         float w = p.width / 2.0f + 0.1f;
         float a = 1.0f;
@@ -366,6 +371,10 @@ public class MurderMystery extends Feature {
     }
 
     private boolean isMurderGame() {
+        if (GameLocation.isKnown()) {
+            return GameLocation.inGame("MURDER_MYSTERY");
+        }
+        // sidebar fallback for when the location packet has not landed yet
         Scoreboard sb = mc.theWorld.getScoreboard();
         if (sb == null) return false;
         ScoreObjective obj = sb.getObjectiveInDisplaySlot(1);
@@ -381,31 +390,26 @@ public class MurderMystery extends Feature {
     }
 
     private String strippedName(EntityPlayer p) {
-        if (p.getTeam() instanceof net.minecraft.scoreboard.ScorePlayerTeam) {
-            net.minecraft.scoreboard.ScorePlayerTeam team =
-                    (net.minecraft.scoreboard.ScorePlayerTeam) p.getTeam();
-            return stripCodes(ScorePlayerTeam.formatPlayerName(team, p.getName()));
+        if (p.getTeam() instanceof ScorePlayerTeam) {
+            return stripCodes(ScorePlayerTeam.formatPlayerName((ScorePlayerTeam) p.getTeam(), p.getName()));
         }
         return stripCodes(p.getName());
     }
 
-    // oringo's reveal-names: force murderer/detective team tags visible so
-    // myau nametags and vanilla tab show a colored prefix
+    // reveal-names: force murderer/detective team tags visible so myau
+    // nametags and vanilla tab show a colored prefix
     void revealTeams() {
         boolean reveal = properties.getBoolean(revealNamesProperty, true);
         for (Object o : mc.theWorld.playerEntities) {
             if (!(o instanceof EntityPlayer)) continue;
             EntityPlayer p = (EntityPlayer) o;
-            if (!(p.getTeam() instanceof net.minecraft.scoreboard.ScorePlayerTeam)) continue;
-            net.minecraft.scoreboard.ScorePlayerTeam team =
-                    (net.minecraft.scoreboard.ScorePlayerTeam) p.getTeam();
-            if (murderers.contains(p.getUniqueID())) {
-                team.setNameTagVisibility(net.minecraft.scoreboard.Team.EnumVisible.ALWAYS);
-                if (reveal) team.setNamePrefix("\u00a74[M] \u00a7c");
-            } else if (detectives.contains(p.getUniqueID())) {
-                team.setNameTagVisibility(net.minecraft.scoreboard.Team.EnumVisible.ALWAYS);
-                if (reveal) team.setNamePrefix("\u00a79[B] \u00a7b");
-            }
+            if (!(p.getTeam() instanceof ScorePlayerTeam)) continue;
+            ScorePlayerTeam team = (ScorePlayerTeam) p.getTeam();
+            String prefix = murderers.contains(p.getUniqueID()) ? "\u00a74[M] \u00a7c"
+                    : detectives.contains(p.getUniqueID()) ? "\u00a79[B] \u00a7b" : null;
+            if (prefix == null) continue;
+            team.setNameTagVisibility(Team.EnumVisible.ALWAYS);
+            if (reveal) team.setNamePrefix(prefix);
         }
     }
 
@@ -414,8 +418,10 @@ public class MurderMystery extends Feature {
         manager.sendMessage("&7MurderMystery: &r" + text);
     }
 
+    private static final Pattern FORMAT_CODES = Pattern.compile("\u00a7.");
+
     private static String stripCodes(String s) {
-        return s == null ? "" : s.replaceAll("\u00a7.", "");
+        return s == null ? "" : FORMAT_CODES.matcher(s).replaceAll("");
     }
 
 }

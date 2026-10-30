@@ -1,5 +1,6 @@
 package coffee.axle.suim.feature.world;
 
+import coffee.axle.suim.events.HypixelLocationEvent;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.util.BedwarsDetector;
 import coffee.axle.suim.util.MyauLogger;
@@ -12,9 +13,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Adds kol's bedwars-only setting to the native myau bed modules. When the
+ * Adds a bedwars-only setting to the native myau bed modules. When the
  * setting is on and we are not in a bedwars game the module keeps its enabled
- * state but does nothing, matching kol's "!bedwars-only || inBedWarsGame".
+ * state but does nothing unless a bedwars game is running.
  * The actual gating happens in MixinModule (myau.V.isEnabled).
  */
 public class BedwarsOnly extends Feature {
@@ -76,6 +77,15 @@ public class BedwarsOnly extends Feature {
         return !inGameCached();
     }
 
+    // the location packet lands before the first tick of a game, so turn the
+    // modules on here rather than waiting for the sidebar to fill in
+    @SubscribeEvent
+    public void onLocation(HypixelLocationEvent e) {
+        if (!active) return;
+        if (!BedwarsDetector.inBedWarsGame()) return;
+        enableAll();
+    }
+
     // when a game starts, flip the gated modules on so you dont have to
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent e) {
@@ -84,6 +94,9 @@ public class BedwarsOnly extends Feature {
         if (inGame == wasInGame) return;
         wasInGame = inGame;
         if (!inGame) return;
+        enableAll();
+    }
+    private void enableAll() {
         for (Map.Entry<Object, Object> entry : gated.entrySet()) {
             if (!getBool(entry.getValue(), false)) continue;
             try {
