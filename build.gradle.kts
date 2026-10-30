@@ -29,7 +29,7 @@ loom {
         "client" {
             // If you don't want mixins, remove these lines
             property("mixin.debug", "true")
-            arg("--tweakClass", "org.spongepowered.asm.launch.MixinTweaker")
+            arg("--tweakClass", "$baseGroup.init.SuimTweaker")
         }
     }
     runConfigs {
@@ -71,6 +71,7 @@ repositories {
     maven("https://repo.spongepowered.org/maven/")
     // If you don't want to log in with your real minecraft account, remove this line
     maven("https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1")
+    maven("https://repo.hypixel.net/repository/Hypixel/")
 }
 
 val shadowImpl: Configuration by configurations.creating {
@@ -87,6 +88,11 @@ dependencies {
         isTransitive = false
     }
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT")
+
+    compileOnly("net.hypixel:mod-api-forge:1.0.1.2") {
+        exclude(group = "me.djtheredstoner", module = "DevAuth-forge-legacy")
+    }
+    shadowImpl("net.hypixel:mod-api-forge-tweaker:1.0.1.2")
 
     // If you don't want to log in with your real minecraft account, remove this line
     runtimeOnly("me.djtheredstoner:DevAuth-forge-legacy:1.2.2")
@@ -106,7 +112,7 @@ tasks.withType(org.gradle.jvm.tasks.Jar::class) {
         this["ForceLoadAsMod"] = "true"
 
         // If you don't want mixins, remove these lines
-        this["TweakClass"] = "org.spongepowered.asm.launch.MixinTweaker"
+        this["TweakClass"] = "$baseGroup.init.SuimTweaker"
         this["MixinConfigs"] = "mixins.$modid.json"
 	    if (transformerFile.exists())
 			this["FMLAT"] = "${modid}_at.cfg"
@@ -142,6 +148,7 @@ tasks.shadowJar {
     destinationDirectory.set(layout.buildDirectory.dir("intermediates"))
     archiveClassifier.set("non-obfuscated-with-deps")
     configurations = listOf(shadowImpl)
+    relocate("net.hypixel.modapi.tweaker", "$baseGroup.deps.modapitweaker")
     doLast {
         configurations.forEach {
             println("Copying dependencies into mod: ${it.files}")
