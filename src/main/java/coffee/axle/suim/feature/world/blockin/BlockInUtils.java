@@ -1,5 +1,6 @@
 package coffee.axle.suim.feature.world.blockin;
 
+import coffee.axle.suim.rotation.RotationMath;
 import coffee.axle.suim.util.PacketUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockContainer;
@@ -32,8 +33,7 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * Block/placement helpers ported 1:1 from OpenB4's BlockUtils,
- * RotationUtils and PlayerUtils - only what AutoBlockIn uses.
+ * Block, placement and rotation helpers for AutoBlockIn.
  */
 public final class BlockInUtils {
     private static final Minecraft mc = Minecraft.getMinecraft();
@@ -57,7 +57,7 @@ public final class BlockInUtils {
 
     private enum Axis { X, Y, Z }
 
-    // ---- BlockUtils ----
+    // ---- blocks ----
 
     public static double randomBetween(double min, double max) {
         return min + (max - min) * RANDOM.nextDouble();
@@ -213,9 +213,9 @@ public final class BlockInUtils {
         }
     }
 
-    // ---- RotationUtils ----
+    // ---- rotations ----
 
-    public static float clampPitch(float pitch) {
+    private static float clampPitch(float pitch) {
         return MathHelper.clamp_float(pitch, -90.0f, 90.0f);
     }
 
@@ -226,23 +226,18 @@ public final class BlockInUtils {
         double d = (double) (f * f * f) * 1.2;
         float yawStep = (float) ((double) Math.round((double) dYaw / d) * d);
         float pitchStep = (float) ((double) Math.round((double) dPitch / d) * d);
-        // openb4 adds a global jitter-yaw setting here, suim has none
         return new float[]{lastYaw + yawStep, clampPitch(lastPitch + pitchStep)};
     }
 
-    public static float[] fromDelta(float dx, float dy, float dz, float curYaw, float curPitch) {
-        double d4 = Math.sqrt((double) (dx * dx + dz * dz));
-        float f = (float) (Math.atan2(dz, dx) * (double) 57.29578f) - 90.0f;
-        float f2 = (float) (-(Math.atan2(dy, d4) * (double) 57.29578f));
-        f = curYaw + MathHelper.wrapAngleTo180_float(f - curYaw);
-        f2 = clampPitch(curPitch + MathHelper.wrapAngleTo180_float(f2 - curPitch));
-        return new float[]{f, f2};
-    }
-
+    // angles to a point, kept continuous with the current rotation so the
+    // caller can lerp toward it without crossing the 180 wrap
     public static float[] toPosition(double x, double y, double z, float curYaw, float curPitch) {
-        return fromDelta((float) (x - mc.thePlayer.posX),
-                (float) (y - (mc.thePlayer.posY + (double) mc.thePlayer.getEyeHeight())),
-                (float) (z - mc.thePlayer.posZ), curYaw, curPitch);
+        Vec3 eye = mc.thePlayer.getPositionEyes(1.0f);
+        float[] r = RotationMath.toRotationsFromDelta(
+                x - eye.xCoord, y - eye.yCoord, z - eye.zCoord);
+        return new float[]{
+                curYaw + MathHelper.wrapAngleTo180_float(r[0] - curYaw),
+                clampPitch(curPitch + MathHelper.wrapAngleTo180_float(r[1] - curPitch))};
     }
 
     public static Vec3 getVectorForRotation(float yaw, float pitch) {
@@ -340,7 +335,7 @@ public final class BlockInUtils {
         return new Vec3(x, y, z);
     }
 
-    // ---- PlayerUtils ----
+    // ---- player ----
 
     public static void swing(boolean packetOnly, boolean resetEquip) {
         if (packetOnly) {

@@ -4,6 +4,7 @@ import coffee.axle.suim.feature.Feature;
 
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -14,6 +15,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemSword;
 import net.minecraft.item.ItemTool;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -281,12 +283,10 @@ public class AimAssistShowTarget extends Feature {
 
     private void drawEntityOutlineBox(
             EntityPlayer entity, Color color, float partialTicks) {
-        double x = entity.lastTickPosX
-                + (entity.posX - entity.lastTickPosX) * partialTicks;
-        double y = entity.lastTickPosY
-                + (entity.posY - entity.lastTickPosY) * partialTicks;
-        double z = entity.lastTickPosZ
-                + (entity.posZ - entity.lastTickPosZ) * partialTicks;
+        Vec3 pos = Utils.interpolate(entity, partialTicks);
+        double x = pos.xCoord;
+        double y = pos.yCoord;
+        double z = pos.zCoord;
 
         AxisAlignedBB box = entity.getEntityBoundingBox()
                 .expand(0.1f, 0.1f, 0.1f)
@@ -330,12 +330,10 @@ public class AimAssistShowTarget extends Feature {
 
     private void drawEntityBox(
             EntityPlayer entity, Color color, float partialTicks) {
-        double x = entity.lastTickPosX
-                + (entity.posX - entity.lastTickPosX) * partialTicks;
-        double y = entity.lastTickPosY
-                + (entity.posY - entity.lastTickPosY) * partialTicks;
-        double z = entity.lastTickPosZ
-                + (entity.posZ - entity.lastTickPosZ) * partialTicks;
+        Vec3 pos = Utils.interpolate(entity, partialTicks);
+        double x = pos.xCoord;
+        double y = pos.yCoord;
+        double z = pos.zCoord;
 
         AxisAlignedBB box = entity.getEntityBoundingBox()
                 .expand(0.1f, 0.1f, 0.1f)

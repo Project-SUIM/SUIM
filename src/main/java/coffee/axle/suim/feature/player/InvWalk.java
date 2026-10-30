@@ -6,6 +6,7 @@ import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.util.MyauLogger;
 import coffee.axle.suim.util.ShopDetectionUtils;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.settings.KeyBinding;
@@ -138,7 +139,7 @@ public class InvWalk extends Feature {
 
     private boolean isKeyDown(KeyBinding kb) {
         int code = kb.getKeyCode();
-        return code > 0 && org.lwjgl.input.Keyboard.isKeyDown(code);
+        return code != 0 && Utils.isKeyDown(code);
     }
 
     private void reset() {

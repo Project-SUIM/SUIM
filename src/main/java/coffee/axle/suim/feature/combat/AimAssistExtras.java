@@ -3,11 +3,13 @@ package coffee.axle.suim.feature.combat;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.rotation.AimAssistRotation;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.eventbus.AimAssistHook;
 
 import java.lang.reflect.Method;
 
 /**
- * Injects aim-mode and hitbox-bounds properties into the evil AimAssist module.
+ * Injects aim modes tthat are in my personal opinion useful $$$$
+ * {@link AimAssistHook}
  */
 public class AimAssistExtras extends Feature {
 

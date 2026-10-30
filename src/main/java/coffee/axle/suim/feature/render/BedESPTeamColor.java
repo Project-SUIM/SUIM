@@ -2,17 +2,14 @@ package coffee.axle.suim.feature.render;
 
 import coffee.axle.suim.feature.Feature;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import coffee.axle.suim.hooks.MyauMappings;
 import coffee.axle.suim.util.BedLocationAPI;
+import coffee.axle.suim.util.GameLocation;
 import coffee.axle.suim.util.MyauLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.BlockPos;
-import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.awt.*;
 import java.lang.reflect.Field;
@@ -21,8 +18,6 @@ import java.lang.reflect.Field;
  * BedESP Color mode: team
  */
 public class BedESPTeamColor extends Feature {
-    private static final Minecraft mc = Minecraft.getMinecraft();
-
     private static BedESPTeamColor instance;
     private Object bedESPModule;
     private Object colorProperty;
@@ -33,7 +28,6 @@ public class BedESPTeamColor extends Feature {
     private String currentMode = null;
     private String[] currentBedOrder = null;
 
-    private boolean awaitingLocraw = false;
     @SuppressWarnings("unused")
     private String lastMap = null;
 
@@ -95,10 +89,6 @@ public class BedESPTeamColor extends Feature {
             if (modeVal == null || modeVal != 2)
                 return null;
 
-            if (currentBedOrder == null && currentMap == null && mc.thePlayer != null) {
-                // Placeholder for map detection
-            }
-
             if (currentBedOrder == null)
                 return null;
 
@@ -117,39 +107,18 @@ public class BedESPTeamColor extends Feature {
     }
 
     @SubscribeEvent
-    public void onClientChat(ClientChatReceivedEvent event) {
-        String message = event.message.getUnformattedText();
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!BedLocationAPI.isLoaded()) return;
 
-        if (message.startsWith("Sending you to mini") || message.startsWith("Sending you to mega")) {
-            new Thread(() -> {
-                try {
-                    Thread.sleep(400);
-                } catch (InterruptedException e) {
-                }
-                if (mc.thePlayer != null) {
-                    mc.thePlayer.sendChatMessage("/locraw");
-                    awaitingLocraw = true;
-                }
-            }).start();
-        }
+        String map = GameLocation.getMap();
+        String mode = GameLocation.getMode();
+        if (map == null || mode == null) return;
+        if (map.equals(currentMap) && mode.equals(currentMode)) return;
 
-        if (awaitingLocraw && message.startsWith("{") && message.contains("\"gametype\"")) {
-            try {
-                JsonObject json = new JsonParser().parse(message).getAsJsonObject();
-
-                if (json.has("map") && json.has("mode")) {
-                    this.currentMap = json.get("map").getAsString();
-                    this.currentMode = json.get("mode").getAsString();
-                    this.currentBedOrder = BedLocationAPI.getBedOrderForMap(currentMap, currentMode);
-                    event.setCanceled(true);
-                }
-
-                awaitingLocraw = false;
-
-            } catch (Exception e) {
-                // Silent fail
-            }
-        }
+        this.currentMap = map;
+        this.currentMode = mode;
+        this.currentBedOrder = BedLocationAPI.getBedOrderForMap(map, mode);
     }
 
     private Color teamColorNameToRGB(String colorName) {
