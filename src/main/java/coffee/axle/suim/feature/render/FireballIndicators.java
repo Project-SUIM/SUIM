@@ -3,6 +3,7 @@ package coffee.axle.suim.feature.render;
 import coffee.axle.suim.feature.Feature;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
+import coffee.axle.suim.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -24,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Fireball trajectory lines for the Myau Trajectories module.
- * Physics copied from EntityFireball.onUpdate (motion += acceleration, *= 0.95 / 0.8 water).
+ * FireballIndicators
+ * My friend suggested this one icl, its somewhat useful honestly
  */
-public class FireballTrajectories extends Feature {
+public class FireballIndicators extends Feature {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
     private static final int COLOR_NONE = 0;
@@ -37,10 +38,10 @@ public class FireballTrajectories extends Feature {
     private static final int MAX_FIREBALLS = 10;
     private static final int MAX_STEPS = 200;
     private static final long FADE_MS = 500;
-    // inline per spec
+
     private static final long STUCK_MS = 2000;
 
-    private Object trajectoriesModule;
+    private Object indicatorsModule;
     private Object lineColorProperty;
     private Object drawLineProperty;
     private Object lineWidthProperty;
@@ -64,14 +65,14 @@ public class FireballTrajectories extends Feature {
 
     @Override
     public String getName() {
-        return "Trajectories:Fireball";
+        return "Indicators:Fireball";
     }
 
     @Override
     public boolean initialize() {
         try {
-            trajectoriesModule = manager.findModule("Trajectories");
-            if (trajectoriesModule == null) {
+            indicatorsModule = manager.findModule("Indicators");
+            if (indicatorsModule == null) {
                 MyauLogger.log(getName(), "MODULE_NOT_FOUND");
                 return false;
             }
@@ -86,10 +87,10 @@ public class FireballTrajectories extends Feature {
             borderColorProperty = creator.createEnumProperty("border-color", COLOR_NONE, COLOR_MODES);
             renderDistanceProperty = creator.createIntegerProperty("render-distance", 64, 0, 256);
 
-            if (!creator.injectPropertyAfter(trajectoriesModule, lineColorProperty, "pearls")) {
-                creator.registerProperties(trajectoriesModule, lineColorProperty);
+            if (!creator.injectPropertyAfter(indicatorsModule, lineColorProperty, "arrows")) {
+                creator.registerProperties(indicatorsModule, lineColorProperty);
             }
-            creator.registerProperties(trajectoriesModule, drawLineProperty, lineWidthProperty,
+            creator.registerProperties(indicatorsModule, drawLineProperty, lineWidthProperty,
                     impactColorProperty, drawImpactProperty, impactOpacityProperty,
                     impactOutlineProperty, borderColorProperty, renderDistanceProperty);
 
@@ -105,7 +106,7 @@ public class FireballTrajectories extends Feature {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         try {
-            if (!manager.isModuleEnabled(trajectoriesModule)) {
+            if (!manager.isModuleEnabled(indicatorsModule)) {
                 trails.clear();
                 return;
             }
@@ -240,9 +241,10 @@ public class FireballTrajectories extends Feature {
     }
 
     private void simulate(EntityFireball fb, Trail trail, float partialTicks, double maxDistSq) {
-        double x = fb.lastTickPosX + (fb.posX - fb.lastTickPosX) * partialTicks;
-        double y = fb.lastTickPosY + (fb.posY - fb.lastTickPosY) * partialTicks;
-        double z = fb.lastTickPosZ + (fb.posZ - fb.lastTickPosZ) * partialTicks;
+        Vec3 origin = Utils.interpolate(fb, partialTicks);
+        double x = origin.xCoord;
+        double y = origin.yCoord;
+        double z = origin.zCoord;
         double mx = fb.motionX, my = fb.motionY, mz = fb.motionZ;
         double ax = fb.accelerationX, ay = fb.accelerationY, az = fb.accelerationZ;
 
