@@ -17,7 +17,6 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import static coffee.axle.suim.ProjectSUIM.mc;
 
@@ -58,7 +57,6 @@ public class ArmorInfo extends Feature {
             java.util.regex.Pattern.compile(
                     "(\\w+) purchased Reinforced Armor ([IVX]+)");
 
-    // damage-mode per-victim sampling
     private static class Sample {
         final float expectedUnenchanted;
         final long at;
@@ -263,7 +261,6 @@ public class ArmorInfo extends Feature {
         if (e.phase != net.minecraftforge.fml.common.gameevent.TickEvent.Phase.END) return;
         if (mc.thePlayer == null || mc.theWorld == null) return;
 
-        // new game/world: forget everything
         if (mc.theWorld != lastWorld) {
             lastWorld = mc.theWorld;
             teamProt.clear();
