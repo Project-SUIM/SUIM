@@ -19,8 +19,11 @@ import coffee.axle.suim.hooks.MyauModuleManager;
 import coffee.axle.suim.util.HudUtils;
 import coffee.axle.suim.util.MyauLogger;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+
+import java.nio.file.Files;
 
 public class FeatureManager {
     private static final List<Feature> features = new ArrayList<>();
@@ -55,8 +58,6 @@ public class FeatureManager {
         registerFeature(new StatusCommand());
         registerFeature(new ClientInfoCommand());
 
-        // stasis first: its receive hook has to see every s08/s12/s27 before any
-        // other HIGHEST listener can cancel one
         registerFeature(new Stasis());
 
         // Combat
@@ -87,9 +88,7 @@ public class FeatureManager {
 
         // World
         registerFeature(new AutoBlockIn());
-        // registerFeature(new AutoBedDefense()); (bans)
         registerFeature(new AutoClutch());
-        registerFeature(new ArmorInfo());
         registerFeature(new FastPlaceExtras());
         registerFeature(new BedwarsOnly());
 
@@ -111,6 +110,12 @@ public class FeatureManager {
         registerFeature(new Chester());
         registerFeature(new VelocityBuffer());
         registerFeature(new Shopper());
+
+        // surely no one but me has this and therefore it is evil dev testing dir
+        if(Files.isDirectory(Paths.get("F:\\PrismLauncher"))) {
+        registerFeature(new ArmorInfo());
+        registerFeature(new AutoBedDefense());
+        }
 
     }
 
