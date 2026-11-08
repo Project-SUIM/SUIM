@@ -21,33 +21,18 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import static coffee.axle.suim.ProjectSUIM.mc;
 
-/**
- * Injects KOL's AIR_MOTION mode into myau's NoSlow (myau.Jd) sword/food modes
- * plus the food-auto-jump setting.
- *
- * KOL 261015 (a.bu) verified semantics:
- * - s() = sword-mode==2 && holdingSword || food-mode==3 && holdingFood
- * - v() (motion percent) returns 20 for AIR_MOTION - the vanilla 0.2 value
- * - the native handlers gate the actual application; user ground truth:
- *   the bypass only does anything while SPRINTING + IN AIR. on the ground
- *   it's vanilla (0.2 slowdown, no sprint force).
- *
- * So AIR_MOTION here: while airborne + sprinting + using, pin the motion
- * setting to 100 (full motion, the "a lil bit faster") and force sprint.
- * On the ground: unpin, myau's base applies the user's motion (default 20
- * = vanilla). C08 hold: intercept the first use packet,
- * jump + strafe, replay it 2 ticks later so the server sees the jump land
- * before the use starts.
- */
 public class NoSlowExtras extends Feature {
 
     private static final int SWORD_AIR_MOTION = 2;
     private static final int FOOD_AIR_MOTION = 3;
+    private static final int BOW_AIR_MOTION = 2;
 
     @Setting(existing = true) private int swordMode;
     @Setting(existing = true) private int foodMode;
+    @Setting(existing = true) private int bowMode;
     @Setting(existing = true) private int swordMotion;
     @Setting(existing = true) private int foodMotion;
+    @Setting(existing = true) private int bowMotion;
     @Setting private boolean foodAutoJump = false;
 
     // use packet hold state
@@ -69,6 +54,7 @@ public class NoSlowExtras extends Feature {
     protected void init() throws Exception {
         extendEnum(findProperty("sword-mode"), new String[] { "NONE", "VANILLA", "AIR_MOTION" });
         extendEnum(findProperty("food-mode"), new String[] { "NONE", "VANILLA", "FLOAT", "AIR_MOTION" });
+        extendEnum(findProperty("bow-mode"), new String[] { "NONE", "VANILLA", "FLOAT", "AIR_MOTION" });
 
         MyauLogger.log(getName(), "air-motion ready");
     }
@@ -94,7 +80,8 @@ public class NoSlowExtras extends Feature {
         }
         ItemStack held = mc.thePlayer.getHeldItem();
         return swordMode == SWORD_AIR_MOTION && held != null && held.getItem() instanceof ItemSword
-                || foodMode == FOOD_AIR_MOTION && isConsumable(held);
+                || foodMode == FOOD_AIR_MOTION && isConsumable(held)
+                || bowMode == BOW_AIR_MOTION && held != null && held.getItem() instanceof net.minecraft.item.ItemBow;
     }
 
     private boolean isFoodAirMotion() {
@@ -136,19 +123,24 @@ public class NoSlowExtras extends Feature {
             holdTicks = 0;
         }
 
-        // the bypass only lives in the air: airborne + sprinting + using.
-        // on the ground myau's base does its normal thing (vanilla 0.2)
-        boolean air = isAirMotion() && using
-                && !mc.thePlayer.onGround && mc.thePlayer.isSprinting();
-        if (air) {
-            // KOL v() returns 20 for AIR_MOTION - the vanilla 0.2 value.
-            // the native handler then skips applying it while airborne,
-            // which through myau's Jd.b (applies D()/100 every tick) is
-            // equivalent to pinning 100 while in the air
-            pinMotion(100);
-        } else if (isAirMotion() && using) {
-            // on the ground: KOL v() = 20, the vanilla slowdown value
-            pinMotion(20);
+        // universal mode: works everywhere. ground = keep sprint (0.8->1.1 bps),
+        // air = bigger boost (pin 100 = full motion). the C08 hold + jump
+        // handles getting into the air.
+        if (isAirMotion() && using) {
+            if (!mc.thePlayer.onGround) {
+                // airborne: full motion (the big boost)
+                pinMotion(100);
+            } else {
+                // ground: standard 0.2 slowdown but sprint is kept
+                pinMotion(20);
+            }
+            // keep sprint alive while using (the 0.8->1.1 bps ground boost)
+            if (!mc.thePlayer.isSprinting()
+                    && mc.thePlayer.movementInput.moveForward > 0.0f
+                    && !mc.thePlayer.isSneaking()
+                    && mc.thePlayer.getFoodStats().getFoodLevel() > 6) {
+                mc.thePlayer.setSprinting(true);
+            }
         } else {
             unpinMotion();
         }
@@ -203,14 +195,12 @@ public class NoSlowExtras extends Feature {
         e.setCanceled(true);
     }
 
-    // kill the jump input after the forced jump,
-    // and keep it off while using on the ground so vanilla doesn't bounce
+    // ONLY suppress jump after our forced C08 jump. never blanket-suppress
+    // vanilla jump while using items - that breaks eating/drawing bows
     @SubscribeEvent
     public void onPrePlayerInput(PrePlayerInputEvent e) {
         if (jumped) {
             jumped = false;
-            e.setJump(false);
-        } else if (mc.thePlayer != null && mc.thePlayer.isUsingItem() && mc.thePlayer.onGround) {
             e.setJump(false);
         }
     }
@@ -241,6 +231,7 @@ public class NoSlowExtras extends Feature {
 
     private int pinnedSwordMotion = -1;
     private int pinnedFoodMotion = -1;
+    private int pinnedBowMotion = -1;
 
     private void pinMotion(int value) {
         if (pinnedSwordMotion == -1) {
@@ -251,6 +242,10 @@ public class NoSlowExtras extends Feature {
             pinnedFoodMotion = foodMotion;
         }
         set("foodMotion", value);
+        if (pinnedBowMotion == -1) {
+            pinnedBowMotion = bowMotion;
+        }
+        set("bowMotion", value);
     }
 
     private void unpinMotion() {
@@ -261,6 +256,10 @@ public class NoSlowExtras extends Feature {
         if (pinnedFoodMotion != -1) {
             set("foodMotion", pinnedFoodMotion);
             pinnedFoodMotion = -1;
+        }
+        if (pinnedBowMotion != -1) {
+            set("bowMotion", pinnedBowMotion);
+            pinnedBowMotion = -1;
         }
     }
 
