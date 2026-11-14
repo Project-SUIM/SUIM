@@ -13,6 +13,7 @@ import coffee.axle.suim.clickgui.settings.impl.EnumModuleSetting;
 import coffee.axle.suim.clickgui.settings.impl.NumberModuleSetting;
 import coffee.axle.suim.feature.GuiCategory;
 import coffee.axle.suim.util.Utils;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
@@ -21,7 +22,6 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.GL11;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import static coffee.axle.suim.ProjectSUIM.mc;
 
 /**
  * Panel ClickGUI in the Raven B3 style. Port of the B4 ClickGUI script
@@ -37,6 +36,8 @@ import static coffee.axle.suim.ProjectSUIM.mc;
  * Accent color inherits the HUD color like AimAssist's show-target.
  */
 public class B3ClickGuiScreen extends GuiScreen {
+
+    private final Minecraft mc = Minecraft.getMinecraft();
 
     private static final int PANEL_WIDTH = 132;
     private static final int HEADER_HEIGHT = 18;
@@ -111,8 +112,8 @@ public class B3ClickGuiScreen extends GuiScreen {
     }
 
     public B3ClickGuiScreen() {
-        instance = this;
         buildPanels();
+        instance = this;
     }
 
     private void buildPanels() {

@@ -15,6 +15,7 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import static coffee.axle.suim.ProjectSUIM.mc;
@@ -291,7 +292,7 @@ public class BowAimbot extends Feature {
         double speedLen = Math.sqrt(motionX * motionX + motionZ * motionZ + motionY * motionY);
         points[0] = Utils.boxCenter(box).addVector(0.0, 0.3, 0.0);
         if (speedLen > 5.0) {
-            // blinked or teleported, extrapolating that would aim nonsense
+            Arrays.fill(points, 1, points.length, points[0]);
             return points;
         }
         int steps = Math.min(ticks, TRAJECTORY_TICKS);
